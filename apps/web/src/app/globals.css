@@ -130,10 +130,14 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .mode-picker legend span { color: #778c7b; margin-left: 6px; }
 .mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; }
 .request-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
-.select-panel, .match-day-picker, .ticket-odds-picker { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #122019aa; min-width: 0; }
-.select-panel label, .match-day-picker label, .ticket-odds-picker label { display: flex; flex-direction: column; gap: 6px; min-width: min(140px, 100%); color: #c5d4c4; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
-.match-day-picker input[type=date], .ticket-odds-inputs input, .count-selects select { width: 100%; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid #ffffff22; background: #0e1713; color: #e3e9e0; font-size: 14px; color-scheme: dark; }
-.select-panel p, .match-day-picker p, .ticket-odds-picker p { flex: 1 1 160px; margin: 0; color: #8aa190; font-size: 12px; line-height: 1.45; }
+.select-panel, .match-day-picker, .ticket-odds-picker, .prompt-date-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #122019aa; min-width: 0; }
+.select-panel label, .match-day-picker label, .ticket-odds-picker label, .prompt-date-row label { display: flex; flex-direction: column; gap: 6px; min-width: min(140px, 100%); color: #c5d4c4; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.match-day-picker input[type=date], .prompt-date-row input[type=date], .ticket-odds-inputs input, .count-selects select { width: 100%; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid #ffffff22; background: #0e1713; color: #e3e9e0; font-size: 14px; color-scheme: dark; }
+.select-panel p, .match-day-picker p, .ticket-odds-picker p, .prompt-date-row p { flex: 1 1 160px; margin: 0; color: #8aa190; font-size: 12px; line-height: 1.45; }
+.prompt-date-row { margin-bottom: 12px; }
+.result-workspace { max-width: 1180px; }
+.result-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; }
+.collection-saved-pill { color: #a9c596; font-size: 12px; }
 .match-day-reset { border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
 .ticket-odds-heading { width: 100%; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .ticket-odds-heading strong { color: #d7e4d4; font-size: 13px; font-weight: 500; }
@@ -159,8 +163,19 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .chat-input-box { border-radius: 18px; padding: 16px 20px; }
 .chat-input-box textarea { min-height: 100px; font-size: 16px; }
 .chat-input-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.chat-input-footer .composer-options { flex: 1; }
+.chat-input-footer .composer-options { flex: 1; min-width: 0; }
 .chat-input-footer .primary-button { flex-shrink: 0; }
+.composer-date { display: grid; place-items: center; flex-shrink: 0; }
+.composer-date input[type=date] {
+  width: 148px; height: 42px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid #ffffff22; background: #0e1713; color: #e3e9e0;
+  font-size: 13px; color-scheme: dark; cursor: pointer;
+}
+.options-section { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.options-section:last-of-type { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.options-mode-grid { margin-top: 10px; }
+.composer-settings .ticket-odds-inputs { margin-top: 10px; }
+.composer-settings .odds-source-tabs, .composer-settings .odds-presets { margin-top: 10px; }
 .mode-note { color: #829584; font-size: 10px; margin: 10px 5px 0; line-height: 1.7; }
 .mode-note > span { float: right; color: #6c8071; }
 .edit-code-button { display: block; font-size: 10px; color: #a2b49e; margin: -7px 0 13px; }
@@ -271,39 +286,34 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .home-workspace .hero { margin-bottom:32px; }
 .home-workspace .hero h1 { font-size:clamp(52px,6.5vw,88px); margin:18px 0; }
 .home-workspace .hero > p:last-child { font-size:17px; }
-.home-workspace .mode-picker { margin-bottom:20px; }
-.home-workspace .mode-picker legend { font-size:14px; margin-bottom:14px; }
-.home-workspace .mode-grid { gap:12px; }
-.home-workspace .mode-option { min-height:86px; padding:19px 17px; gap:12px; }
-.home-workspace .mode-option strong { font-size:14px; }
-.home-workspace .mode-option small { font-size:12px; line-height:1.5; }
-.home-workspace .mode-icon { font-size:30px; }
 .home-workspace .chat-input-box { padding:24px 28px; border-radius:22px; }
 .home-workspace .chat-input-box textarea { min-height:110px; font-size:20px; line-height:1.7; }
-.home-workspace .chat-input-footer { gap:16px; }
+.home-workspace .chat-input-footer { gap:12px; align-items:center; }
 .home-workspace .chat-input-footer .composer-options { flex:1; }
 .home-workspace .composer-options summary { min-height:44px; padding:10px 14px; font-size:13px; }
+.home-workspace .composer-date input[type=date] { height:44px; width:156px; }
 .home-workspace .chat-input-footer .primary-button { width:auto; min-height:46px; padding:12px 20px; font-size:14px; gap:12px; border-radius:10px; }
 .home-workspace .chat-input-footer .primary-button > span { font-size:24px; }
 .home-workspace .composer-settings .options-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
 .home-workspace .composer-settings .settings-matches { grid-column:auto; }
 .home-workspace .composer-settings .options-grid label { font-size:12px; }
 .home-workspace .composer-settings .options-grid input,.home-workspace .composer-settings .options-grid select { height:44px; font-size:14px; }
+.home-workspace .options-mode-grid { gap:10px; }
+.home-workspace .options-mode-grid .mode-option { min-height:72px; padding:14px 12px; }
+.home-workspace .options-mode-grid .mode-option strong { font-size:13px; }
+.home-workspace .options-mode-grid .mode-option small { font-size:11px; }
 .home-workspace .mode-note,.home-workspace .home-footnote { font-size:12px; }
-@media(max-width:1000px) { .home-workspace .mode-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.home-workspace .composer-settings .options-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:1000px) { .home-workspace .options-mode-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.home-workspace .composer-settings .options-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:540px) {
   .home-workspace { padding:32px 18px; }
   .home-workspace .hero h1 { font-size:clamp(46px,12vw,62px); }
   .home-workspace .hero > p:last-child { font-size:15px; }
-  .home-workspace .mode-grid { gap:10px; }
-  .home-workspace .mode-option { padding:14px 10px; min-height:88px; gap:8px; }
-  .home-workspace .mode-option strong { font-size:12px; white-space:normal; }
-  .home-workspace .mode-option small { font-size:11px; }
-  .home-workspace .mode-icon { font-size:26px; }
   .home-workspace .chat-input-box { padding:18px; border-radius:18px; }
   .home-workspace .chat-input-box textarea { font-size:18px; min-height:100px; }
+  .home-workspace .composer-date input[type=date] { width:132px; height:42px; font-size:12px; }
   .home-workspace .chat-input-footer .primary-button { min-height:44px; padding:11px 14px; font-size:13px; }
   .home-workspace .composer-settings .options-grid > label:first-child,.home-workspace .composer-settings .settings-matches { grid-column:1 / -1; }
+  .home-workspace .options-mode-grid { grid-template-columns:1fr 1fr; }
 }
 .mode-option .mode-risk { display:block; margin-top:5px; font-size:11px; color:#cfddc7; line-height:1.4; }
 .home-workspace .mode-option .mode-risk { font-size:12px; }

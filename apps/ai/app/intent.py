@@ -23,7 +23,7 @@ def parse_rules(instruction: str) -> Config:
 
     data = {}
     count = re.search(r'(?:create|generate|give me)\s+(\d+)\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
-    data['numberOfSlips'] = min(100, max(1, int(count[1]) if count else 10))
+    data['numberOfSlips'] = min(10, max(1, int(count[1]) if count else 10))
     low, high = extract_odds_bounds(instruction)
     if low is not None:
         data['minimumOdds'] = low
@@ -155,7 +155,7 @@ def parse_intent(instruction: str, available_markets: list[dict] | None = None, 
     memory = learned_defaults or {}
     text = instruction.casefold()
     if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
-        config.numberOfSlips = memory['ticketCount']
+        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))
     games = extract_games_per_ticket(instruction)
     if games is not None:
         config.minimumSelections = config.maximumSelections = games

@@ -38,8 +38,13 @@ export class LearningController {
       await tx.trainingFeedback.create({ data: { id: data.id, groupId: group.id, profileId: data.profileId, rating: data.rating, note: data.note, correctedPrompt: data.correctedPrompt } });
       await tx.trainingEvent.create({ data: { eventKey: `feedback-${data.id}`, groupId: group.id, profileId: data.profileId, kind: 'USER_FEEDBACK', payload: { ...data, effectiveConfig: config ?? null } as Prisma.InputJsonValue } });
       if (data.rememberSettings && config) {
-        const preferences = { riskMode: config.riskMode ?? null, ticketCount: config.numberOfSlips ?? 10,
-          gamesPerTicket: config.minimumSelections === config.maximumSelections ? config.minimumSelections : null } as Prisma.InputJsonValue;
+        const slips = Number(config.numberOfSlips);
+        const games = Number(config.minimumSelections);
+        const preferences = {
+          riskMode: typeof config.riskMode === 'string' ? config.riskMode : null,
+          ticketCount: Math.min(10, Math.max(1, Number.isFinite(slips) ? slips : 10)),
+          gamesPerTicket: Number.isFinite(games) && config.minimumSelections === config.maximumSelections ? games : null,
+        } as Prisma.InputJsonValue;
         await tx.learningProfile.upsert({ where: { id: data.profileId }, create: { id: data.profileId, preferences },
           update: { preferences, revision: { increment: 1 } } });
       }

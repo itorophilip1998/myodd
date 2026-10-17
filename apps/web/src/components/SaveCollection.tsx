@@ -30,15 +30,13 @@ export function SaveCollection({ publicId, saved, userSaved, isOwner, isPublic }
       setSaving(false);
     }
   }
-  return <div className="collection-account-save">
-    {account.signedIn ? <>
-      {kept
-        ? <span>✓ Saved to your account{isOwner && !isPublic ? ' · private until you share' : ''}</span>
-        : <button disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : '＋ Save this collection'}</button>}
-      {!kept && <p className="collection-save-hint">Results stay on this page until you save them to your library.</p>}
-    </> : account.configured
-      ? <Link href="/sign-in">Sign in to save this collection to your library ↗</Link>
-      : <p className="collection-save-hint">Keep this page open or bookmark it. Saving to a library needs sign-in.</p>}
-    {error && <p role="alert">{error}</p>}
-  </div>;
+  if (!account.signedIn) {
+    return account.configured ? <Link className="outline-button" href="/sign-in">Sign in to save</Link> : null;
+  }
+  return <>
+    {kept
+      ? <span className="collection-saved-pill">Saved{isOwner && !isPublic ? ' · private' : ''}</span>
+      : <button className="outline-button" disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button>}
+    {error && <p role="alert" className="form-error">{error}</p>}
+  </>;
 }

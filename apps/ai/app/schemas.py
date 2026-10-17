@@ -27,7 +27,7 @@ class MarketRule(BaseModel):
 
 
 class Config(BaseModel):
-    numberOfSlips: int = Field(default=10, ge=1, le=100)
+    numberOfSlips: int = Field(default=10, ge=1, le=10)
     minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)
     maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)
     maximumSelections: int = Field(default=20, ge=1, le=30)
@@ -67,7 +67,7 @@ class Config(BaseModel):
 
 class LearnedDefaults(BaseModel):
     riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
-    ticketCount: int | None = Field(default=None, ge=1, le=100)
+    ticketCount: int | None = Field(default=None, ge=1, le=10)
     gamesPerTicket: int | None = Field(default=None, ge=1, le=30)
 
 

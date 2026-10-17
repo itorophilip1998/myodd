@@ -80,7 +80,7 @@ export class SlipsService implements OnModuleInit {
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
-    if (splitInto !== undefined && (!Number.isInteger(splitInto) || splitInto < 1 || splitInto > 100)) throw new BadRequestException('Choose between 1 and 100 split parts.');
+    if (splitInto !== undefined && (!Number.isInteger(splitInto) || splitInto < 1 || splitInto > 10)) throw new BadRequestException('Choose between 1 and 10 split parts.');
     req = { ...req, bookingCode: parsed.bookingCode ?? req.bookingCode, splitInto };
     const { group, job } = await this.prisma.$transaction(async tx => {
       const group = await tx.slipGroup.create({ data: {
@@ -152,6 +152,7 @@ export class SlipsService implements OnModuleInit {
       };
     }
     if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
+    if (!input.splitInto) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
     if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
     // UI ticket-odds range is authoritative and always clamped into the selected mode band.
     if (!input.splitInto && (input.minimumOdds != null || input.maximumOdds !== undefined)) {

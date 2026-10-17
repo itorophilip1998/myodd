@@ -35,7 +35,7 @@ def fixture(event='1', **changes):
 class IntentTests(unittest.TestCase):
     def test_prompt(self):
         result = parse_rules('Create 20 lower-risk slips between 3 and 5 odds. Prefer over 1.5 and double chance.')
-        self.assertEqual(result.numberOfSlips, 20)
+        self.assertEqual(result.numberOfSlips, 10)
         self.assertEqual((result.minimumOdds, result.maximumOdds), (3, 5))
         self.assertEqual((result.riskMode, result.riskPreference), ('INVESTOR', 'VERY_LOW'))
         self.assertIn(Market.OVER_1_5, result.markets)

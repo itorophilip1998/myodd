@@ -24,9 +24,9 @@ def original(*events):
 class FlexibleGenerationTests(unittest.TestCase):
     def test_lower_risk_can_rank_high_odds_without_a_probability_floor(self):
         pool = [selection(i, odds=3, probability=.3) for i in range(8)]
-        report = generate_report(pool, Config(numberOfSlips=50, minimumOdds=100, maximumOdds=500,
+        report = generate_report(pool, Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500,
                                              riskPreference='LOWER'), [])
-        self.assertEqual(len(report['candidates']), 50)
+        self.assertEqual(len(report['candidates']), 10)
         self.assertTrue(all(100 <= c['totalOdds'] <= 500 for c in report['candidates']))
 
     def test_adaptive_mode_adds_matches_and_explains_it(self):
@@ -82,7 +82,7 @@ class FlexibleGenerationTests(unittest.TestCase):
 
     def test_requests_expansion_when_original_pool_cannot_fill_request(self):
         report = generate_report([selection(1, 1.2), selection(2, 1.2)],
-                                 Config(numberOfSlips=50, minimumOdds=100, maximumOdds=500), original(1, 2))
+                                 Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500), original(1, 2))
         self.assertTrue(report['needsExpansion'])
 
     def test_preserve_picks_does_not_change_or_omit_original_outcomes(self):
