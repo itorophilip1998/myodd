@@ -76,10 +76,15 @@ services:
       CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}
       MODEL_PATH: /data/model.json
       INTENT_PROVIDER: ${INTENT_PROVIDER:-rules}
-      AI_PROVIDER: ${AI_PROVIDER:-}
-      AI_MODEL: ${AI_MODEL:-qwen/qwen3.8-27b}
-      AI_MODEL_TEMPERATURE: ${AI_MODEL_TEMPERATURE:-0.7}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_MODEL: ${AI_MODEL:-gpt-4o}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-gpt-4o-mini}
+      AI_MODEL_ROUTE: ${AI_MODEL_ROUTE:-auto}
+      AI_MODEL_TEMPERATURE: ${AI_MODEL_TEMPERATURE:-0.2}
       AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
     volumes:

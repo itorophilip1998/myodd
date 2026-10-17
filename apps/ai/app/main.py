@@ -12,7 +12,7 @@ from .intent import parse_intent
 from .predictions import load_model, score_fixtures
 from .schemas import GenerateInput, Instruction, ResolveInput, SplitInput, PredictionInput
 from .market_preferences import resolve_preferences
-from .groq import GroqIntentError
+from .llm import IntentProviderError, health_intent_fields
 from .risk_modes import ModeConstraintError
 from .discovery import DiscoveryRequest, discover
 
@@ -33,10 +33,7 @@ app = FastAPI(title='myOdd AI', version='1.0.0', lifespan=lifespan)
 
 @app.get('/health')
 def health():
-    provider = os.getenv('AI_PROVIDER') or os.getenv('INTENT_PROVIDER', 'rules')
-    return {'ok': True, 'service': 'myodd-ai', 'modelVersion': app.state.model.version,
-            'intentProvider': provider,
-            'intentModel': os.getenv('AI_MODEL', 'qwen/qwen3.8-27b') if provider == 'groq' else os.getenv('OLLAMA_MODEL', 'llama3.2') if provider == 'ollama' else None}
+    return {'ok': True, 'service': 'myodd-ai', 'modelVersion': app.state.model.version, **health_intent_fields()}
 
 
 @app.post('/tools/discover-codes')
@@ -48,7 +45,7 @@ def discover_codes(body: DiscoveryRequest):
 def intent(body: Instruction):
     try:
         return parse_intent(body.instruction, body.availableMarkets, body.learnedDefaults.model_dump()).model_dump(mode='json')
-    except GroqIntentError as exc:
+    except IntentProviderError as exc:
         raise HTTPException(502, str(exc)) from None
     except ModeConstraintError as exc:
         raise HTTPException(422, str(exc)) from None

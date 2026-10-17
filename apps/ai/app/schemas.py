@@ -28,8 +28,8 @@ class MarketRule(BaseModel):
 
 class Config(BaseModel):
     numberOfSlips: int = Field(default=10, ge=1, le=100)
-    minimumOdds: float = Field(default=2.5, ge=1, allow_inf_nan=False)
-    maximumOdds: float | None = Field(default=5, ge=1, allow_inf_nan=False)
+    minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)
+    maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)
     maximumSelections: int = Field(default=20, ge=1, le=30)
     minimumSelections: int = Field(default=2, ge=1, le=30)
     markets: list[Market] = Field(default_factory=list)

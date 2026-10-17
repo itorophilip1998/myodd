@@ -4,5 +4,6 @@ export * from './types';
 export * from './utils';
 export * from './chat-request';
 export * from './mode-policy';
+export * from './match-day';
 export * from './format-odds';
 export * from './prediction-markets';

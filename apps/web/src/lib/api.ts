@@ -28,7 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export interface CreatorSummary { publicId: string; username: string | null; name: string; following?: boolean; isSelf?: boolean; publicCollections?: number; followerCount?: number }
+export interface CreatorSummary { publicId: string; username: string | null; name: string }
 export interface CollectionSummary { publicId: string; title: string; createdAt: string; originalBookingCode?: string | null; slipCount: number; saved?: boolean; isPublic?: boolean; isOwner?: boolean; creator?: CreatorSummary | null }
 
 export interface GenerateResponse {
@@ -73,7 +73,10 @@ export interface GeneratedSlip {
   confidence: number;
   riskLevel: 'LOWER' | 'MODERATE' | 'HIGHER';
   selectionCount: number;
+  rankOrder?: number;
+  slipScore?: number;
   expiresAt: string | null;
+  displayStatus?: 'ACTIVE' | 'CHECKING' | 'PARTIAL' | 'UNAVAILABLE' | 'EXPIRED' | 'UNKNOWN';
   selections: SlipSelection[];
   groupPublicId?: string;
 }
@@ -93,6 +96,7 @@ export interface SlipGroup {
   id: string;
   publicId: string;
   saved?: boolean;
+  userSaved?: boolean;
   isOwner?: boolean;
   isPublic?: boolean;
   title: string;
@@ -100,7 +104,7 @@ export interface SlipGroup {
   createdAt: string;
   expiresAt: string | null;
   originalBookingCode: string | null;
-  availability?: { saved: number; checking: number; unavailable: number };
+  availability?: { saved: number; active?: number; checking: number; unavailable: number };
   generationReport: GenerationReport | null;
   job: Pick<JobProgress, 'createdAt' | 'updatedAt' | 'status' | 'stage' | 'stageDetail' | 'error' | 'progress' | 'total' | 'failedCount'> | null;
   slips: GeneratedSlip[];
@@ -118,13 +122,12 @@ export const api = {
     const profileId = signedIn ? crypto.randomUUID() : browserProfileId(); if (!profileId) return Promise.reject(new Error('Enable browser storage to remember your settings.'));
     return request<{ saved: boolean; remembered: boolean }>('/learning/feedback', { method: 'POST', body: JSON.stringify({ ...body, id: crypto.randomUUID(), profileId }) });
   },
-  publicGroups(page = 1, creator?: string) { return request<CollectionSummary[]>(`/groups/public?page=${page}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`); },
-  followingGroups(page = 1) { return request<CollectionSummary[]>(`/groups/following?page=${page}`); },
+  publicGroups(page = 1) { return request<CollectionSummary[]>(`/groups/public?page=${page}`); },
   editGroup(id: string, body: { title?: string; isPublic?: boolean }) { return request<{ publicId: string; title: string; isPublic: boolean }>(`/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }); },
   listGroups(page = 1) {
     return request<CollectionSummary[]>(`/groups?page=${page}`);
   },
-  generate(body: { bookingCode?: string; instruction: string; splitInto?: number; ticketCount?: number; gamesPerTicket?: number; profileId?: string; operation?: 'generate' | 'split' }) {
+  generate(body: { bookingCode?: string; instruction: string; splitInto?: number; ticketCount?: number; gamesPerTicket?: number; matchDate?: string; minimumOdds?: number; maximumOdds?: number | null; profileId?: string; operation?: 'generate' | 'split' }) {
     const path = body.bookingCode
       ? '/slips/generate'
       : '/slips/generate-from-prompt';
@@ -190,17 +193,8 @@ export const exploreApi = {
 
 
 export const accountApi = {
-  saveSelected: (publicIds: string[]) => request<{ saved: string[] }>('/account/collections/save', { method: 'POST', body: JSON.stringify({ publicIds }) }),
   remove: (publicIds: string[]) => request<{ removed: string[] }>('/account/collections/remove', { method: 'POST', body: JSON.stringify({ publicIds }) }),
   sync: () => request<{ id: string; synced: boolean }>('/account/sync', { method: 'POST' }),
   save: (id: string) => request<{ saved: boolean }>(`/account/saves/${encodeURIComponent(id)}`, { method: 'POST' }),
   legacy: (page = 1) => request<CollectionSummary[]>(`/account/legacy?page=${page}`),
-};
-
-export const creatorsApi = {
-  discover: (search = '', page = 1) => request<CreatorSummary[]>(`/creators?search=${encodeURIComponent(search)}&page=${page}`),
-  profile: (id: string) => request<CreatorSummary>(`/creators/${encodeURIComponent(id)}`),
-  monitoring: (page = 1) => request<CreatorSummary[]>(`/account/monitoring?page=${page}`),
-  follow: (id: string) => request<{ following: boolean }>(`/account/monitoring/${encodeURIComponent(id)}`, { method: 'POST' }),
-  unfollow: (id: string) => request<{ following: boolean }>(`/account/monitoring/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

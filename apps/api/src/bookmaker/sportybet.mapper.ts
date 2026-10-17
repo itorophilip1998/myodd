@@ -1,10 +1,11 @@
-import type {
-  LiveFixture,
-  BookmakerBooking,
-  BookmakerFixture,
-  BookmakerMarket,
-  BookmakerOutcome,
-  BookmakerSelection,
+import {
+  MIN_SELECTION_ODDS,
+  type LiveFixture,
+  type BookmakerBooking,
+  type BookmakerFixture,
+  type BookmakerMarket,
+  type BookmakerOutcome,
+  type BookmakerSelection,
 } from '@myodd/shared';
 
 interface RawOutcome {
@@ -113,7 +114,7 @@ export function mapMarket(m: RawMarket): BookmakerMarket {
     marketName: m.desc,
     specifier: m.specifier ?? '',
     status: String(m.status ?? ''),
-    outcomes: (m.outcomes ?? []).map(mapOutcome).filter(o => Number.isFinite(o.odds) && o.odds > 1),
+    outcomes: (m.outcomes ?? []).map(mapOutcome).filter(o => Number.isFinite(o.odds) && o.odds >= MIN_SELECTION_ODDS),
   };
 }
 
@@ -139,7 +140,7 @@ export function mapShareResponse(
     .map(selection => ({ ...selection, isActive: false }));
   const ticketOdds = Number(data.ticket?.displayTotalOdds);
   const totalOdds = Number.isFinite(ticketOdds) && ticketOdds > 1 ? ticketOdds
-    : selections.length && selections.every(s => Number.isFinite(s.odds) && s.odds! > 1)
+    : selections.length && selections.every(s => Number.isFinite(s.odds) && s.odds! >= MIN_SELECTION_ODDS)
       ? selections.reduce((acc, s) => acc * s.odds!, 1) : null;
   return {
     code,

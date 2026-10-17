@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { combinedOdds, withinModeOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { combinedOdds, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 
 @Injectable()
@@ -10,13 +10,14 @@ export class SlipValidatorService {
     const current = fixtures ?? await this.bookmaker.getFixtures({ eventIds: selections.map(selection => selection.eventId) });
     if (capture) await capture(current);
     const events = new Map(current.map(f => [f.eventId, f]));
-    const seen = new Set<string>();
+    const seenEvents = new Set<string>();
+    const seenMatches = new Set<string>();
     const validated: ScoredSelection[] = [];
     for (const leg of selections) {
       const event = events.get(leg.eventId);
       const market = event?.markets.find(m => m.marketId === leg.marketId && (m.specifier ?? '') === (leg.specifier ?? ''));
       const outcome = market?.outcomes.find(o => o.outcomeId === leg.outcomeId && o.isActive);
-      if (!event || !market || !outcome || seen.has(leg.eventId) || !Number.isFinite(outcome.odds) || outcome.odds <= 1) return null;
+      if (!event || !market || !outcome || seenEvents.has(leg.eventId) || !Number.isFinite(outcome.odds) || !withinModeSelectionOdds(outcome.odds, config.riskMode)) return null;
       if (!['', '0', 'active', 'open'].includes(market.status.toLowerCase())) return null;
       const kickoff = new Date(event.kickoffAt).getTime();
       if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return null;
@@ -31,12 +32,15 @@ export class SlipValidatorService {
         if (!matches) return null;
       }
       const teams = `${event.homeTeam} ${event.awayTeam}`.toLowerCase();
+      const matchKey = [event.homeTeam, event.awayTeam].map(name => name.toLowerCase().replace(/\s+/g, ' ').trim()).sort().join('|');
+      if (seenMatches.has(matchKey)) return null;
       if (config.excludedTeams.some(t => teams.includes(t.toLowerCase()))) return null;
       const league = event.league?.toLowerCase() ?? '';
       if (config.excludedLeagues?.some(l => league.includes(l.toLowerCase()))) return null;
       if (config.includedLeagues?.length && !config.includedLeagues.some(l => league.includes(l.toLowerCase()))) return null;
       if (config.minimumProbability != null && leg.probability < config.minimumProbability) return null;
-      seen.add(leg.eventId);
+      seenEvents.add(leg.eventId);
+      seenMatches.add(matchKey);
       validated.push({ ...leg, odds: outcome.odds, homeTeam: event.homeTeam, awayTeam: event.awayTeam, kickoffAt: event.kickoffAt });
     }
     if (config.includedTeams?.some(team => !validated.some(s => `${s.homeTeam} ${s.awayTeam}`.toLowerCase().includes(team.toLowerCase())))) return null;

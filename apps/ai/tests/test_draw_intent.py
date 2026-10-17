@@ -35,7 +35,7 @@ def pick(event, id, outcome='x', odds=1.3):
 
 
 def config(**kwargs):
-    return resolve_preferences(Config(numberOfSlips=2, minimumOdds=1, maximumOdds=10,
+    return resolve_preferences(Config(numberOfSlips=2, minimumOdds=1.1, maximumOdds=10,
         minimumSelections=1, maximumSelections=2, **kwargs), CATALOG, 'Create tickets with 1-10 draws')
 
 
@@ -51,12 +51,12 @@ class DrawIntentTests(unittest.TestCase):
             relatedMarketRules=[MarketRule(marketId='dc')])
         self.assertEqual(result.marketPolicy, 'only')
         self.assertEqual(result.markets, [])
-        self.assertEqual((result.minimumOdds, result.maximumOdds), (1, None))
+        self.assertEqual((result.minimumOdds, result.maximumOdds), (1.1, None))
         self.assertEqual([(r.marketId,r.outcomeIds) for r in result.marketRules], [('ten',['x'])])
         self.assertEqual([(r.marketId,r.outcomeIds) for r in result.relatedMarketRules], [('score',['00','11']),('goals',['u'])])
 
     def test_prefers_exact_draws_over_narrower_alternatives(self):
-        pool = [pick(i, 'ten') for i in range(3)] + [pick(i, 'goals', 'u', 1.01) for i in range(3)]
+        pool = [pick(i, 'ten') for i in range(3)] + [pick(i, 'goals', 'u', 1.12) for i in range(3)]
         report = generate_report(pool, config(), [])
         self.assertEqual(len(report['candidates']), 2)
         self.assertTrue(all(s['marketId'] == 'ten' for c in report['candidates'] for s in c['selections']))
@@ -85,8 +85,8 @@ class DrawIntentTests(unittest.TestCase):
         strict = resolve_preferences(Config(), CATALOG, 'Only use the requested markets: 1-10 draws. No alternatives.')
         self.assertEqual(strict.relatedMarketRules, [])
 
-    @patch.dict('os.environ', {'AI_PROVIDER':'groq','AI_API_KEY':'test-secret'})
-    @patch('app.groq.httpx.post')
+    @patch.dict('os.environ', {'AI_PROVIDER': 'openai', 'AI_API_KEY': 'test-secret', 'AI_MODEL': 'gpt-4o-mini'})
+    @patch('app.llm.httpx.post')
     def test_shorthand_interval_draws_survive_provider_rate_limits(self, post):
         _intent_cache.clear()
         post.return_value = httpx.Response(429)

@@ -26,7 +26,7 @@ Each application has its own container. PostgreSQL, Redis, and a one-shot migrat
 # Or: pnpm start
 ```
 
-The script creates `.env` from the example only when missing, preserves existing credentials, builds images, applies migrations, and waits for every long-running service to be healthy. Start Docker Desktop or Docker Engine first. To reuse existing images, run `./scripts/start.sh --no-build`. Inspect logs with `docker compose logs -f api ai web`. The Groq model runs on Groq's servers; the local AI service calls the configured model using your key.
+The script creates `.env` from the example only when missing, preserves existing credentials, builds images, applies migrations, and waits for every long-running service to be healthy. Start Docker Desktop or Docker Engine first. To reuse existing images, run `./scripts/start.sh --no-build`. Inspect logs with `docker compose logs -f api ai web`. Hosted instruction models (OpenAI GPT by default) run on the provider’s servers; the local AI service calls the configured provider/model using your key.
 
 Open http://localhost:3000. API health: http://localhost:3001/api/health. AI health and model version: http://localhost:8000/health. AI API schema: http://localhost:8000/docs.
 
@@ -80,7 +80,7 @@ The AI receives a catalog of real bookmaker markets and outcome IDs. This suppor
 
 The API searches two upcoming-fixture pages and enriches up to 24 matches with detailed markets when expanding. This is a bounded search, not the entire bookmaker inventory. Up to 100 slips and 30 selections per slip are supported, with no app-set upper odds cap; the bookmaker may enforce additional limits. A code is saved only after SportyBet confirms the exact selections and the accepted odds satisfy the effective request.
 
-Results retain partial successes and include a persisted generation report: requested/found counts, available matches, market substitutions, added fixtures and theoretical odds bounds. Bounds do not guarantee every intermediate odds total exists. Requested odds stay strict by default. Only an explicit nearest/closest-odds instruction or the form checkbox permits adjusted totals, which are reported. The result and shared group pages let users edit the request and generate again. Parsing is cached briefly, and fixture expansion resolves the existing intent locally rather than spending another model request. If Groq is temporarily rate-limited or unreachable, simple numeric requests without unsupported hard constraints can use the deterministic parser; results explicitly disclose that fallback. More complex requests fail clearly rather than guessing at their constraints.
+Results retain partial successes and include a persisted generation report: requested/found counts, available matches, market substitutions, added fixtures and theoretical odds bounds. Bounds do not guarantee every intermediate odds total exists. Requested odds stay strict by default. Only an explicit nearest/closest-odds instruction or the form checkbox permits adjusted totals, which are reported. The result and shared group pages let users edit the request and generate again. Parsing is cached briefly, and fixture expansion resolves the existing intent locally rather than spending another model request. If the configured hosted provider is temporarily rate-limited or unreachable, simple numeric requests without unsupported hard constraints can use the deterministic parser; results explicitly disclose that fallback. More complex requests fail clearly rather than guessing at their constraints.
 
 Examples:
 
@@ -95,14 +95,14 @@ Unsupported or unavailable requested features are reported. Generation remains f
 
 The chat-style composer sits above generated codes. There is no separate source-code field. Use **Edit this code** on a card, or type `@ABC123` / `code: ABC123` in your message to work from a different code. An explicit code in a newly edited message takes precedence over the existing collection context. Existing booking codes remain unchanged; edits generate a new saved collection. Ctrl/Cmd+Enter submits the message.
 
-Four selectable modes also work as typed keywords and enforce **hard per-ticket odds bands**:
+Four selectable modes also work as typed keywords and enforce **hard per-ticket odds bands** plus **safe per-game odds** inside each ticket. Investor Mode is recommended by default and ranks tickets by estimated joint probability within its band:
 
-| Mode | Odds band |
-|------|-----------|
-| Investor Mode | 1–10 inclusive |
-| Gambler Mode (also `Gamler Mode`) | Above 10 to 100 (10.01–100 at displayed precision) |
-| Japa Mode | Above 100 to 500 (100.01–500) |
-| Lagoslife / Lagos-Lifes Mode | Above 500, no app-set ceiling (`maximumOdds=null`) |
+| Mode | Ticket odds | Safe odds per game |
+|------|-------------|--------------------|
+| Investor Mode (recommended) | 2–5 inclusive | 1.10–1.50 |
+| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.80 |
+| Japa Mode | 20.01–100 | 1.10–2.00 |
+| Lagoslife / Lagos-Lifes Mode | 100.01+, no app ceiling | 1.10–2.00 |
 
 Explicit odds targets narrow the mode band. A typed contradictory target fails clearly; a final mode selected in the controls overrides an older conflicting range and reports that change. Nearest-odds adjustment cannot escape a named band. Inventory, selection-count, numerical and bookmaker constraints still apply. These names do not promise prediction accuracy or a guaranteed outcome.
 
@@ -132,7 +132,7 @@ Exports are local-only, contain complete journal payloads and are not available 
 
 Paste `GNPM8T` in the chat, select **Split a code**, choose the part count and a risk mode, then submit. Natural instructions also work: `Split GNPM8T into 3 parts using Investor Mode`. The API uses the same conservative code/count extractor as the UI, so a separate source field or `@` prefix is optional. SportyBet share links are accepted as code evidence too.
 
-Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and odds of at least 1.01 without an app upper cap (named modes enforce their own bands). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
+Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor ≤1.50, Gambler ≤1.80, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
 
 Unavailable or filtered picks are counted and explained. Impossible counts, contradictory constraints or unsupported same-match/bet-builder originals return a clear error without invented or repeated picks. Static partition planning returns the entire requested partition or none; live bookmaker changes during code creation can still produce partial successes, which the job reports. Each accepted part uses the existing confirmation, persistence, expiry and copy/share pipeline. Split strategy and counts are retained in the group's generation report.
 
@@ -142,7 +142,7 @@ Unavailable or filtered picks are counted and explained. Impossible counts, cont
 
 Minute ranges are not odds targets. A draw request without an explicit odds band or mode does not inherit an arbitrary 2.5–5 band. Explicit odds, modes and game counts remain binding. Matching accuracy is covered by regression tests; this does not establish improved win probability or a trained betting advantage.
 
-Odds display uses compact rounded labels: `184775.21` → `185k`, then `1m`, `10m`, `100m`, `1b`, `1t`, etc. Low odds retain up to two decimals. Full totals remain in PostgreSQL, calculations and accessible card tooltips. Compact labels do not alter mode-boundary checks or bookmaker validation.
+Odds display uses compact rounded labels: `184775.21` → `185ks`, then `1ms`, `10ms`, `100ms`, `1b`, `1t`, etc. Prompt parsing accepts the same compact forms (`20ks`, `1.5ms`, `2k`, `1m`). Low odds retain up to two decimals. Full totals remain in PostgreSQL, calculations and accessible card tooltips. Compact labels do not alter mode-boundary checks or bookmaker validation.
 
 ## Saved codes and automatic master selection
 
@@ -186,24 +186,47 @@ Only matches strictly before the cutoff enter training. Retraining writes a new 
 
 ## Instruction parsing
 
-For hosted language understanding, configure the Python AI container with:
+Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llm.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
+
+Supported providers:
+
+| `AI_PROVIDER` | Default model | Credentials | Notes |
+|---------------|---------------|-------------|-------|
+| `openai` | accurate `gpt-4o` + fast `gpt-4o-mini` | `AI_API_KEY` or `OPENAI_API_KEY` | Dual-model route (`AI_MODEL_ROUTE=auto`). If your OpenAI project has GPT-5.6 enabled, set `AI_MODEL=gpt-5.6-sol` and `AI_MODEL_FAST=gpt-5.6-terra`. |
+| `groq` | `qwen/qwen3.8-27b` | `AI_API_KEY` or `GROQ_API_KEY` | OpenAI-compatible Groq endpoint; keeps Groq-specific request fields. |
+| `ollama` | `OLLAMA_MODEL` (`llama3.2`) | none | Local server via `OLLAMA_URL`. |
+| `rules` | none | none | Deterministic parser; no remote call. |
+
+For hosted GPT language understanding (recommended):
 
 ```dotenv
-AI_PROVIDER=groq
-AI_MODEL=qwen/qwen3.8-27b
-AI_MODEL_TEMPERATURE=0.7
-AI_API_KEY=your_local_key
+AI_PROVIDER=openai
+AI_MODEL=gpt-4o
+AI_MODEL_FAST=gpt-4o-mini
+AI_MODEL_ROUTE=auto
+AI_MODEL_TEMPERATURE=0.2
+AI_API_KEY=your_openai_key
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-4o
+# Optional OpenAI-compatible proxy:
+# AI_BASE_URL=https://api.openai.com/v1
 ```
 
-Keep the real key in the ignored root `.env`, then run `docker compose up -d --build --no-deps ai`. Only the AI container receives the key; it is never included in frontend builds or source code. `AI_PROVIDER` takes precedence over the legacy `INTENT_PROVIDER` setting. The selected Qwen model supports [Groq strict structured outputs](https://console.groq.com/docs/structured-outputs); the service requires every configuration field, validates values again with Pydantic, and reports sanitized errors if the provider fails. It uses instruct mode for extraction at the configured temperature. `GET /health` reports the active instruction provider/model separately from the prediction model.
+`AI_MODEL_ROUTE` controls which model runs:
 
-`INTENT_PROVIDER=rules` runs immediately without downloads. It supports counts, odds ranges, markets, lower/moderate/higher risk, team exclusions, maximum/minimum selections, and explicit ISO kickoff deadlines. Examples:
+- `auto` (default): short mode/count prompts → `AI_MODEL_FAST`; draws, markets, leagues, long prompts → `AI_MODEL`
+- `fast`: always use the fast model
+- `accurate`: always use the higher-accuracy model
+
+Keep the real key in the ignored root `.env`, then run `docker compose up -d --build --no-deps ai`. Only the AI container receives the key; it is never included in frontend builds or source code. The orchestrator requires every configuration field, validates again with Pydantic, and reports sanitized provider errors. OpenAI uses [structured outputs](https://platform.openai.com/docs/guides/structured-outputs); Groq uses its compatible chat-completions schema path. Extraction runs at `AI_MODEL_TEMPERATURE`. `GET /health` reports `intentProvider`, `intentModel` (accurate), `intentModelFast`, `intentModelRoute`, and `intentBaseUrl` separately from the prediction model version.
+
+`AI_PROVIDER=rules` (or legacy `INTENT_PROVIDER=rules` when `AI_PROVIDER` is empty) runs immediately without downloads. It supports counts, odds ranges, markets, lower/moderate/higher risk, team exclusions, maximum/minimum selections, and explicit ISO kickoff deadlines. Examples:
 
 - `Create 10 lower-risk slips between 3 and 5 odds. Prefer over 1.5 and double chance.`
 - `Generate 5 slips around 8 odds. Maximum 4 selections. Remove Arsenal and Chelsea.`
 - `Create 3 slips between 2 and 4 odds. No straight wins. Before 2026-10-17T18:00:00Z`
 
-For broader language understanding, run a local Ollama server, pull your chosen model, and set `INTENT_PROVIDER=ollama`, `OLLAMA_URL`, and `OLLAMA_MODEL`. Recreate `ai` after changing settings. The Python service uses Ollama's [JSON-schema structured output](https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx) and validates the configuration. Ollama is an optional external dependency; the default stack needs no LLM. Language models only interpret requests; prediction models rank real bookmaker selections.
+For local Ollama, set `AI_PROVIDER=ollama` (or legacy `INTENT_PROVIDER=ollama`), `OLLAMA_URL`, and `OLLAMA_MODEL`, then recreate `ai`. The Python service uses Ollama's [JSON-schema structured output](https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx) and validates the configuration. Ollama is optional; language models only interpret requests, and prediction models rank real bookmaker selections.
 
 ## Host development
 
@@ -261,14 +284,8 @@ Header navigation now provides **Create**, **Live Games**, **Predictions** and *
 
 `/predictions` uses a separate Python scoring-only endpoint on up to two pages of upcoming football fixtures (72-hour search window). In-play/ended fixtures are excluded by kickoff before scoring; the UI removes kicked-off entries as time passes. Users can search, filter leagues and choose None (all markets), over goals, under goals, draws, corners, BTTS, double chance, handicaps, cards or correct score. Detailed alternate markets are fetched for up to 24 upcoming matches; the remaining loaded matches retain listing markets. Missing specialist markets produce an explicit empty state rather than unrelated picks. The browser receives only the selected market and the first 50 ranked outcomes per match. Compare outcomes fetches additional selections on demand (up to 5,000 per match), including alternate lines, and users can sort matches by estimate. The complete scoring snapshot remains in the local training journal. Predictions show actual per-selection model versions and distinguish price-based estimates from trained Poisson estimates. Available prices and normalized probabilities are estimates, not verified outcomes. Full fixture/scoring snapshots are retained in the training journal, with a 90-second cache to avoid recalculating identical browsing requests. No live forecasts or live booking codes are generated by this feature.
 
-Profile/sign-in functionality remains deferred at the user's request.
-
 ### Saved code library
 
-Saved codes has Public codes and My collections tabs. Public collections containing saved tickets are browsable without signing in; account-only collections stay private. Signed-in users can select up to 100 public collections created by others and add them to My collections in one action; own/already-saved collections are excluded from selection. Users can switch between Grid, Compact (six desktop columns) and List layouts, with the preference saved on this device, and search loaded collection titles/codes. My collections supports individual selection, selection of up to 100 loaded collections, single/bulk delete and Undo. Removing another creator’s saved collection only changes your own saved list. Deleting your own collection retracts its public visibility and hides it from all feeds and direct collection/code routes, while preserving records, jobs and training history. Undo restores an owned collection privately; publishing it again is an explicit owner action.
+Saved codes has Public codes and My collections tabs. Public collections containing saved tickets are browsable without signing in; account-only collections stay private. Users can switch between Grid, Compact (six desktop columns) and List layouts, with the preference saved on this device, and search loaded collection titles/codes. My collections lists only collections you own and supports selection of up to 100 loaded collections, single/bulk delete and Undo. Deleting a collection retracts its public visibility and hides it from public browse and direct collection/code routes, while preserving records, jobs and training history. Undo restores an owned collection privately; publishing it again is an explicit owner action.
 
-### Creator monitoring and collection controls
-
-Following provides Discover creators, Monitoring list and Latest picks views. A creator profile lists all their public collections, and the feed refreshes every 30 seconds. Follow/unfollow and saved-copy relationships are account scoped. Public names use the authenticated account’s Clerk username (synced server-side at most hourly) or a generated creator label; public APIs never expose Clerk IDs, emails, phone numbers, private collections or the follower list. Older ownerless guest codes remain community collections and cannot be attributed to a creator. Copying a collection bookmarks its public picks; it never places bets or reveals stakes, wager history or win/loss performance. If its owner makes it private or deletes it, it disappears from other users’ feeds and saved lists.
-
-The ⋯ menu on owned collections provides Edit tickets (opens the existing prompt editor), Rename, Make private/public and Delete. Editing picks generates a new collection rather than mutating an upstream SportyBet booking. Private collections, their job progress and generated-code app routes remain owner-only. Public creator menus provide Copy to My collections, Monitor creator and a link to all of that creator’s public codes.
+Public creator names use the authenticated account’s Clerk username (synced server-side at most hourly) or a generated creator label; public APIs never expose Clerk IDs, emails, phone numbers or private collections. Older ownerless guest codes remain community collections. The ⋯ menu on owned collections provides Edit tickets (opens the existing prompt editor), Rename, Make private/public and Delete. Editing picks generates a new collection rather than mutating an upstream SportyBet booking. Private collections, their job progress and generated-code app routes remain owner-only.

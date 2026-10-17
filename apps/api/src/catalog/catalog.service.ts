@@ -105,23 +105,51 @@ export class CatalogService implements OnModuleInit {
   }
 
   async displayStatus(codes: string[]) {
-    const rows = await this.prisma.bookingCode.findMany({ where: { code: { in: [...new Set(codes.map(code => code.toUpperCase()))] } } });
-    const valid = new Set<string>(); let checking = 0, unavailable = 0;
-    for (const row of rows) {
+    const unique = [...new Set(codes.map(code => code.toUpperCase()))];
+    const rows = await this.prisma.bookingCode.findMany({ where: { code: { in: unique } } });
+    const byCode = new Map(rows.map(row => [row.code, row]));
+    const valid = new Set<string>();
+    const statuses = new Map<string, 'ACTIVE' | 'CHECKING' | 'PARTIAL' | 'UNAVAILABLE' | 'EXPIRED' | 'UNKNOWN'>();
+    let checking = 0, unavailable = 0;
+    for (const code of unique) {
+      const row = byCode.get(code);
+      if (!row) {
+        statuses.set(code, 'UNKNOWN');
+        unavailable++;
+        continue;
+      }
+      if (row.expiresAt <= new Date()) {
+        statuses.set(code, 'EXPIRED');
+        unavailable++;
+        continue;
+      }
       const stale = !row.checkedAt || row.checkedAt.getTime() < Date.now() - 60000;
-      if (row.expiresAt <= new Date()) { unavailable++; continue; }
+      const snapshot = row.snapshot as unknown as BookmakerBooking | null;
+      const activeNow = snapshot ? assessBooking(snapshot, row.firstSeenAt) : null;
+      const lastKnownActive = row.status === BookingCodeStatus.ACTIVE;
       if (stale) {
         checking++;
+        statuses.set(code, 'CHECKING');
+        // Keep last-known-active codes visible while a background refresh runs.
+        if (lastKnownActive) valid.add(row.code);
         await this.queue.add('verify-display', { codes: [row.code] }, { jobId: `display-${row.code}-${Math.floor(Date.now() / 60000)}`,
           removeOnComplete: true, removeOnFail: 50, attempts: 2, backoff: { type: 'exponential', delay: 2000 } });
         continue;
       }
-      const snapshot = row.snapshot as unknown as BookmakerBooking | null;
-      const activeNow = snapshot ? assessBooking(snapshot, row.firstSeenAt) : null;
-      if (row.status === BookingCodeStatus.ACTIVE && activeNow?.status === 'ACTIVE') valid.add(row.code);
-      else unavailable++;
+      if (row.status === BookingCodeStatus.ACTIVE && activeNow?.status === 'ACTIVE') {
+        valid.add(row.code);
+        statuses.set(code, 'ACTIVE');
+      } else if (row.status === BookingCodeStatus.PARTIAL) {
+        statuses.set(code, 'PARTIAL');
+      } else if (row.status === BookingCodeStatus.PENDING) {
+        statuses.set(code, 'CHECKING');
+        checking++;
+      } else {
+        statuses.set(code, 'UNAVAILABLE');
+        unavailable++;
+      }
     }
-    return { valid, checking, unavailable: unavailable + codes.filter(code => !rows.some(row => row.code === code.toUpperCase())).length };
+    return { valid, checking, unavailable, statuses };
   }
 
   async verifyCodes(codes: string[]) {

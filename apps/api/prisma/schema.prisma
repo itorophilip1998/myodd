@@ -25,7 +25,8 @@ model SlipGroup {
   id                   String          @id @default(cuid())
   ownerId              String?         @map("owner_id")
   owner                AppUser?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  isPublic             Boolean         @default(true) @map("is_public")
+  isPublic             Boolean         @default(false) @map("is_public")
+  userSaved            Boolean         @default(false) @map("user_saved")
   isLegacy             Boolean         @default(false) @map("is_legacy")
   savedBy              SavedCollection[]
   publicId             String          @unique @map("public_id")
@@ -40,6 +41,7 @@ model SlipGroup {
   jobs                 GenerationJob[]
 
   @@index([ownerId, createdAt])
+  @@index([userSaved, isPublic, createdAt])
   @@map("slip_groups")
 }
 
@@ -54,11 +56,14 @@ model GeneratedSlip {
   riskLevel      VarianceLevel    @map("risk_level")
   selectionCount Int              @map("selection_count")
   fingerprint    String
+  rankOrder      Int              @default(0) @map("rank_order")
+  slipScore      Float            @default(0) @map("slip_score")
   expiresAt      DateTime?        @map("expires_at")
   createdAt      DateTime         @default(now()) @map("created_at")
   selections     SlipSelection[]
 
   @@index([groupId])
+  @@index([groupId, rankOrder])
   @@index([bookingCode])
   @@index([fingerprint])
   @@map("generated_slips")

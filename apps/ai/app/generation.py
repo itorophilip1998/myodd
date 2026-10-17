@@ -4,11 +4,25 @@ import math
 import random
 from datetime import datetime, timezone
 
+from .odds_policy import within_mode_selection_odds
 from .schemas import Config, ScoredSelection, Selection
 
 
 def fingerprint(selections):
     return hashlib.sha256('\n'.join(sorted(f'{s.eventId}|{s.marketId}|{s.outcomeId}|{s.specifier}' for s in selections)).encode()).hexdigest()
+
+
+def match_key(selection):
+    """Normalize a fixture so the same game cannot appear twice under different event IDs."""
+    home = ' '.join((selection.homeTeam or '').casefold().split())
+    away = ' '.join((selection.awayTeam or '').casefold().split())
+    return '|'.join(sorted((home, away)))
+
+
+def unique_ticket(selections):
+    event_ids = [s.eventId for s in selections]
+    matches = [match_key(s) for s in selections]
+    return len(event_ids) == len(set(event_ids)) == len(selections) and len(matches) == len(set(matches))
 
 
 def matches_preference(selection, config):
@@ -32,6 +46,7 @@ def eligible(selection, config):
     league = selection.league.casefold()
     now = datetime.now(timezone.utc)
     return (selection.isActive and selection.kickoffAt > now
+            and within_mode_selection_odds(selection.odds, config.riskMode)
             and not any(t.casefold() in teams for t in config.excludedTeams)
             and not any(t.casefold() in league for t in config.excludedLeagues)
             and (not config.includedLeagues or any(t.casefold() in league for t in config.includedLeagues))
@@ -42,8 +57,16 @@ def eligible(selection, config):
 
 
 def event_choices(pool, config):
-    events = {}
+    # Collapse duplicate listings of the same match (different event IDs) to one game.
+    by_match: dict[str, list] = {}
     for selection in pool:
+        by_match.setdefault(match_key(selection), []).append(selection)
+    deduped = []
+    for group in by_match.values():
+        best_event = max(group, key=lambda s: (s.probability, -s.odds)).eventId
+        deduped.extend(s for s in group if s.eventId == best_event)
+    events = {}
+    for selection in deduped:
         events.setdefault(selection.eventId, []).append(selection)
     # Preserve market diversity, rather than letting near-identical favourites fill every slot.
     for event, choices in events.items():
@@ -88,8 +111,9 @@ def search(pool, config, original, allow_nearest=False):
     lower_bound = math.prod(min_event_odds[:config.minimumSelections])
     ceiling = config.maximumOdds if config.maximumOdds is not None else max(config.minimumOdds, min(upper_bound, 1e300))
     target_log = (math.log(config.minimumOdds) + math.log(ceiling)) / 2
+    # Investor / VERY_LOW maximizes estimated joint probability within the hard odds band.
     exponent, appetite, penalty = {
-        'VERY_LOW': (3, 0, .6), 'LOWER': (2, 0, .15), 'MODERATE': (1, .4, 0),
+        'VERY_LOW': (4.5, 0, .85), 'LOWER': (2, 0, .15), 'MODERATE': (1, .4, 0),
         'HIGHER': (.7, 1.15, -.05), 'VERY_HIGH': (.35, 1.6, -.15),
     }[config.riskPreference]
     weights = {event: [max(.001, s.probability) ** exponent
@@ -97,7 +121,7 @@ def search(pool, config, original, allow_nearest=False):
                for event, options in events.items()}
     if upper_bound < config.minimumOdds and not allow_nearest:
         return [], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
-    attempts = min(20000, max(1500, config.numberOfSlips * 160))
+    attempts = min(12000, max(900, config.numberOfSlips * 100))
     for attempt in range(attempts):
         # Rotate lengths; later passes target the requested total rather than relying on luck.
         legs = minimum + attempt % (maximum - minimum + 1)
@@ -125,7 +149,7 @@ def search(pool, config, original, allow_nearest=False):
                 selection = rng.choice(choices)
             picked.append(selection)
             log_odds += math.log(selection.odds)
-        if len(picked) != legs:
+        if len(picked) != legs or not unique_ticket(picked):
             continue
         if not all(any(team.casefold() in f'{s.homeTeam} {s.awayTeam}'.casefold() for s in picked) for team in config.includedTeams):
             continue

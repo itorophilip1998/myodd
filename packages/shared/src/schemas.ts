@@ -3,8 +3,8 @@ import { RiskPreference, SupportedMarket } from './enums';
 
 export const generationConfigSchema = z.object({
   numberOfSlips: z.number().int().min(1).max(100).default(10),
-  minimumOdds: z.number().finite().min(1).default(2.5),
-  maximumOdds: z.number().finite().min(1).nullable().default(5),
+  minimumOdds: z.number().finite().min(1.1).default(2.5),
+  maximumOdds: z.number().finite().min(1.1).nullable().default(5),
   maximumSelections: z.number().int().min(1).max(30).default(20),
   minimumSelections: z.number().int().min(1).max(30).default(2),
   markets: z.array(z.nativeEnum(SupportedMarket)).default([]),
@@ -41,6 +41,15 @@ export const analyzeSlipSchema = z.object({
   bookingCode: z.string().min(3).max(32).trim(),
 });
 
+const matchDateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+
+const ticketOddsFields = {
+  /** Hard ticket-odds floor from the UI range control. */
+  minimumOdds: z.number().finite().min(1.1).optional(),
+  /** Hard ticket-odds ceiling from the UI range control. Null = no ceiling (Lagoslife). */
+  maximumOdds: z.number().finite().min(1.1).nullable().optional(),
+};
+
 export const generateFromCodeSchema = z.object({
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
@@ -48,6 +57,9 @@ export const generateFromCodeSchema = z.object({
   gamesPerTicket: z.number().int().min(1).max(30).optional(),
   splitInto: z.number().int().min(1).max(100).optional(),
   bookingCode: z.string().min(3).max(32).trim().optional(),
+  /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
+  matchDate: matchDateField,
+  ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
 });
 
@@ -57,6 +69,9 @@ export const generateFromPromptSchema = z.object({
   ticketCount: z.number().int().min(1).max(100).optional(),
   gamesPerTicket: z.number().int().min(1).max(30).optional(),
   splitInto: z.number().int().min(1).max(100).optional(),
+  /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
+  matchDate: matchDateField,
+  ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
 });
 

@@ -8,7 +8,6 @@ export function AppHeader() {
   const links = [{ href: '/', label: 'Create', active: path === '/' || path.startsWith('/result') },
     { href: '/live', label: 'Live Games', active: path.startsWith('/live') },
     { href: '/predictions', label: 'Predictions', active: path.startsWith('/predictions') },
-    { href: '/following', label: 'Following', active: path.startsWith('/following') || path.startsWith('/creators/') },
     { href: '/history', label: 'Saved codes', active: path.startsWith('/history') || path.startsWith('/g/') }];
   return <header className="app-header"><Link href="/" className="brand"><BrandMark />myOdd<span className="brand-dot">.</span></Link><nav aria-label="Main navigation">{links.map(link => <Link key={link.href} href={link.href} aria-current={link.active ? 'page' : undefined}>{link.href === '/live' && <i className="nav-live-dot" aria-hidden />}{link.label}</Link>)}</nav><AccountControls /></header>;
 }

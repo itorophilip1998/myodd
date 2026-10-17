@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger, forwardRef } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { withinModeOdds, type BookmakerBooking, type ScoredSelection } from '@myodd/shared';
+import { withinModeOdds, withinModeSelectionOdds, type BookmakerBooking, type ScoredSelection } from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { SlipsService, type PrepareJob, type BookingJob } from '../slips/slips.service';
 import { SlipValidatorService } from '../slips/slip-validator.service';
@@ -57,7 +57,7 @@ export class CreateBookingProcessor extends WorkerHost {
       }
       const confirmed = selections.map(s => {
         const accepted = booking.selections.find(b => b.eventId === s.eventId && b.marketId === s.marketId && b.outcomeId === s.outcomeId && b.specifier === s.specifier)!;
-        if (!Number.isFinite(accepted.odds) || accepted.odds! <= 1) throw new Error('SportyBet did not confirm valid odds');
+        if (!Number.isFinite(accepted.odds) || !withinModeSelectionOdds(accepted.odds!, data.config.riskMode)) throw new Error('SportyBet did not confirm valid odds');
         return { ...s, odds: accepted.odds };
       });
       const totalOdds = Math.round(confirmed.reduce((n, s) => n * s.odds!, 1) * 100) / 100;

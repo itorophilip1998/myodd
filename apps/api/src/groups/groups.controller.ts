@@ -22,20 +22,13 @@ export class GroupsController {
   }
 
   @Get('groups/public')
-  async publicGroups(@Req() req: AuthRequest, @Query('page') input = '1', @Query('creator') creator?: string) {
+  async publicGroups(@Req() req: AuthRequest, @Query('page') input = '1') {
     const page = Number(input);
     if (!Number.isInteger(page) || page < 1 || page > 100000) throw new BadRequestException('Invalid history page');
     await this.rateLimit.consume('groups', 60);
-    return this.groups.listPublic(page, req.account?.id, creator);
+    return this.groups.listPublic(page, req.account?.id);
   }
 
-  @Get('groups/following') @UseGuards(SignedInGuard)
-  async followingGroups(@Req() req: AuthRequest, @Query('page') input = '1') {
-    const page = Number(input);
-    if (!Number.isInteger(page) || page < 1 || page > 100000) throw new BadRequestException('Invalid page');
-    await this.rateLimit.consume('groups', 60);
-    return this.groups.listPublic(page, req.account!.id, undefined, true);
-  }
   @Patch('groups/:groupId') @UseGuards(SignedInGuard)
   async edit(@Param('groupId') id: string, @Req() req: AuthRequest, @Body() body: unknown) {
     const parsed = z.object({ title: z.string().trim().min(1).max(120).optional(), isPublic: z.boolean().optional() }).strict().refine(data => data.title !== undefined || data.isPublic !== undefined).safeParse(body);

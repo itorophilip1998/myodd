@@ -36,7 +36,7 @@ fi
 
 if [[ ! -f .env ]]; then
   (umask 077; cp .env.example .env)
-  echo 'Created .env from .env.example. Add your AI credentials there when using Groq.'
+  echo 'Created .env from .env.example. Add your OpenAI (or other provider) AI credentials there when using a hosted instruction model.'
 fi
 
 docker compose config --quiet

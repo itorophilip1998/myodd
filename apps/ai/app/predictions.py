@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .odds_policy import MIN_SELECTION_ODDS
 from .schemas import Fixture, Market, ScoredSelection
 
 
@@ -130,7 +131,7 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                 continue
             for outcome in market.outcomes:
                 supported = supported_market(market.marketId, market.specifier, outcome.outcomeId, outcome.outcomeName)
-                if not supported or not outcome.isActive:
+                if not supported or not outcome.isActive or outcome.odds < MIN_SELECTION_ODDS:
                     continue
                 probability = max(.001, min(.999, model.probability(fixture, market, outcome, supported)))
                 # Explicitly identify fallback predictions for uncovered teams/leagues.

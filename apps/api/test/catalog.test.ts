@@ -42,7 +42,7 @@ it('keeps the original expiry when SportyBet returns a previously saved code', a
   expect(create.mock.calls[0][0].data.expiresAt).toEqual(codeExpiry(firstSeenAt));
 });
 
-it('hides stale, partial and expired codes until a fully active recent check', async () => {
+it('keeps last-known-active codes visible while rechecking stale snapshots', async () => {
   const firstSeenAt = new Date();
   const snapshot = { ...booking, selections: booking.selections.map((s: any) => ({ ...s, kickoffAt: '2099-01-01T00:00:00Z' })) };
   const row = { firstSeenAt, checkedAt: new Date(), expiresAt: codeExpiry(firstSeenAt), snapshot, status: 'ACTIVE' };
@@ -52,8 +52,10 @@ it('hides stale, partial and expired codes until a fully active recent check', a
     { ...row, code: 'PARTLY', status: 'PARTIAL' }, { ...row, code: 'OLD123', expiresAt: new Date(0) },
   ]) } } as any, {} as any, {} as any, queue as any);
   const result = await service.displayStatus(['FRESH1', 'STALE1', 'PARTLY', 'OLD123']);
-  expect([...result.valid]).toEqual(['FRESH1']);
+  expect([...result.valid].sort()).toEqual(['FRESH1', 'STALE1']);
+  expect(result.statuses.get('STALE1')).toBe('CHECKING');
   expect(result.checking).toBe(1);
-  expect(result.unavailable).toBe(2);
+  expect(result.statuses.get('PARTLY')).toBe('PARTIAL');
+  expect(result.unavailable).toBe(1);
   expect(queue.add).toHaveBeenCalledTimes(1);
 });

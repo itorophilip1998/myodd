@@ -31,41 +31,37 @@ export class AccountController {
   }
   @Post('saves/:publicId') async save(@Param('publicId') publicId: string, @Req() req: AuthRequest) {
     const userId = req.account!.id;
-    const group = await this.prisma.slipGroup.findFirst({ where: { publicId, OR: [{ isPublic: true, deletedAt: null }, { ownerId: userId }] } });
+    const group = await this.prisma.slipGroup.findFirst({
+      where: { publicId, deletedAt: null, OR: [{ ownerId: userId }, { ownerId: null }] },
+    });
     if (!group) throw new NotFoundException('Collection not found');
     await this.prisma.$transaction(async tx => {
-      if (group.ownerId === userId && group.deletedAt) await tx.slipGroup.update({ where: { id: group.id }, data: { deletedAt: null } });
+      await tx.slipGroup.update({
+        where: { id: group.id },
+        data: {
+          userSaved: true,
+          deletedAt: null,
+          ...(group.ownerId ? {} : { ownerId: userId }),
+        },
+      });
       await tx.savedCollection.upsert({ where: { userId_groupId: { userId, groupId: group.id } }, create: { userId, groupId: group.id }, update: { hiddenAt: null } });
+      await tx.trainingEvent.create({ data: { groupId: group.id, profileId: userId, kind: 'COLLECTION_SAVED', payload: { publicId } } });
     });
-    return { saved: true };
+    return { saved: true, userSaved: true };
   }
   @Post('collections/remove') async remove(@Body() body: unknown, @Req() req: AuthRequest) {
     const parsed = z.object({ publicIds: z.array(z.string().min(1).max(100)).min(1).max(100) }).safeParse(body);
     if (!parsed.success) throw new BadRequestException('Select 1–100 collections');
     const userId = req.account!.id;
     return this.prisma.$transaction(async tx => {
-      const groups = await tx.slipGroup.findMany({ where: { publicId: { in: [...new Set(parsed.data.publicIds)] },
-        OR: [{ ownerId: userId }, { isPublic: true, deletedAt: null, savedBy: { some: { userId, hiddenAt: null } } }] }, select: { id: true, publicId: true, ownerId: true } });
+      const groups = await tx.slipGroup.findMany({ where: { publicId: { in: [...new Set(parsed.data.publicIds)] }, ownerId: userId }, select: { id: true, publicId: true, ownerId: true } });
       for (const group of groups) {
-        if (group.ownerId === userId) await tx.slipGroup.update({ where: { id: group.id }, data: { deletedAt: new Date(), isPublic: false } });
+        await tx.slipGroup.update({ where: { id: group.id }, data: { deletedAt: new Date(), isPublic: false } });
         await tx.savedCollection.upsert({ where: { userId_groupId: { userId, groupId: group.id } },
         create: { userId, groupId: group.id, hiddenAt: new Date() }, update: { hiddenAt: new Date() } });
       }
       if (groups.length) await tx.trainingEvent.create({ data: { kind: 'COLLECTIONS_REMOVED', profileId: userId, payload: { publicIds: groups.map(g => g.publicId) } } });
       return { removed: groups.map(g => g.publicId) };
-    });
-  }
-  @Post('collections/save') async saveSelected(@Body() body: unknown, @Req() req: AuthRequest) {
-    const parsed = z.object({ publicIds: z.array(z.string().min(1).max(100)).min(1).max(100) }).safeParse(body);
-    if (!parsed.success) throw new BadRequestException('Select 1–100 public collections');
-    const userId = req.account!.id;
-    return this.prisma.$transaction(async tx => {
-      const groups = await tx.slipGroup.findMany({ where: { publicId: { in: [...new Set(parsed.data.publicIds)] }, isPublic: true, deletedAt: null,
-        OR: [{ ownerId: null }, { ownerId: { not: userId } }] }, select: { id: true, publicId: true } });
-      for (const group of groups) await tx.savedCollection.upsert({ where: { userId_groupId: { userId, groupId: group.id } },
-        create: { userId, groupId: group.id }, update: { hiddenAt: null } });
-      if (groups.length) await tx.trainingEvent.create({ data: { kind: 'PUBLIC_COLLECTIONS_SAVED', profileId: userId, payload: { publicIds: groups.map(g => g.publicId) } } });
-      return { saved: groups.map(g => g.publicId) };
     });
   }
   @Delete('saves/:publicId') async unsave(@Param('publicId') publicId: string, @Req() req: AuthRequest) {

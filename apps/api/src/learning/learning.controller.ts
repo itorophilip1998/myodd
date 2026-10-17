@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RateLimitService } from '../common/rate-limit.service';
+import { canAccessGroup } from '../groups/group-access';
 const id = z.string().uuid();
 const feedback = z.object({ id, profileId: id, groupId: z.string().min(1).max(64), rating: z.enum(['helpful', 'needs_work']),
   note: z.string().max(2000).optional(), correctedPrompt: z.string().max(6000).optional(), rememberSettings: z.boolean().default(false) });
@@ -28,7 +29,7 @@ export class LearningController {
     const data = { ...parsed.data, profileId: req.account?.id ?? parsed.data.profileId };
     if (!req.account && await this.prisma.appUser.findUnique({ where: { id: data.profileId } })) throw new NotFoundException('Profile not found');
     const group = await this.prisma.slipGroup.findUnique({ where: { publicId: data.groupId }, include: { jobs: { orderBy: { createdAt: 'desc' }, take: 1 }, _count: { select: { slips: true } } } });
-    if (!group || group.deletedAt || (!group.isPublic && group.ownerId !== req.account?.id)) throw new NotFoundException('Collection not found');
+    if (!group || !canAccessGroup(group, req.account?.id)) throw new NotFoundException('Collection not found');
     const config = (group.generationReport as { effectiveConfig?: Record<string, unknown> } | null)?.effectiveConfig;
     if (data.rememberSettings && (data.rating !== 'helpful' || !config || group.jobs[0]?.status !== 'COMPLETED' || !group._count.slips)) throw new BadRequestException('Choose a completed useful result before saving defaults');
     return this.prisma.$transaction(async tx => {

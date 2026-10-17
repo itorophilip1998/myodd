@@ -7,7 +7,7 @@ class SplittingTests(unittest.TestCase):
     def setUp(self):
         self.pool = [selection(i, odds=1.2 + i * .1, probability=.9 - i * .03) for i in range(12)]
         self.original = [Selection(**s.model_dump()) for s in self.pool]
-        self.config = Config(numberOfSlips=3, minimumOdds=1.01, maximumOdds=1000000, minimumSelections=1, maximumSelections=30, fixtureMode='original_only', riskPreference='VERY_LOW')
+        self.config = Config(numberOfSlips=3, minimumOdds=1.1, maximumOdds=1000000, minimumSelections=1, maximumSelections=30, fixtureMode='original_only', riskPreference='VERY_LOW')
     def test_each_original_pick_appears_once_in_exact_requested_count(self):
         for mode in ['VERY_LOW', 'MODERATE', 'HIGHER', 'VERY_HIGH']:
             result = split_report(self.pool, self.config.model_copy(update={'riskPreference': mode}), self.original, 3)

@@ -29,6 +29,6 @@ export function ProgressQuest({ job, availability }: { job: BuildJob | null; ava
     <div className="quest-track" role="progressbar" aria-label="Build stages" aria-valuemin={0} aria-valuemax={5} aria-valuenow={step} aria-valuetext={progressLabel}><div style={{ width: `${width}%` }} /></div>
     <div className="quest-bottom"><p role="status" aria-live="polite">{detail}</p><span>{progressLabel}</span></div>
     {job.total > 0 && <div className="quest-live-counts"><span><b>{saved}</b> saved</span><span><b>{Math.max(0, job.total - job.progress)}</b> remaining</span>{!!job.failedCount && <span><b>{job.failedCount}</b> unavailable</span>}{running && <small>Verified codes appear below as they are saved.</small>}</div>}
-    {running && elapsed >= 45 && <p className="quest-patience">Still working with the live markets. You can leave this page; saved codes will be waiting in your history.</p>}
+    {running && elapsed >= 45 && <p className="quest-patience">Still working with the live markets. Keep this page open, or save the collection when codes appear if you want them in your library.</p>}
   </section>;
 }

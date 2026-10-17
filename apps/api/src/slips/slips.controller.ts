@@ -50,6 +50,9 @@ export class SlipsController {
       userId: req.account?.id,
       ticketCount: parsed.data.ticketCount,
       gamesPerTicket: parsed.data.gamesPerTicket,
+      matchDate: parsed.data.matchDate,
+      minimumOdds: parsed.data.minimumOdds,
+      maximumOdds: parsed.data.maximumOdds,
       bookingCode: parsed.data.bookingCode,
     });
   }
@@ -70,6 +73,9 @@ export class SlipsController {
       userId: req.account?.id,
       ticketCount: parsed.data.ticketCount,
       gamesPerTicket: parsed.data.gamesPerTicket,
+      matchDate: parsed.data.matchDate,
+      minimumOdds: parsed.data.minimumOdds,
+      maximumOdds: parsed.data.maximumOdds,
     });
   }
 }

@@ -1,5 +1,6 @@
 import { Controller, Get, NotFoundException, Param, Req, UseGuards } from '@nestjs/common';
 import { ClerkGuard, type AuthRequest } from '../auth/auth.guard';
+import { canAccessGroup } from '../groups/group-access';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('jobs')
@@ -13,7 +14,7 @@ export class JobsController {
       where: { id: jobId },
       include: { group: true },
     });
-    if (!job || !job.group || job.group.deletedAt || (!job.group.isPublic && job.group.ownerId !== req.account?.id)) throw new NotFoundException('Job not found');
+    if (!job || !job.group || !canAccessGroup(job.group, req.account?.id)) throw new NotFoundException('Job not found');
     return {
       id: job.id,
       createdAt: job.createdAt.toISOString(),

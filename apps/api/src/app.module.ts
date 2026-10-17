@@ -1,4 +1,3 @@
-import { CreatorsModule } from './creators/creators.module';
 import { AuthModule } from './auth/auth.module';
 import { ExploreModule } from './explore/explore.module';
 import { LearningModule } from './learning/learning.module';
@@ -19,7 +18,6 @@ import { HealthController } from './health.controller';
 
 @Module({
   imports: [
-    CreatorsModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
     BullModule.forRoot({
       connection: {

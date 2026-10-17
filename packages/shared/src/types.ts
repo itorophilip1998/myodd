@@ -71,6 +71,8 @@ export interface GeneratedSlipDto {
   confidence: number;
   riskLevel: VarianceLevel;
   selectionCount: number;
+  rankOrder?: number;
+  slipScore?: number;
   selections: SlipSelectionDto[];
   expiresAt: string | null;
 }

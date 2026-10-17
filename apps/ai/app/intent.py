@@ -8,10 +8,11 @@ from datetime import datetime, timezone
 import httpx
 
 from .schemas import Config, Market
-from .risk_modes import MODES, apply_named_mode
+from .risk_modes import MODES, apply_default_investor, apply_named_mode
 from .draw_markets import draw_request
-from .groq import parse_groq, GroqIntentError
+from .llm import IntentProviderError, parse_chat_completions, resolve_provider_name, resolve_settings, select_model
 from .market_preferences import resolve_preferences
+from .odds_format import extract_games_per_ticket, extract_odds_bounds
 
 
 def parse_rules(instruction: str) -> Config:
@@ -21,20 +22,19 @@ def parse_rules(instruction: str) -> Config:
         return int(match[1]) if match else default
 
     data = {}
-    count = re.search(r'(?:create|generate|give me)\s+(\d+)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
+    count = re.search(r'(?:create|generate|give me)\s+(\d+)\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
     data['numberOfSlips'] = min(100, max(1, int(count[1]) if count else 10))
-    bounds = re.search(r'between\s+(\d+(?:\.\d+)?)\s*(?:and|to|-|–)\s*(\d+(?:\.\d+)?)', text)
-    around = re.search(r'around\s+(\d+(?:\.\d+)?)', text)
-    if bounds:
-        data.update(minimumOdds=float(bounds[1]), maximumOdds=float(bounds[2]))
-    elif around:
-        data.update(minimumOdds=max(1.01, float(around[1]) * .8), maximumOdds=float(around[1]) * 1.2)
+    low, high = extract_odds_bounds(instruction)
+    if low is not None:
+        data['minimumOdds'] = low
+    if high is not None:
+        data['maximumOdds'] = high
     data['maximumSelections'] = number(r'max(?:imum)?\s+(\d+)\s*(?:selections?|legs?)', 20)
     data['minimumSelections'] = number(r'min(?:imum)?\s+(\d+)\s*(?:selections?|legs?)', 2)
     data['riskPreference'] = 'HIGHER' if re.search(r'aggressive|high(?:er)?[- ]?(?:risk|variance|odds)|risky', text) else 'LOWER' if re.search(r'safer|conservative|low(?:er)?[- ]?(?:risk|variance)', text) else 'MODERATE'
-    exact = re.search(r'(?:exactly\s+)?(\d+)\s+(?:games?|matches?|picks?|legs?|selections?)\s+(?:per\s+(?:ticket|slip|code)|each|on each)', text)
-    if exact:
-        data['minimumSelections'] = data['maximumSelections'] = int(exact[1])
+    exact = extract_games_per_ticket(instruction)
+    if exact is not None:
+        data['minimumSelections'] = data['maximumSelections'] = exact
     markets = []
     if re.search(r'double\s*chance|\b1x\b|\bx2\b', text):
         markets += [Market.DOUBLE_CHANCE_1X, Market.DOUBLE_CHANCE_X2, Market.DOUBLE_CHANCE_12]
@@ -79,7 +79,7 @@ def parse_rules(instruction: str) -> Config:
             data['marketPolicy'] = 'prefer'
         if 'only use my requested markets' in settings:
             data['marketPolicy'] = 'only'
-    return apply_named_mode(Config.model_validate(data), instruction)
+    return apply_default_investor(apply_named_mode(Config.model_validate(data), instruction), instruction)
 
 
 _intent_cache: dict[tuple, tuple[float, Config]] = {}
@@ -110,21 +110,25 @@ def local_fallback_supported(instruction: str) -> bool:
 
 
 def _parse_intent(instruction: str, available_markets: list[dict] | None = None) -> Config:
-    provider = os.getenv('AI_PROVIDER') or os.getenv('INTENT_PROVIDER', 'rules')
-    if provider == 'groq':
+    provider = resolve_provider_name()
+    if provider in ('openai', 'groq'):
+        settings = resolve_settings()
+        model = select_model(instruction, available_markets, settings)
         catalog_key = hashlib.sha256(json.dumps(available_markets or [], sort_keys=True).encode()).hexdigest()
-        cache_key = (instruction, os.getenv('AI_MODEL'), os.getenv('AI_MODEL_TEMPERATURE'), catalog_key)
+        cache_key = (provider, model, settings.route, settings.temperature, settings.base_url, instruction, catalog_key)
         cached = _intent_cache.get(cache_key)
         if cached and time.monotonic() - cached[0] < 300:
             return resolve_preferences(cached[1].model_copy(deep=True), available_markets or [], instruction)
         try:
-            config = parse_groq(instruction, available_markets)
-        except GroqIntentError as exc:
+            config = parse_chat_completions(instruction, available_markets, model=model)
+        except IntentProviderError as exc:
             transient = 'rate limit' in str(exc).casefold() or 'could not reach' in str(exc).casefold() or bool(re.search(r'HTTP 5\d\d', str(exc)))
             if not transient or not local_fallback_supported(instruction):
                 raise
             config = parse_rules(instruction)
-            config.unhandledRequests.append('Groq was temporarily unavailable; this request was interpreted by the local parser. Review the settings shown below.')
+            config.unhandledRequests.append(
+                f'{settings.label} was temporarily unavailable; this request was interpreted by the local parser. Review the settings shown below.'
+            )
         if len(_intent_cache) >= 128:
             _intent_cache.pop(next(iter(_intent_cache)))
         _intent_cache[cache_key] = (time.monotonic(), config.model_copy(deep=True))
@@ -143,7 +147,7 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
         return resolve_preferences(Config.model_validate(json.loads(response.json()['message']['content'])), available_markets or [], instruction)
     if provider == 'rules':
         return resolve_preferences(parse_rules(instruction), available_markets or [], instruction)
-    raise ValueError('Unsupported AI_PROVIDER')
+    raise ValueError(f'Unsupported AI_PROVIDER: {provider}')
 
 
 def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None) -> Config:
@@ -152,9 +156,18 @@ def parse_intent(instruction: str, available_markets: list[dict] | None = None, 
     text = instruction.casefold()
     if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
         config.numberOfSlips = memory['ticketCount']
-    if memory.get('gamesPerTicket') and not re.search(r'\d+\s+(?:games?|matches?|picks?|legs?|selections?)', text):
+    games = extract_games_per_ticket(instruction)
+    if games is not None:
+        config.minimumSelections = config.maximumSelections = games
+    elif memory.get('gamesPerTicket') and not re.search(r'\d+\s+(?:games?|matches?|picks?|legs?|selections?)', text):
         config.minimumSelections = config.maximumSelections = memory['gamesPerTicket']
+    low, high = extract_odds_bounds(instruction)
+    if low is not None:
+        config.minimumOdds = low
+    if high is not None:
+        config.maximumOdds = high
     if memory.get('riskMode') and not re.search(r'\b(?:mode|modes|risk|odds|between|around|conservative|aggressive|safer|higher|lower|medium|moderate)\b', text):
         label = {'INVESTOR': 'Investor Mode', 'GAMBLER': 'Gambler Mode', 'JAPA': 'Japa Mode', 'LAGOS_LIFE': 'Lagoslife Mode'}[memory['riskMode']]
         config = apply_named_mode(config, label)
-    return apply_named_mode(config, instruction)
+    config = apply_named_mode(config, instruction)
+    return apply_default_investor(config, instruction)
