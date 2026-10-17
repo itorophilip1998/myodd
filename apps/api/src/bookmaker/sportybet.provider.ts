@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { SPORTYBET_MARKET_IDS } from '@myodd/shared';
 import type {
+  LiveFixture,
   BookmakerBooking,
   BookmakerFixture,
   BookmakerMarket,
@@ -10,6 +11,8 @@ import type { BookmakerProvider, FixturesQuery } from './bookmaker.provider';
 import { SportyBetClient, SportyBetHttpError } from './sportybet.client';
 import {
   mapFixtures,
+  mapLiveFixtures,
+  mapEvent,
   mapShareResponse,
   toSharePayload,
 } from './sportybet.mapper';
@@ -25,8 +28,31 @@ const DEFAULT_MARKETS = [
 export class SportyBetProvider implements BookmakerProvider {
   constructor(private readonly client: SportyBetClient) {}
 
+  async getLiveFixtures(): Promise<LiveFixture[]> {
+    const region = this.client.regionCode;
+    const data = await this.client.get<Parameters<typeof mapLiveFixtures>[0]>(
+      `/api/${region}/factsCenter/configurableLiveOrPrematchEvents?sportId=sr%3Asport%3A1&withTwoUpMarket=true&withOneUpMarket=true&_t=${Date.now()}`,
+      { retries: 1 },
+    );
+    if (!Array.isArray(data)) throw new Error('Live football feed returned an unexpected format');
+    return mapLiveFixtures(data);
+  }
+
   async getFixtures(query: FixturesQuery = {}): Promise<BookmakerFixture[]> {
     const region = this.client.regionCode;
+    if (query.eventIds) {
+      const ids = [...new Set(query.eventIds)];
+      const results = await Promise.allSettled(ids.map(async eventId => {
+        const data = await this.client.get<Parameters<typeof mapEvent>[0]>(
+          `/api/${region}/factsCenter/event?eventId=${encodeURIComponent(eventId)}`,
+          { cacheKey: `sporty:event:${region}:${eventId}` },
+        );
+        return mapEvent(data);
+      }));
+      const fixtures = results.filter((result): result is PromiseFulfilledResult<BookmakerFixture> => result.status === 'fulfilled').map(result => result.value);
+      if (ids.length && !fixtures.length) throw (results[0] as PromiseRejectedResult).reason;
+      return fixtures;
+    }
     const pageSize = Math.min(query.pageSize ?? 50, 100);
     const pageNum = query.pageNum ?? 1;
     const timeline = Math.min(query.timelineHours ?? 48, 720);
@@ -53,9 +79,7 @@ export class SportyBetProvider implements BookmakerProvider {
 
   async getMarkets(eventId: string): Promise<BookmakerMarket[]> {
     const fixtures = await this.getFixtures({
-      timelineHours: 168,
-      pageSize: 100,
-      todayGames: false,
+      eventIds: [eventId],
     });
     const match = fixtures.find((f) => f.eventId === eventId);
     if (!match) {
@@ -64,14 +88,14 @@ export class SportyBetProvider implements BookmakerProvider {
     return match.markets;
   }
 
-  async getBooking(code: string): Promise<BookmakerBooking> {
+  async getBooking(code: string, options: { fresh?: boolean } = {}): Promise<BookmakerBooking> {
     const region = this.client.regionCode;
     const normalized = code.trim().toUpperCase();
     const path = `/api/${region}/orders/share/${encodeURIComponent(normalized)}`;
     const cacheKey = `sporty:booking:${region}:${normalized}`;
     try {
       const data = await this.client.get<Record<string, unknown>>(path, {
-        cacheKey,
+        cacheKey: options.fresh ? undefined : cacheKey,
         retries: 2,
       });
       return mapShareResponse(data as never, region);
@@ -96,6 +120,8 @@ export class SportyBetProvider implements BookmakerProvider {
     const path = `/api/${region}/orders/share`;
     const payload = toSharePayload(selections);
     const data = await this.client.post<Record<string, unknown>>(path, payload);
-    return mapShareResponse(data as never, region);
+    const booking = mapShareResponse(data as never, region);
+    // Creation may return only the code; read it back to verify the accepted outcomes and prices.
+    return this.getBooking(booking.code, { fresh: true });
   }
 }

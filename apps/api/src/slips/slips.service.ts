@@ -1,252 +1,277 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CatalogService } from '../catalog/catalog.service';
+import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
+import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import {
-  classifyVariance,
-  generatePublicId,
-  type GenerationConfig,
-  type ScoredSelection,
-} from '@myodd/shared';
-import { JobStatus, VarianceLevel } from '@prisma/client';
-import {
-  BOOKMAKER_PROVIDER,
-  type BookmakerProvider,
-} from '../bookmaker/bookmaker.provider';
+import { classifyVariance, generatePublicId, readChatRequest, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
+import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
-import { IntentParserService } from '../ai/intent-parser.service';
+import { AiClient } from '../ai/ai.client';
 import { PrismaService } from '../prisma/prisma.service';
-import { SlipGeneratorService } from './slip-generator.service';
 import { SlipValidatorService } from './slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from '../jobs/job.constants';
+import { slipFingerprint } from './slip-fingerprint';
 
-export interface GenerateRequest {
-  instruction: string;
-  bookingCode?: string;
+export interface GenerateRequest { userId?: string; instruction: string; bookingCode?: string; splitInto?: number; operation?: 'generate' | 'split'; profileId?: string; ticketCount?: number; gamesPerTicket?: number }
+export interface PrepareJob extends GenerateRequest { jobId: string; groupId: string }
+export interface BookingJob {
+  jobId: string; groupId: string; selections: ScoredSelection[]; config: GenerationConfig;
 }
 
 @Injectable()
-export class SlipsService {
-  private readonly logger = new Logger(SlipsService.name);
-
+export class SlipsService implements OnModuleInit {
   constructor(
     @Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider,
     private readonly predictions: PredictionsService,
-    private readonly intent: IntentParserService,
-    private readonly generator: SlipGeneratorService,
+    private readonly ai: AiClient,
     private readonly validator: SlipValidatorService,
     private readonly prisma: PrismaService,
+    private readonly catalog: CatalogService,
     @InjectQueue(CREATE_BOOKING_QUEUE) private readonly queue: Queue,
   ) {}
 
-  async analyze(bookingCode: string) {
+  async onModuleInit() {
+    // Rebuild missing Redis work from durable database plans after a restart or queue loss.
+    const pending = await this.prisma.generationJob.findMany({ where: { status: { in: [JobStatus.PENDING, JobStatus.RUNNING] } }, orderBy: { createdAt: 'asc' } });
+    for (const job of pending) {
+      const request = await this.prisma.trainingEvent.findFirst({ where: { jobId: job.id, kind: 'REQUEST_ACCEPTED' }, orderBy: { createdAt: 'asc' } });
+      if (!request || !job.groupId) continue;
+      const input = { ...(request.payload as unknown as GenerateRequest), jobId: job.id, groupId: job.groupId };
+      const plan = await this.prisma.trainingEvent.findFirst({ where: { jobId: job.id, kind: 'BOOKING_PLAN' }, orderBy: { createdAt: 'desc' } });
+      if (plan) {
+        for (let i = 0; i < job.total; i++) {
+          const id = `booking-${job.id}-${i}`;
+          if (job.completedTasks.includes(id)) continue;
+          const queued = await this.queue.getJob(id);
+          if (queued && await queued.getState() === 'failed') await queued.retry();
+        }
+        const prepared = plan.payload as unknown as { config: GenerationConfig; candidates: ScoredSelection[][] };
+        await this.enqueueBookings(input, prepared.config, prepared.candidates);
+      } else {
+        await this.queue.add('prepare-generation', input, { jobId: `prepare-${job.id}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: 100 });
+      }
+    }
+  }
+
+  async analyze(bookingCode: string, publicCatalog = true) {
     const booking = await this.bookmaker.getBooking(bookingCode);
-    return {
-      code: booking.code,
-      shareUrl: booking.shareUrl,
-      deadline: booking.deadline,
-      totalOdds: booking.totalOdds,
-      selectionCount: booking.selections.length,
-      selections: booking.selections,
-    };
+    if (publicCatalog) await this.catalog.remember(bookingCode, 'user', undefined, booking);
+    return { ...booking, selectionCount: booking.selections.length };
   }
 
   async startGeneration(req: GenerateRequest) {
-    const config = await this.intent.parse(req.instruction);
-    const publicId = generatePublicId(5);
-    const title = req.bookingCode
-      ? `Variations of ${req.bookingCode.toUpperCase()}`
-      : "Today's myOdd slips";
-
-    const group = await this.prisma.slipGroup.create({
-      data: {
-        publicId,
-        title,
-        description: req.instruction,
+    if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
+    const parsed = readChatRequest(req.instruction);
+    const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
+    if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
+    if (splitInto !== undefined && (!Number.isInteger(splitInto) || splitInto < 1 || splitInto > 100)) throw new BadRequestException('Choose between 1 and 100 split parts.');
+    req = { ...req, bookingCode: parsed.bookingCode ?? req.bookingCode, splitInto };
+    const { group, job } = await this.prisma.$transaction(async tx => {
+      const group = await tx.slipGroup.create({ data: {
+        publicId: generatePublicId(10),
+        ownerId: req.userId ?? null, isPublic: !req.userId,
+        title: req.splitInto ? `Split ${req.bookingCode ?? 'master code'} into ${req.splitInto} parts` : req.bookingCode ? `Variations of ${req.bookingCode.toUpperCase()}` : "Today's myOdd slips",
+        description: req.instruction, instruction: req.instruction,
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
-        instruction: req.instruction,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
+        expiresAt: codeExpiry(new Date()),
+      } });
+      const job = await tx.generationJob.create({ data: { groupId: group.id } });
+      await tx.trainingEvent.create({ data: { eventKey: `${job.id}:request`, groupId: group.id, jobId: job.id, profileId: req.profileId,
+        kind: 'REQUEST_ACCEPTED', payload: { ...req, engineVersion: 'myodd-v5', acceptedAt: new Date().toISOString() } as Prisma.InputJsonValue } });
+      return { group, job };
     });
-
-    const job = await this.prisma.generationJob.create({
-      data: {
-        groupId: group.id,
-        status: JobStatus.PENDING,
-        progress: 0,
-        total: config.numberOfSlips,
-      },
-    });
-
-    // Fire async pipeline without blocking HTTP
-    void this.runGeneration(job.id, group.id, config, req.bookingCode).catch(
-      (err) => this.logger.error(err),
-    );
-
-    return {
-      jobId: job.id,
-      groupId: group.id,
-      publicId: group.publicId,
-    };
-  }
-
-  private async runGeneration(
-    jobId: string,
-    groupId: string,
-    config: GenerationConfig,
-    bookingCode?: string,
-  ) {
-    await this.prisma.generationJob.update({
-      where: { id: jobId },
-      data: { status: JobStatus.RUNNING },
-    });
-
     try {
-      let pool: ScoredSelection[] = [];
-
-      if (bookingCode) {
-        const original = await this.bookmaker.getBooking(bookingCode);
-        // Expand around original fixtures + today's pool
-        const fixtures = await this.bookmaker.getFixtures({
-          timelineHours: 72,
-          pageSize: 80,
-          todayGames: true,
-        });
-        pool = this.predictions.scoreFixtures(fixtures);
-
-        // Soft-boost markets similar to original by keeping full pool;
-        // excluded teams from intent still apply in generator.
-        void original;
-      } else {
-        const fixtures = await this.bookmaker.getFixtures({
-          timelineHours: 36,
-          pageSize: 80,
-          todayGames: true,
-        });
-        pool = this.predictions.scoreFixtures(fixtures);
-      }
-
-      await this.predictions.cacheScores(pool);
-      const candidates = this.generator.generate(pool, config);
-
-      const validated: ScoredSelection[][] = [];
-      for (const c of candidates) {
-        const repaired = await this.validator.validateAndRepair(
-          c.selections,
-          pool,
-        );
-        if (repaired && repaired.length >= config.minimumSelections) {
-          validated.push(repaired);
-        }
-        if (validated.length >= config.numberOfSlips) break;
-      }
-
-      await this.prisma.generationJob.update({
-        where: { id: jobId },
-        data: { total: validated.length },
+      // Entire preparation pipeline is durable, rather than an untracked promise in HTTP.
+      await this.queue.add('prepare-generation', { ...req, jobId: job.id, groupId: group.id }, {
+        jobId: `prepare-${job.id}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: 100,
       });
-
-      // Enqueue booking creation with limited concurrency via BullMQ
-      for (let i = 0; i < validated.length; i++) {
-        await this.queue.add(
-          'create-booking',
-          {
-            jobId,
-            groupId,
-            selections: validated[i],
-            index: i,
-          },
-          {
-            attempts: 1,
-            removeOnComplete: true,
-            removeOnFail: 100,
-          },
-        );
-      }
-
-      if (validated.length === 0) {
-        await this.prisma.generationJob.update({
-          where: { id: jobId },
-          data: {
-            status: JobStatus.FAILED,
-            error:
-              'No valid slip combinations found for the current markets and filters. Try widening odds or markets.',
-          },
-        });
-      }
-    } catch (err) {
-      await this.prisma.generationJob.update({
-        where: { id: jobId },
-        data: {
-          status: JobStatus.FAILED,
-          error: (err as Error).message,
-        },
-      });
-      throw err;
+    } catch (error) {
+      await this.prisma.generationJob.update({ where: { id: job.id }, data: { status: JobStatus.FAILED, error: 'Could not queue generation. Please try again.' } });
+      throw error;
     }
+    return { jobId: job.id, groupId: group.id, publicId: group.publicId };
   }
 
-  async persistCreatedSlip(input: {
-    jobId: string;
-    groupId: string;
-    bookingCode: string;
-    shareUrl: string;
-    deadline: string | null;
-    selections: ScoredSelection[];
-    fingerprint: string;
-  }) {
-    const totalOdds = input.selections.reduce(
-      (acc, s) => acc * (s.odds ?? 1),
-      1,
-    );
-    const confidence =
-      input.selections.reduce((sum, s) => sum + s.confidence, 0) /
-      Math.max(1, input.selections.length);
-    const risk = classifyVariance(
-      Math.round(totalOdds * 100) / 100,
-      confidence,
-    );
-
-    await this.prisma.generatedSlip.create({
-      data: {
-        groupId: input.groupId,
-        bookingCode: input.bookingCode,
-        shareUrl: input.shareUrl,
-        totalOdds: Math.round(totalOdds * 100) / 100,
-        confidence: Math.round(confidence * 10) / 10,
-        riskLevel: risk as VarianceLevel,
-        selectionCount: input.selections.length,
-        fingerprint: input.fingerprint,
-        expiresAt: input.deadline ? new Date(input.deadline) : null,
-        selections: {
-          create: input.selections.map((s) => ({
-            sportyEventId: s.eventId,
-            marketId: s.marketId,
-            outcomeId: s.outcomeId,
-            specifier: s.specifier ?? '',
-            homeTeam: s.homeTeam ?? '',
-            awayTeam: s.awayTeam ?? '',
-            league: s.league ?? '',
-            marketName: s.marketName ?? '',
-            selectionName: s.selectionName ?? '',
-            odds: s.odds ?? 1,
-            predictionProbability: s.probability,
-            predictionScore: s.confidence,
-            kickoffAt: s.kickoffAt ? new Date(s.kickoffAt) : null,
-          })),
-        },
-      },
-    });
-
-    const job = await this.prisma.generationJob.update({
-      where: { id: input.jobId },
-      data: { progress: { increment: 1 } },
-    });
-
-    if (job.progress >= job.total && job.total > 0) {
-      await this.prisma.generationJob.update({
-        where: { id: input.jobId },
-        data: { status: JobStatus.COMPLETED },
-      });
+  async prepareGeneration(input: PrepareJob) {
+    const current = await this.prisma.generationJob.findUniqueOrThrow({ where: { id: input.jobId } });
+    if (current.status === JobStatus.COMPLETED || current.status === JobStatus.FAILED) return;
+    await this.prisma.generationJob.update({ where: { id: input.jobId }, data: { status: JobStatus.RUNNING } });
+    await this.stage(input, 'READING', 'Loading your source code and available games');
+    const master = input.bookingCode ? null : await this.catalog.master();
+    const original = input.bookingCode ? await this.bookmaker.getBooking(input.bookingCode, { fresh: true }) : master?.booking ?? null;
+    if (input.bookingCode && original && !input.userId) await this.catalog.remember(input.bookingCode, 'user', undefined, original);
+    let fixtures = original?.selections.length
+      ? await this.bookmaker.getFixtures({ eventIds: original.selections.map(selection => selection.eventId) })
+      : await this.upcomingFixtures();
+    const memory = input.profileId ? await this.prisma.learningProfile.findUnique({ where: { id: input.profileId } }) : null;
+    await this.audit(input, 'SOURCE_SNAPSHOT', { original, fixtures, preferences: memory?.preferences ?? null, preferenceRevision: memory?.revision ?? null });
+    const modelInfo = await this.ai.modelInfo();
+    await this.audit(input, 'MODEL_CONFIGURATION', modelInfo);
+    await this.stage(input, 'PLANNING', `Understanding your requested markets across ${fixtures.length} loaded games`);
+    const countSettings = [input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '', input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : ''].filter(Boolean).join(' ');
+    const requestInstruction = `${input.instruction}${countSettings ? `\nFinal request settings (take precedence): ${countSettings}` : ''}`;
+    const intentInstruction = input.splitInto
+      ? `${requestInstruction}\nFinal request settings (take precedence): Split this code into ${input.splitInto} parts. Keep the original selections.`
+      : requestInstruction;
+    let config = await this.ai.parse(intentInstruction, fixtures, memory?.preferences);
+    if (input.splitInto) {
+      if (!original) throw new BadRequestException('No verified source code is available to split. Paste a SportyBet code.');
+      const explicitOdds = /\b(?:between|around|odds(?:\s+(?:of|above|below|over|under|from|at))?)\s+\d|\d(?:\.\d+)?\s*(?:to|-|and)\s*\d(?:\.\d+)?\s*odds|\d(?:\.\d+)?\s*odds/i.test(input.instruction);
+      config = { ...config, numberOfSlips: input.splitInto, fixtureMode: 'original_only', preserveOriginalSelections: false,
+        minimumSelections: /\bmin(?:imum)?\s+\d+\s*(?:selections?|legs?|picks?)/i.test(input.instruction) ? config.minimumSelections : 1,
+        maximumSelections: /\bmax(?:imum)?\s+\d+\s*(?:selections?|legs?|picks?)/i.test(input.instruction) ? config.maximumSelections : 30,
+        minimumOdds: explicitOdds || config.riskMode ? config.minimumOdds : 1.01, maximumOdds: explicitOdds || config.riskMode ? config.maximumOdds : null,
+      };
     }
+    if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
+    if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
+    await this.audit(input, 'RESOLVED_INTENT', { config, instruction: intentInstruction });
+    await this.stage(input, 'BUILDING', `Searching ${fixtures.length} games for combinations that match your request`);
+    if (!input.splitInto && config.fixtureMode === 'upcoming' && original) {
+      fixtures = await this.upcomingFixtures();
+      config = await this.ai.resolve(input.instruction, fixtures, config);
+    }
+    await this.audit(input, 'FIXTURE_SNAPSHOT', { fixtures, config });
+    let result = input.splitInto
+      ? await this.ai.split(fixtures, config, original!.selections, input.splitInto)
+      : await this.ai.generate(fixtures, config, original?.selections);
+    if (!input.splitInto && result.needsExpansion && config.fixtureMode === 'adaptive') {
+      await this.stage(input, 'BUILDING', 'Looking for more upcoming games with your requested markets');
+      const upcoming = await this.upcomingFixtures();
+      fixtures = [...new Map([...fixtures, ...upcoming].map(f => [f.eventId, f])).values()];
+      // Resolve requested markets against the expanded catalog; keep the original hard constraints.
+      const expanded = await this.ai.resolve(input.instruction, fixtures, config);
+      config = { ...config, marketRules: expanded.marketRules, relatedMarketRules: expanded.relatedMarketRules, marketPolicy: expanded.marketPolicy, marketQueries: expanded.marketQueries, markets: expanded.markets,
+        unhandledRequests: expanded.unhandledRequests };
+      await this.audit(input, 'EXPANDED_SNAPSHOT', { fixtures, config });
+      await this.stage(input, 'BUILDING', `Searching ${fixtures.length} games; keeping your requested markets and periods`);
+      result = await this.ai.generate(fixtures, config, original?.selections, true);
+    }
+    await this.audit(input, 'PREDICTION_AND_CANDIDATES', result);
+    await this.stage(input, 'CHECKING', 'Checking each candidate against bookmaker availability');
+    const effectiveConfig = result.effectiveConfig;
+    await this.predictions.cacheScores(result.pool);
+    const { pool: _pool, candidates: _candidates, ...report } = result;
+
+
+    const unique = new Map<string, ScoredSelection[]>();
+    for (const candidate of result.candidates) {
+      const validated = await this.validator.validate(candidate.selections, effectiveConfig, fixtures);
+      if (validated) unique.set(slipFingerprint(validated), validated);
+    }
+    const candidates = [...unique.values()].slice(0, config.numberOfSlips);
+    if (input.splitInto && candidates.length !== result.candidates.length) {
+      candidates.splice(0);
+      report.notices.push('A split part changed during validation. No parts were created; retry with current availability.');
+    }
+    if (candidates.length < result.candidates.length) {
+      report.notices.push(`${result.candidates.length - candidates.length} candidates changed or failed final bookmaker validation.`);
+    }
+    report.diagnostics.foundSlips = candidates.length;
+    await this.prisma.slipGroup.update({ where: { id: input.groupId }, data: {
+      generationReport: report as unknown as Prisma.InputJsonValue,
+      ...(master && config.fixtureMode !== 'upcoming' ? { originalBookingCode: master.code } : {}),
+    } });
+    if (!candidates.length) {
+      await this.failPreparation(input.jobId, result.notices.join(' ') || 'No combinations satisfy the explicit constraints. Try different markets, a wider odds range, or allow new matches.');
+      return;
+    }
+    // Replays after partial queue writes must not regenerate a different candidate set.
+    // Retain the preparation payload's derived candidates before enqueueing any booking.
+    await this.audit(input, 'BOOKING_PLAN', { config: effectiveConfig, candidates });
+    return { config: effectiveConfig, candidates };
+  }
+
+  async audit(input: { jobId: string; groupId?: string; profileId?: string }, kind: string, payload: unknown, eventKey?: string) {
+    const data = { jobId: input.jobId, groupId: input.groupId, profileId: input.profileId, kind,
+      payload: JSON.parse(JSON.stringify(payload)), eventKey };
+    if (eventKey) return this.prisma.trainingEvent.upsert({ where: { eventKey }, create: data, update: {} });
+    return this.prisma.trainingEvent.create({ data });
+  }
+
+  async stage(input: { jobId: string; groupId?: string }, stage: string, stageDetail: string) {
+    await this.prisma.$transaction([
+      this.prisma.generationJob.update({ where: { id: input.jobId }, data: { stage, stageDetail } }),
+      this.prisma.trainingEvent.create({ data: { jobId: input.jobId, groupId: input.groupId, kind: 'STAGE_CHANGED', payload: { stage, stageDetail } } }),
+    ]);
+  }
+
+  private async upcomingFixtures() {
+    const pages = await Promise.all([1, 2].map(pageNum => this.bookmaker.getFixtures({
+      timelineHours: 72, pageSize: 60, pageNum, todayGames: false,
+    })));
+    const fixtures = [...new Map(pages.flat().map(fixture => [fixture.eventId, fixture])).values()]
+      .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now());
+    // Detailed markets unlock handicaps, interval outcomes and alternate lines beyond the listing API.
+    const details = fixtures.length ? await this.bookmaker.getFixtures({ eventIds: fixtures.slice(0, 24).map(f => f.eventId) }) : [];
+    return [...new Map([...fixtures, ...details].map(fixture => [fixture.eventId, fixture])).values()];
+  }
+
+  async enqueueBookings(input: PrepareJob, config: GenerationConfig, candidates: ScoredSelection[][]) {
+    await this.prisma.generationJob.update({ where: { id: input.jobId }, data: { total: candidates.length } });
+    await this.stage(input, 'BOOKING', `Creating and saving ${candidates.length} tickets`);
+    await this.queue.addBulk(candidates.map((selections, index) => ({
+      name: 'create-booking', data: { jobId: input.jobId, groupId: input.groupId, selections, config },
+      opts: { jobId: `booking-${input.jobId}-${index}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: false, removeOnFail: 100 },
+    })));
+  }
+
+  async failPreparation(jobId: string, error: string) {
+    await this.prisma.$transaction([
+      this.prisma.generationJob.update({ where: { id: jobId }, data: { status: JobStatus.FAILED, stage: 'FAILED', error } }),
+      this.prisma.trainingEvent.create({ data: { jobId, kind: 'PREPARATION_FAILED', payload: { error } } }),
+    ]);
+  }
+
+  /** Settle each queue task once, atomically with its persisted slip and progress. */
+  async settleBooking(taskId: string, input: BookingJob, booking?: BookmakerBooking, selections?: ScoredSelection[]) {
+    await this.prisma.$transaction(async tx => {
+      const claimed = await tx.generationJob.updateMany({
+        where: { id: input.jobId, NOT: { completedTasks: { has: taskId } } },
+        data: { completedTasks: { push: taskId }, progress: { increment: 1 }, failedCount: { increment: booking ? 0 : 1 } },
+      });
+      if (!claimed.count) return;
+      await tx.trainingEvent.create({ data: { eventKey: `${input.jobId}:${taskId}:settled`, jobId: input.jobId, groupId: input.groupId,
+        kind: booking ? 'BOOKING_SAVED' : 'BOOKING_FAILED', payload: JSON.parse(JSON.stringify({ taskId, config: input.config, requestedSelections: input.selections,
+          confirmedBooking: booking ?? null, acceptedSelections: selections ?? null, recordedAt: new Date().toISOString() })) } });
+      if (booking && selections) {
+        const now = new Date();
+        const code = booking.code.toUpperCase();
+        const existing = await tx.bookingCode.findUnique({ where: { code } });
+        const firstSeenAt = existing?.firstSeenAt ?? now;
+        const assessment = assessBooking({ ...booking, selections }, firstSeenAt, now);
+        const totalOdds = selections.reduce((acc, s) => acc * s.odds!, 1);
+        const confidence = selections.reduce((sum, s) => sum + s.confidence, 0) / selections.length;
+        await tx.generatedSlip.create({ data: {
+          groupId: input.groupId, bookingCode: booking.code, shareUrl: booking.shareUrl,
+          totalOdds: Math.round(totalOdds * 100) / 100, confidence,
+          riskLevel: classifyVariance(totalOdds, confidence) as VarianceLevel,
+          selectionCount: selections.length, fingerprint: slipFingerprint(selections),
+          createdAt: now, expiresAt: assessment.expiresAt,
+          selections: { create: selections.map(s => ({
+            sportyEventId: s.eventId, marketId: s.marketId, outcomeId: s.outcomeId, specifier: s.specifier ?? '',
+            homeTeam: s.homeTeam ?? '', awayTeam: s.awayTeam ?? '', league: s.league ?? '',
+            marketName: s.marketName ?? '', selectionName: s.selectionName ?? '', odds: s.odds!,
+            predictionProbability: s.probability, predictionScore: s.confidence, modelVersion: s.modelVersion,
+            kickoffAt: s.kickoffAt ? new Date(s.kickoffAt) : null,
+          })) },
+        } });
+        await tx.bookingCode.upsert({ where: { code }, create: {
+          code, source: 'generated', firstSeenAt, ...assessment, checkedAt: now,
+          snapshot: { ...booking, selections } as unknown as Prisma.InputJsonValue,
+        }, update: { ...assessment, checkedAt: now, lastSeenAt: now, lastError: null,
+          snapshot: { ...booking, selections } as unknown as Prisma.InputJsonValue } });
+      }
+      const job = await tx.generationJob.findUniqueOrThrow({ where: { id: input.jobId } });
+      if (job.total > 0 && job.progress >= job.total) {
+        await tx.trainingEvent.create({ data: { jobId: job.id, groupId: input.groupId, kind: 'JOB_FINISHED', payload: { progress: job.progress, total: job.total, failedCount: job.failedCount } } });
+        await tx.generationJob.update({ where: { id: job.id }, data: {
+          status: job.failedCount === job.total ? JobStatus.FAILED : JobStatus.COMPLETED,
+          stage: job.failedCount === job.total ? 'FAILED' : 'SAVED', stageDetail: `${job.total - job.failedCount} of ${job.total} tickets saved`,
+          error: job.failedCount ? `${job.failedCount} of ${job.total} bookings could not be created. Markets may have changed.` : null,
+        } });
+      }
+    });
   }
 }

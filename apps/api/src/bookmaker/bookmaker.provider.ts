@@ -1,4 +1,5 @@
 import type {
+  LiveFixture,
   BookmakerBooking,
   BookmakerFixture,
   BookmakerMarket,
@@ -6,6 +7,7 @@ import type {
 } from '@myodd/shared';
 
 export interface FixturesQuery {
+  eventIds?: string[];
   timelineHours?: number;
   pageSize?: number;
   pageNum?: number;
@@ -14,9 +16,10 @@ export interface FixturesQuery {
 }
 
 export interface BookmakerProvider {
+  getLiveFixtures(): Promise<LiveFixture[]>;
   getFixtures(query?: FixturesQuery): Promise<BookmakerFixture[]>;
   getMarkets(eventId: string): Promise<BookmakerMarket[]>;
-  getBooking(code: string): Promise<BookmakerBooking>;
+  getBooking(code: string, options?: { fresh?: boolean }): Promise<BookmakerBooking>;
   createBooking(selections: BookmakerSelection[]): Promise<BookmakerBooking>;
 }
 

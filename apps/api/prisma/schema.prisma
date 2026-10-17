@@ -21,17 +21,25 @@ enum JobStatus {
 }
 
 model SlipGroup {
+  deletedAt            DateTime?       @map("deleted_at")
   id                   String          @id @default(cuid())
+  ownerId              String?         @map("owner_id")
+  owner                AppUser?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  isPublic             Boolean         @default(true) @map("is_public")
+  isLegacy             Boolean         @default(false) @map("is_legacy")
+  savedBy              SavedCollection[]
   publicId             String          @unique @map("public_id")
   title                String
   description          String?
   originalBookingCode  String?         @map("original_booking_code")
+  generationReport     Json?           @map("generation_report")
   instruction          String?
   createdAt            DateTime        @default(now()) @map("created_at")
   expiresAt            DateTime?       @map("expires_at")
   slips                GeneratedSlip[]
   jobs                 GenerationJob[]
 
+  @@index([ownerId, createdAt])
   @@map("slip_groups")
 }
 
@@ -72,6 +80,7 @@ model SlipSelection {
   odds                  Float
   predictionProbability Float         @map("prediction_probability")
   predictionScore       Float         @map("prediction_score")
+  modelVersion          String        @default("odds-v1") @map("model_version")
   kickoffAt             DateTime?     @map("kickoff_at")
 
   @@index([slipId])
@@ -99,10 +108,147 @@ model GenerationJob {
   status    JobStatus @default(PENDING)
   progress  Int       @default(0)
   total     Int       @default(0)
+  failedCount Int     @default(0) @map("failed_count")
+  completedTasks String[] @default([]) @map("completed_tasks")
   error     String?
+  stage     String   @default("QUEUED")
+  stageDetail String? @map("stage_detail")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@index([status])
   @@map("generation_jobs")
+}
+
+enum BookingCodeStatus {
+  PENDING
+  ACTIVE
+  PARTIAL
+  INACTIVE
+  EXPIRED
+}
+
+model BookingCode {
+  id               String            @id @default(cuid())
+  code             String            @unique
+  source           String
+  sourceUrl        String?           @map("source_url")
+  firstSeenAt      DateTime          @default(now()) @map("first_seen_at")
+  lastSeenAt       DateTime          @default(now()) @map("last_seen_at")
+  expiresAt        DateTime          @map("expires_at")
+  upstreamExpiresAt DateTime?        @map("upstream_expires_at")
+  checkedAt        DateTime?         @map("checked_at")
+  status           BookingCodeStatus @default(PENDING)
+  activeSelections Int               @default(0) @map("active_selections")
+  totalSelections  Int               @default(0) @map("total_selections")
+  snapshot         Json?
+  lastError        String?           @map("last_error")
+  lastUsedAt       DateTime?         @map("last_used_at")
+
+  @@index([status, expiresAt])
+  @@index([checkedAt])
+  @@map("booking_codes")
+}
+
+model CodeSource {
+  id            String   @id @default(cuid())
+  url           String   @unique
+  enabled       Boolean  @default(true)
+  checkedAt     DateTime? @map("checked_at")
+  lastError     String?   @map("last_error")
+  discovered    Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("code_sources")
+}
+
+model CodeCrawlRun {
+  id            String    @id @default(cuid())
+  startedAt     DateTime  @default(now()) @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  discovered    Int       @default(0)
+  verified      Int       @default(0)
+  errors        Json?
+
+  @@map("code_crawl_runs")
+}
+
+// Append-only provenance for dataset replay; no bookmaker credentials or account data.
+model TrainingEvent {
+  id            String   @id @default(cuid())
+  eventKey      String?  @unique @map("event_key")
+  groupId       String?  @map("group_id")
+  jobId         String?  @map("job_id")
+  profileId     String?  @map("profile_id")
+  kind          String
+  schemaVersion Int      @default(1) @map("schema_version")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([groupId, createdAt])
+  @@index([jobId, createdAt])
+  @@index([kind, createdAt])
+  @@map("training_events")
+}
+
+model LearningProfile {
+  id          String   @id
+  preferences Json
+  revision    Int      @default(1)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("learning_profiles")
+}
+
+model TrainingFeedback {
+  id              String   @id
+  groupId         String   @map("group_id")
+  profileId       String?  @map("profile_id")
+  rating          String
+  note            String?
+  correctedPrompt String?  @map("corrected_prompt")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([groupId])
+  @@map("training_feedback")
+}
+
+
+model AppUser {
+  id        String @id @default(uuid())
+  publicId  String @unique @default(cuid()) @map("public_id")
+  username  String?
+  profileSyncedAt DateTime? @map("profile_synced_at")
+  clerkId   String @unique @map("clerk_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  groups    SlipGroup[]
+  saves     SavedCollection[]
+  following CreatorFollow[] @relation("CreatorFollowing")
+  followers CreatorFollow[] @relation("CreatorFollowers")
+  @@map("app_users")
+}
+
+model CreatorFollow {
+  followerId String @map("follower_id")
+  creatorId String @map("creator_id")
+  follower AppUser @relation("CreatorFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  creator AppUser @relation("CreatorFollowers", fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  @@id([followerId, creatorId])
+  @@index([creatorId])
+  @@map("creator_follows")
+}
+
+model SavedCollection {
+  hiddenAt DateTime? @map("hidden_at")
+  userId String @map("user_id")
+  groupId String @map("group_id")
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group SlipGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  @@id([userId, groupId])
+  @@index([groupId])
+  @@map("saved_collections")
 }

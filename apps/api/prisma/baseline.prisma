@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VarianceLevel {
+  LOWER
+  MODERATE
+  HIGHER
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model SlipGroup {
+  id                   String          @id @default(cuid())
+  publicId             String          @unique @map("public_id")
+  title                String
+  description          String?
+  originalBookingCode  String?         @map("original_booking_code")
+  instruction          String?
+  createdAt            DateTime        @default(now()) @map("created_at")
+  expiresAt            DateTime?       @map("expires_at")
+  slips                GeneratedSlip[]
+  jobs                 GenerationJob[]
+
+  @@map("slip_groups")
+}
+
+model GeneratedSlip {
+  id             String           @id @default(cuid())
+  groupId        String           @map("group_id")
+  group          SlipGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  bookingCode    String           @map("booking_code")
+  shareUrl       String           @map("share_url")
+  totalOdds      Float            @map("total_odds")
+  confidence     Float
+  riskLevel      VarianceLevel    @map("risk_level")
+  selectionCount Int              @map("selection_count")
+  fingerprint    String
+  expiresAt      DateTime?        @map("expires_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  selections     SlipSelection[]
+
+  @@index([groupId])
+  @@index([bookingCode])
+  @@index([fingerprint])
+  @@map("generated_slips")
+}
+
+model SlipSelection {
+  id                    String        @id @default(cuid())
+  slipId                String        @map("slip_id")
+  slip                  GeneratedSlip @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  sportyEventId         String        @map("sporty_event_id")
+  marketId              String        @map("market_id")
+  outcomeId             String        @map("outcome_id")
+  specifier             String        @default("")
+  homeTeam              String        @map("home_team")
+  awayTeam              String        @map("away_team")
+  league                String
+  marketName            String        @map("market_name")
+  selectionName         String        @map("selection_name")
+  odds                  Float
+  predictionProbability Float         @map("prediction_probability")
+  predictionScore       Float         @map("prediction_score")
+  kickoffAt             DateTime?     @map("kickoff_at")
+
+  @@index([slipId])
+  @@map("slip_selections")
+}
+
+model Prediction {
+  id         String   @id @default(cuid())
+  eventId    String   @map("event_id")
+  market     String
+  selection  String
+  probability Float
+  confidence Float
+  modelVersion String @map("model_version")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([eventId, market, selection])
+  @@map("predictions")
+}
+
+model GenerationJob {
+  id        String    @id @default(cuid())
+  groupId   String?   @map("group_id")
+  group     SlipGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  status    JobStatus @default(PENDING)
+  progress  Int       @default(0)
+  total     Int       @default(0)
+  error     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("generation_jobs")
+}

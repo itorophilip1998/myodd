@@ -1,4 +1,5 @@
 'use client';
+import { formatOdds, exactOdds } from '@myodd/shared';
 
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -32,17 +33,14 @@ export default function CodePage() {
 
   return (
     <main className="px-6 py-12 max-w-2xl mx-auto space-y-8">
-      <Link href="/" className="font-display text-2xl text-lime inline-block">
-        myOdd
-      </Link>
+      <Link href={data.groupPublicId ? `/g/${data.groupPublicId}` : '/history'} className="text-sm text-lime">← Back to collection</Link>
       <header className="space-y-3 animate-rise">
         <p className="text-sm uppercase tracking-[0.25em] text-lime/70">
           SportyBet code
         </p>
         <h1 className="font-display text-5xl tracking-wide">{data.bookingCode}</h1>
         <p className="text-sand/70">
-          Odds {data.totalOdds.toFixed(2)} · {data.selectionCount} selections ·
-          Confidence {Math.round(data.confidence)}% · {data.riskLevel} variance
+          Odds <span title={exactOdds(data.totalOdds)}>{formatOdds(data.totalOdds)}</span> · {data.selectionCount} selections
         </p>
         <ShareButtons
           code={data.bookingCode}
@@ -50,8 +48,10 @@ export default function CodePage() {
           totalOdds={data.totalOdds}
           shareUrl={data.shareUrl}
           groupUrl={groupUrl}
+          expired={!!data.expiresAt && new Date(data.expiresAt).getTime() <= Date.now()}
         />
       </header>
+      {data.expiresAt && new Date(data.expiresAt).getTime() <= Date.now() && <p className="text-sand/60 text-sm">Archived code. Generate a fresh collection to use upcoming matches.</p>}
       <ul className="space-y-4 animate-rise-delay">
         {data.selections.map((s, i) => (
           <li key={i} className="border-b border-white/10 pb-3">
@@ -60,11 +60,9 @@ export default function CodePage() {
               {s.homeTeam} vs {s.awayTeam}
             </p>
             <p className="text-lime/90">
-              {s.marketName}: {s.selectionName} @ {s.odds.toFixed(2)}
+              {s.marketName}: {s.selectionName} @ {formatOdds(s.odds)}
             </p>
             <p className="text-xs text-sand/50 mt-1">
-              Score {Math.round(s.predictionScore)}/100 · Prob{' '}
-              {(s.predictionProbability * 100).toFixed(0)}%
               {s.kickoffAt
                 ? ` · ${new Date(s.kickoffAt).toLocaleString()}`
                 : ''}

@@ -1,4 +1,113 @@
 services:
+  web:
+    env_file:
+      - path: ./apps/web/.env.local
+        required: false
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      target: web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    env_file:
+      - path: ./apps/web/.env.local
+        required: false
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      target: api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 3001
+      DATABASE_URL: postgresql://myodd:myodd@postgres:5432/myodd
+      REDIS_URL: redis://redis:6379
+      CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}
+      CODE_DISCOVERY_INTERVAL_HOURS: ${CODE_DISCOVERY_INTERVAL_HOURS:-6}
+      CODE_VALIDATION_INTERVAL_MINUTES: ${CODE_VALIDATION_INTERVAL_MINUTES:-60}
+      AI_SERVICE_URL: http://ai:8000
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-120000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      SPORTYBET_REGION: ${SPORTYBET_REGION:-ng}
+      SPORTYBET_API_BASE_URL: ${SPORTYBET_API_BASE_URL:-https://www.sportybet.com}
+      SPORTYBET_TIMEOUT_MS: ${SPORTYBET_TIMEOUT_MS:-15000}
+      SPORTYBET_MIN_INTERVAL_MS: ${SPORTYBET_MIN_INTERVAL_MS:-250}
+      SPORTYBET_MAX_CONCURRENCY: ${SPORTYBET_MAX_CONCURRENCY:-4}
+      SPORTYBET_CACHE_TTL_MS: ${SPORTYBET_CACHE_TTL_MS:-90000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  ai:
+    build:
+      context: .
+      dockerfile: apps/ai/Dockerfile
+    restart: unless-stopped
+    environment:
+      PREDICTION_MODEL: ${PREDICTION_MODEL:-odds}
+      PREDICTION_WORKERS: ${PREDICTION_WORKERS:-2}
+      CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}
+      MODEL_PATH: /data/model.json
+      INTENT_PROVIDER: ${INTENT_PROVIDER:-rules}
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-qwen/qwen3.8-27b}
+      AI_MODEL_TEMPERATURE: ${AI_MODEL_TEMPERATURE:-0.7}
+      AI_API_KEY: ${AI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    volumes:
+      - ai_data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      target: api
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://myodd:myodd@postgres:5432/myodd
+    command: ["node", "scripts/migrate.cjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -7,18 +116,52 @@ services:
       POSTGRES_PASSWORD: myodd
       POSTGRES_DB: myodd
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myodd -d myodd"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: myodd
+      PGPASSWORD: myodd
+      PGDATABASE: myodd
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-ec", "set -o pipefail; while true; do name=/backups/myodd-$$(date -u +%Y%m%dT%H%M%SZ).sql.gz; pg_dump --no-owner | gzip > $$name.partial; mv $$name.partial $$name; touch /backups/last-success; sleep 86400; done"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /backups/last-success && test $$(find /backups/last-success -mmin -1500 | wc -l) -gt 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
+  postgres_backups:
   postgres_data:
   redis_data:
+  ai_data:

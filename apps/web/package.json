@@ -9,6 +9,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.17",
     "@myodd/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.8",
     "next": "^15.1.2",

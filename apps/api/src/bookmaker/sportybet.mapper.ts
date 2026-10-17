@@ -1,4 +1,5 @@
 import type {
+  LiveFixture,
   BookmakerBooking,
   BookmakerFixture,
   BookmakerMarket,
@@ -27,7 +28,11 @@ interface RawEvent {
   awayTeamName: string;
   estimateStartTime: number;
   matchStatus?: string | number;
+  status?: number | string;
+  setScore?: string;
+  playedSeconds?: string;
   markets?: RawMarket[];
+  sport?: { category?: { name?: string; tournament?: { name?: string } } };
 }
 
 interface RawTournament {
@@ -54,7 +59,9 @@ interface ShareOutcome {
   awayTeamName?: string;
   tournamentName?: string;
   estimateStartTime?: number;
-  status?: string;
+  status?: string | number;
+  markets?: RawMarket[];
+  sport?: { category?: { tournament?: { name?: string } } };
 }
 
 interface ShareData {
@@ -63,25 +70,41 @@ interface ShareData {
   deadline?: number;
   outcomes?: ShareOutcome[];
   unavailableOutcomes?: ShareOutcome[];
+  ticket?: { selections?: ShareOutcome[]; displayTotalOdds?: string | number };
 }
 
 export function mapFixtures(data: UpcomingEventsData): BookmakerFixture[] {
   const fixtures: BookmakerFixture[] = [];
   for (const t of data.tournaments ?? []) {
     for (const e of t.events ?? []) {
-      fixtures.push({
-        eventId: e.eventId,
-        homeTeam: e.homeTeamName,
-        awayTeam: e.awayTeamName,
-        league: t.name,
-        categoryName: t.categoryName ?? '',
-        kickoffAt: new Date(e.estimateStartTime).toISOString(),
-        matchStatus: String(e.matchStatus ?? ''),
-        markets: (e.markets ?? []).map(mapMarket),
-      });
+      fixtures.push(mapEvent(e, t.name, t.categoryName));
     }
   }
   return fixtures;
+}
+
+export function mapLiveFixtures(tournaments: RawTournament[]): LiveFixture[] {
+  const games: LiveFixture[] = [];
+  for (const tournament of tournaments) for (const event of tournament.events ?? []) {
+    // The live-list response can include a pre-match event; never relabel it as live.
+    if (String(event.status) !== '1') continue;
+    const fixture = mapEvent(event, tournament.name, tournament.categoryName);
+    games.push({ ...fixture, score: /^\d+:\d+$/.test(event.setScore ?? '') ? event.setScore!.replace(':', ' : ') : null,
+      clock: /^\d{1,3}:\d{2}$/.test(event.playedSeconds ?? '') ? event.playedSeconds! : null,
+      liveStatus: String(event.matchStatus ?? 'Live') });
+  }
+  return games;
+}
+
+export function mapEvent(event: RawEvent, league?: string, category?: string): BookmakerFixture {
+  return {
+    eventId: event.eventId, homeTeam: event.homeTeamName, awayTeam: event.awayTeamName,
+    league: league ?? event.sport?.category?.tournament?.name ?? '',
+    categoryName: category ?? event.sport?.category?.name ?? '',
+    kickoffAt: new Date(event.estimateStartTime).toISOString(),
+    matchStatus: String(event.matchStatus ?? ''),
+    markets: (event.markets ?? []).map(mapMarket),
+  };
 }
 
 export function mapMarket(m: RawMarket): BookmakerMarket {
@@ -90,7 +113,7 @@ export function mapMarket(m: RawMarket): BookmakerMarket {
     marketName: m.desc,
     specifier: m.specifier ?? '',
     status: String(m.status ?? ''),
-    outcomes: (m.outcomes ?? []).map(mapOutcome),
+    outcomes: (m.outcomes ?? []).map(mapOutcome).filter(o => Number.isFinite(o.odds) && o.odds > 1),
   };
 }
 
@@ -111,19 +134,46 @@ export function mapShareResponse(
   if (!code) {
     throw Object.assign(new Error('NO_BOOKING_CODE'), { code: 'NO_BOOKING_CODE' });
   }
-  const selections = (data.outcomes ?? []).map(mapShareOutcome);
-  const unavailable = (data.unavailableOutcomes ?? []).map(mapShareOutcome);
-  const totalOdds = selections.reduce((acc, s) => acc * (s.odds ?? 1), 1);
+  const selections = mapBookingOutcomes(data.outcomes ?? [], data.ticket?.selections);
+  const unavailable = mapBookingOutcomes(data.unavailableOutcomes ?? [], data.ticket?.selections)
+    .map(selection => ({ ...selection, isActive: false }));
+  const ticketOdds = Number(data.ticket?.displayTotalOdds);
+  const totalOdds = Number.isFinite(ticketOdds) && ticketOdds > 1 ? ticketOdds
+    : selections.length && selections.every(s => Number.isFinite(s.odds) && s.odds! > 1)
+      ? selections.reduce((acc, s) => acc * s.odds!, 1) : null;
   return {
     code,
     shareUrl:
       data.shareURL ??
       `https://www.sportybet.com/${region}/?shareCode=${code}`,
     deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
-    totalOdds: Math.round(totalOdds * 100) / 100,
+    totalOdds: totalOdds === null ? null : Math.round(totalOdds * 100) / 100,
     selections,
     unavailableOutcomes: unavailable,
   };
+}
+
+function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]): BookmakerSelection[] {
+  return events.flatMap(event => {
+    if (!event.markets?.length) return [mapShareOutcome(event)];
+    // Share responses contain events with nested markets. Ticket IDs identify the booked outcomes.
+    const selected = requested?.filter(s => s.eventId === event.eventId)
+      ?? event.markets.flatMap(m => (m.outcomes ?? []).map(o => ({
+        eventId: event.eventId, marketId: m.id, specifier: m.specifier ?? '', outcomeId: o.id,
+      })));
+    return selected.map(selection => {
+      const market = event.markets!.find(m => String(m.id) === String(selection.marketId)
+        && (m.specifier ?? '') === (selection.specifier ?? ''));
+      const outcome = market?.outcomes?.find(o => String(o.id) === String(selection.outcomeId));
+      return {
+        ...mapShareOutcome({ ...event, ...selection, odds: outcome?.odds,
+          marketDesc: market?.desc, outcomeDesc: outcome?.desc,
+          tournamentName: event.sport?.category?.tournament?.name ?? event.tournamentName }),
+        isActive: !!outcome && mapOutcome(outcome).isActive
+          && String(market?.status ?? '0') === '0' && String(event.status ?? '0') === '0',
+      };
+    });
+  });
 }
 
 function mapShareOutcome(o: ShareOutcome): BookmakerSelection {

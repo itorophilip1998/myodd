@@ -1,4 +1,6 @@
 export enum SupportedMarket {
+  OTHER = 'OTHER',
+  DRAW = 'DRAW',
   HOME = 'HOME',
   AWAY = 'AWAY',
   DOUBLE_CHANCE_1X = 'DOUBLE_CHANCE_1X',
@@ -12,6 +14,8 @@ export enum SupportedMarket {
 }
 
 export enum RiskPreference {
+  VERY_LOW = 'VERY_LOW',
+  VERY_HIGH = 'VERY_HIGH',
   LOWER = 'LOWER',
   MODERATE = 'MODERATE',
   HIGHER = 'HIGHER',
@@ -39,6 +43,8 @@ export const SPORTYBET_MARKET_IDS = {
 } as const;
 
 export const SUPPORTED_MARKET_LABELS: Record<SupportedMarket, string> = {
+  [SupportedMarket.OTHER]: 'Other bookmaker market',
+  [SupportedMarket.DRAW]: 'Draw',
   [SupportedMarket.HOME]: 'Home Win',
   [SupportedMarket.AWAY]: 'Away Win',
   [SupportedMarket.DOUBLE_CHANCE_1X]: '1X',

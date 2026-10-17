@@ -1,3 +1,7 @@
+import { CreatorsModule } from './creators/creators.module';
+import { AuthModule } from './auth/auth.module';
+import { ExploreModule } from './explore/explore.module';
+import { LearningModule } from './learning/learning.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
@@ -15,15 +19,21 @@ import { HealthController } from './health.controller';
 
 @Module({
   imports: [
+    CreatorsModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
     BullModule.forRoot({
       connection: {
-        url: process.env.REDIS_URL ?? 'redis://localhost:6379',
+        host: new URL(process.env.REDIS_URL ?? 'redis://localhost:6379').hostname,
+        port: Number(new URL(process.env.REDIS_URL ?? 'redis://localhost:6379').port || 6379),
+        password: new URL(process.env.REDIS_URL ?? 'redis://localhost:6379').password || undefined,
       },
     }),
     PrismaModule,
     RedisModule,
     CommonModule,
+    AuthModule,
+    LearningModule,
+    ExploreModule,
     BookmakerModule,
     BookingsModule,
     PredictionsModule,

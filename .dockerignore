@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.tsbuildinfo
+**/*.log
+.env
+.env.*
+.git
+apps/ai/data
+
+**/.env
+**/.env.*
+**/.clerk

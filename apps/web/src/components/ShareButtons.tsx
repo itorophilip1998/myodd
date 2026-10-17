@@ -1,84 +1,27 @@
 'use client';
+import { formatOdds } from '@myodd/shared';
+import { useState } from 'react';
+import { api } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 
-import { buildShareMessage } from '@myodd/shared';
-
-export function ShareButtons({
-  code,
-  selectionCount,
-  totalOdds,
-  shareUrl,
-  groupUrl,
-}: {
-  code: string;
-  selectionCount: number;
-  totalOdds: number;
-  shareUrl: string;
-  groupUrl?: string;
-}) {
-  const text = buildShareMessage({ code, selectionCount, totalOdds });
-  const encoded = encodeURIComponent(text);
-  const url = encodeURIComponent(groupUrl ?? shareUrl);
-
-  async function copy(value: string) {
-    await navigator.clipboard.writeText(value);
+export function ShareButtons({ code, selectionCount, totalOdds, shareUrl, groupUrl, expired = false, onUnavailable }: { code: string; selectionCount: number; totalOdds: number; shareUrl: string; groupUrl?: string; expired?: boolean; onUnavailable?: () => void }) {
+  const [status, setStatus] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [open, setOpen] = useState(false);
+  const text = `${code} · ${selectionCount} picks · ${formatOdds(totalOdds)} odds`;
+  async function verify() {
+    setChecking(true);
+    try { const checked = await api.verifyCode(code); if (!checked.codes.includes(code)) { setStatus('This code is no longer available'); onUnavailable?.(); return false; } return true; }
+    catch { setStatus('Could not verify this code. Try again.'); return false; } finally { setChecking(false); }
   }
-
-  return (
-    <div className="flex flex-wrap gap-2 text-sm">
-      <button
-        type="button"
-        onClick={() => copy(code)}
-        className="rounded-md border border-lime/30 px-3 py-1.5 text-lime hover:bg-lime/10 transition"
-      >
-        Copy code
-      </button>
-      <a
-        href={shareUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        Open SportyBet
-      </a>
-      <a
-        href={`https://wa.me/?text=${encoded}%20${url}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        WhatsApp
-      </a>
-      <a
-        href={`https://t.me/share/url?url=${url}&text=${encoded}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        Telegram
-      </a>
-      <a
-        href={`https://twitter.com/intent/tweet?text=${encoded}&url=${url}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        X
-      </a>
-      <a
-        href={`https://www.facebook.com/sharer/sharer.php?u=${url}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        Facebook
-      </a>
-      <button
-        type="button"
-        onClick={() => copy(groupUrl ?? shareUrl)}
-        className="rounded-md border border-sand/20 px-3 py-1.5 hover:bg-white/5 transition"
-      >
-        Copy link
-      </button>
-    </div>
-  );
+  async function copy() { if (!await verify()) return; try { await copyText(code); setStatus('Copied!'); } catch { setStatus('Select the code to copy'); } }
+  async function share() {
+    if (!await verify()) return;
+    if (navigator.share) { try { await navigator.share({ title: `SportyBet ${code}`, text, url: shareUrl }); } catch (error) { if ((error as Error).name !== 'AbortError') setOpen(true); } }
+    else setOpen(!open);
+  }
+  return <div className="code-actions"><button onClick={copy} disabled={expired || checking} type="button" className="copy-button">{checking ? 'Checking…' : status === 'Copied!' ? '✓ Copied' : 'Copy code'}</button><button onClick={share} disabled={expired || checking} type="button" className="quiet-button">Share ↗</button>
+    {open && <div className="share-menu"><a href={`https://wa.me/?text=${encodeURIComponent(`${text} ${shareUrl}`)}`} target="_blank" rel="noopener noreferrer">WhatsApp ↗</a><a href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer">Telegram ↗</a><button onClick={async () => { try { await copyText(groupUrl ?? shareUrl); setStatus('Link copied'); } catch { setStatus('Could not copy link'); } }}>Copy link</button></div>}
+    <span className="sr-only" role="status">{status}</span>{status && status !== 'Copied!' && <small role="status">{status}</small>}
+  </div>;
 }

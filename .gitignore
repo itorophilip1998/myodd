@@ -11,3 +11,10 @@ coverage
 .tmp-run.sh
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+.venv/
+__pycache__/
+.pytest_cache/
+apps/ai/data/*
+!apps/ai/data/.gitkeep
+
+.clerk/

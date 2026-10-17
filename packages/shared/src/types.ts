@@ -19,7 +19,7 @@ export interface BookmakerBooking {
   code: string;
   shareUrl: string;
   deadline: string | null;
-  totalOdds: number;
+  totalOdds: number | null;
   selections: BookmakerSelection[];
   unavailableOutcomes: BookmakerSelection[];
 }
@@ -33,6 +33,12 @@ export interface BookmakerFixture {
   kickoffAt: string;
   matchStatus: string;
   markets: BookmakerMarket[];
+}
+
+export interface LiveFixture extends BookmakerFixture {
+  score: string | null;
+  clock: string | null;
+  liveStatus: string;
 }
 
 export interface BookmakerMarket {
@@ -78,6 +84,7 @@ export interface SlipSelectionDto {
   odds: number;
   predictionProbability: number;
   predictionScore: number;
+  modelVersion: string;
   kickoffAt: string | null;
 }
 
@@ -105,4 +112,5 @@ export interface JobProgressDto {
   groupId: string | null;
   publicId: string | null;
   error: string | null;
+  failedCount: number;
 }

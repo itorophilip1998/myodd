@@ -11,9 +11,11 @@
     "test:watch": "vitest",
     "prisma:generate": "sh -c 'set -a; [ -f ../../.env ] && . ../../.env; set +a; prisma generate'",
     "prisma:migrate": "sh -c 'set -a; [ -f ../../.env ] && . ../../.env; set +a; prisma migrate dev'",
+    "prisma:deploy": "sh -c 'set -a; [ -f ../../.env ] && . ../../.env; set +a; prisma migrate deploy'",
     "prisma:push": "sh -c 'set -a; [ -f ../../.env ] && . ../../.env; set +a; prisma db push'"
   },
   "dependencies": {
+    "@clerk/backend": "^3.25.0",
     "@myodd/shared": "workspace:*",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^10.4.15",
