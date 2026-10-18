@@ -4,8 +4,11 @@
  */
 export const APP_VERSION = '0.2.3';
 
-/** Format e.g. `v0.2.3` or `v0.2.3 · a1b2c3d` when a deploy git sha is provided. */
+/** Format e.g. `v0.2.3` or `v0.2.3 · a1b2c3d` when a real deploy git sha is provided. */
 export function formatAppVersion(gitSha?: string | null) {
-  const short = gitSha?.trim() ? gitSha.trim().slice(0, 7) : '';
+  const raw = gitSha?.trim() ?? '';
+  // Ignore env placeholders so UI shows the product version, not “local” / “production”.
+  const ignore = !raw || /^(local|production|development|dev|prod|unknown|none)$/i.test(raw);
+  const short = ignore ? '' : raw.slice(0, 7);
   return short ? `v${APP_VERSION} · ${short}` : `v${APP_VERSION}`;
 }
