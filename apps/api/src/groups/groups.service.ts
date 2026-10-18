@@ -1,3 +1,4 @@
+import { modeKeyFromLabel, type ModeKey } from '@myodd/shared';
 import { creatorLabel, creatorSelect } from '../creators/creators.service';
 import {
   Injectable,
@@ -8,6 +9,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { canAccessGroup } from './group-access';
 import { PlayCheckService } from './play-check.service';
 
+const MODE_KEYS = new Set(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']);
+
+function resolveRiskMode(generationReport: unknown, description?: string | null): ModeKey | null {
+  const report = generationReport as { effectiveConfig?: { riskMode?: string | null } } | null;
+  const fromConfig = report?.effectiveConfig?.riskMode ?? null;
+  if (fromConfig && MODE_KEYS.has(fromConfig)) return fromConfig as ModeKey;
+  return modeKeyFromLabel(description) ?? modeKeyFromLabel(fromConfig);
+}
+
 @Injectable()
 export class GroupsService {
   constructor(
@@ -15,6 +25,36 @@ export class GroupsService {
     private readonly catalog: CatalogService,
     private readonly playCheck: PlayCheckService,
   ) {}
+
+  private collectionPlay(slips?: Array<{ playStatus: string; playCheckedAt: Date | null; cutLegs: number; openLegs: number; liveLegs: number; playedLegs: number }> | null) {
+    if (!slips?.length) {
+      return { playResult: 'UNKNOWN' as const, playCheckedAt: null as string | null, done: 0, open: 0, live: 0 };
+    }
+    const summary = this.playCheck.summarize(slips.map(s => ({
+      playStatus: s.playStatus as 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN',
+      cutLegs: s.cutLegs, openLegs: s.openLegs, liveLegs: s.liveLegs, playedLegs: s.playedLegs,
+    })));
+    const checked = slips.some(s => s.playCheckedAt);
+    let playResult: 'DONE' | 'LIVE' | 'OPEN' | 'UNKNOWN' = 'UNKNOWN';
+    if (!checked && summary.unknown === slips.length) playResult = 'UNKNOWN';
+    else if (summary.live > 0) playResult = 'LIVE';
+    else if (summary.open > 0) playResult = 'OPEN';
+    else if (summary.done === slips.length) playResult = 'DONE';
+    else if (summary.done > 0) playResult = 'DONE';
+    else if (checked) playResult = 'UNKNOWN';
+    const latest = slips.reduce<Date | null>((max, s) => {
+      if (!s.playCheckedAt) return max;
+      if (!max || s.playCheckedAt > max) return s.playCheckedAt;
+      return max;
+    }, null);
+    return {
+      playResult,
+      playCheckedAt: latest?.toISOString() ?? null,
+      done: summary.done,
+      open: summary.open,
+      live: summary.live,
+    };
+  }
 
   async listRecent(page = 1, userId: string) {
     const groups = await this.prisma.slipGroup.findMany({
@@ -25,22 +65,46 @@ export class GroupsService {
         savedBy: { none: { userId, hiddenAt: { not: null } } },
       },
       take: 50, skip: (page - 1) * 50, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { publicId: true, title: true, createdAt: true, originalBookingCode: true,
-        isPublic: true, ownerId: true, owner: { select: creatorSelect }, _count: { select: { slips: true } } },
+      select: {
+        publicId: true, title: true, createdAt: true, originalBookingCode: true, description: true,
+        generationReport: true, isPublic: true, ownerId: true, owner: { select: creatorSelect },
+        _count: { select: { slips: true } },
+        slips: { select: { playStatus: true, playCheckedAt: true, cutLegs: true, openLegs: true, liveLegs: true, playedLegs: true } },
+      },
     });
-    return groups.map(group => ({ publicId: group.publicId, title: group.title,
-      createdAt: group.createdAt.toISOString(), originalBookingCode: group.originalBookingCode,
-      creator: group.owner ? creatorLabel(group.owner) : null, slipCount: group._count.slips, isPublic: group.isPublic, isOwner: group.ownerId === userId, saved: true }));
+    return groups.map(group => {
+      const play = this.collectionPlay(group.slips);
+      return {
+        publicId: group.publicId, title: group.title,
+        createdAt: group.createdAt.toISOString(), originalBookingCode: group.originalBookingCode,
+        creator: group.owner ? creatorLabel(group.owner) : null, slipCount: group._count.slips,
+        isPublic: group.isPublic, isOwner: group.ownerId === userId, saved: true,
+        riskMode: resolveRiskMode(group.generationReport, group.description),
+        ...play,
+      };
+    });
   }
 
   async listPublic(page = 1, userId?: string) {
     const rows = await this.prisma.slipGroup.findMany({ where: { isPublic: true, userSaved: true, deletedAt: null, slips: { some: {} } },
       take: 50, skip: (page - 1) * 50, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { publicId: true, title: true, createdAt: true, originalBookingCode: true, ownerId: true, owner: { select: creatorSelect },
-        _count: { select: { slips: true } } } });
-    return rows.map(g => ({ publicId: g.publicId, title: g.title, createdAt: g.createdAt.toISOString(),
-      creator: g.owner ? creatorLabel(g.owner) : null, originalBookingCode: g.originalBookingCode, slipCount: g._count.slips, isPublic: true, isOwner: !!userId && g.ownerId === userId,
-      saved: !!userId && g.ownerId === userId }));
+      select: {
+        publicId: true, title: true, createdAt: true, originalBookingCode: true, description: true,
+        generationReport: true, ownerId: true, owner: { select: creatorSelect },
+        _count: { select: { slips: true } },
+        slips: { select: { playStatus: true, playCheckedAt: true, cutLegs: true, openLegs: true, liveLegs: true, playedLegs: true } },
+      } });
+    return rows.map(g => {
+      const play = this.collectionPlay(g.slips);
+      return {
+        publicId: g.publicId, title: g.title, createdAt: g.createdAt.toISOString(),
+        creator: g.owner ? creatorLabel(g.owner) : null, originalBookingCode: g.originalBookingCode, slipCount: g._count.slips,
+        isPublic: true, isOwner: !!userId && g.ownerId === userId,
+        saved: !!userId && g.ownerId === userId,
+        riskMode: resolveRiskMode(g.generationReport, g.description),
+        ...play,
+      };
+    });
   }
 
   async getByPublicId(publicId: string, userId?: string) {
@@ -58,6 +122,7 @@ export class GroupsService {
     if (!canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
 
     const availability = await this.catalog.displayStatus(group.slips.map(s => s.bookingCode));
+    const riskMode = resolveRiskMode(group.generationReport, group.description);
     const slips = group.slips.map((s) => {
       const code = s.bookingCode.toUpperCase();
       const displayStatus = availability.statuses.get(code)
@@ -69,6 +134,7 @@ export class GroupsService {
         totalOdds: s.totalOdds,
         confidence: s.confidence,
         riskLevel: s.riskLevel,
+        riskMode,
         selectionCount: s.selectionCount,
         rankOrder: s.rankOrder,
         slipScore: s.slipScore,
@@ -110,6 +176,7 @@ export class GroupsService {
       isOwner: !!userId && group.ownerId === userId, isPublic: group.isPublic,
       title: group.title,
       description: group.description,
+      riskMode,
       createdAt: group.createdAt.toISOString(),
       expiresAt: group.expiresAt?.toISOString() ?? null,
       originalBookingCode: group.originalBookingCode,
@@ -242,6 +309,8 @@ export class GroupsService {
     if (!slip || !canAccessGroup(slip.group, userId)) throw new NotFoundException('Slip not found');
     const availability = await this.catalog.displayStatus([slip.bookingCode]);
     const displayStatus = availability.statuses.get(slip.bookingCode.toUpperCase()) ?? 'UNKNOWN';
+    const riskMode = resolveRiskMode(slip.group.generationReport, slip.group.description);
+    const isOwner = !!userId && slip.group.ownerId === userId;
     return {
       id: slip.id,
       bookingCode: slip.bookingCode,
@@ -249,6 +318,7 @@ export class GroupsService {
       totalOdds: slip.totalOdds,
       confidence: slip.confidence,
       riskLevel: slip.riskLevel,
+      riskMode,
       selectionCount: slip.selectionCount,
       playStatus: slip.playStatus,
       playCheckedAt: slip.playCheckedAt?.toISOString() ?? null,
@@ -258,8 +328,12 @@ export class GroupsService {
       cutLegs: slip.cutLegs,
       cutSummary: slip.cutSummary,
       expiresAt: slip.expiresAt?.toISOString() ?? null,
+      createdAt: slip.createdAt.toISOString(),
       displayStatus,
       groupPublicId: slip.group.publicId,
+      userSaved: slip.group.userSaved,
+      isOwner,
+      isPublic: slip.group.isPublic,
       selections: slip.selections.map((sel) => ({
         homeTeam: sel.homeTeam,
         awayTeam: sel.awayTeam,

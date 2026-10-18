@@ -30,28 +30,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export interface CreatorSummary { publicId: string; username: string | null; name: string }
-export type CollectionPlayResult = 'ALL_PLAYED' | 'CUT' | 'MIXED' | 'LIVE' | 'OPEN' | 'UNKNOWN';
+export type CollectionPlayResult = 'DONE' | 'LIVE' | 'OPEN' | 'UNKNOWN' | 'ALL_PLAYED' | 'CUT' | 'MIXED';
 export type RiskMode = 'INVESTOR' | 'GAMBLER' | 'JAPA' | 'LAGOS_LIFE';
-export type SlipPlayStatus = 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
-export type LegPlayStatus = 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+export type SlipPlayStatus = 'OPEN' | 'LIVE' | 'ALL_PLAYED' | 'UNKNOWN' | 'CUT';
+export type LegPlayStatus = 'UPCOMING' | 'LIVE' | 'PLAYED' | 'UNKNOWN' | 'CUT';
 export interface PlaySummary {
   tickets: number;
   open: number;
   live: number;
-  cut: number;
-  allPlayed: number;
+  done: number;
   unknown: number;
   legsOpen: number;
   legsLive: number;
-  legsPlayed: number;
-  legsCut: number;
-}
-export interface CutLegDetail {
-  homeTeam: string;
-  awayTeam: string;
-  marketName?: string;
-  selectionName?: string;
-  playNote?: string | null;
+  legsDone: number;
+  /** @deprecated use done */
+  cut?: number;
+  /** @deprecated use done */
+  allPlayed?: number;
+  /** @deprecated use legsDone */
+  legsPlayed?: number;
+  /** @deprecated */
+  legsCut?: number;
 }
 
 export interface CollectionSummary {
@@ -67,10 +66,13 @@ export interface CollectionSummary {
   riskMode?: RiskMode | null;
   playResult?: CollectionPlayResult;
   playCheckedAt?: string | null;
-  cut?: number;
-  allPlayed?: number;
+  done?: number;
   open?: number;
   live?: number;
+  /** @deprecated use done */
+  cut?: number;
+  /** @deprecated use done */
+  allPlayed?: number;
 }
 
 export interface GenerateResponse {
@@ -134,6 +136,7 @@ export interface GeneratedSlip {
   selections: SlipSelection[];
   groupPublicId?: string;
   userSaved?: boolean;
+  isOwner?: boolean;
   isPublic?: boolean;
 }
 
@@ -222,10 +225,10 @@ export const api = {
   verifyCode(code: string) { return request<{ codes: string[]; unavailable: number }>(`/codes/${encodeURIComponent(code)}/verify`, { method: 'POST' }); },
   verifyGroup(id: string) { return request<{ codes: string[]; unavailable: number }>(`/groups/${encodeURIComponent(id)}/verify`, { method: 'POST' }); },
   checkPlayGroup(id: string) {
-    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: CutLegDetail[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
+    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
   },
   checkPlayCode(code: string) {
-    return request<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: CutLegDetail[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
+    return request<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
   },
   getJob(jobId: string) {
     return request<JobProgress>(`/jobs/${jobId}`);

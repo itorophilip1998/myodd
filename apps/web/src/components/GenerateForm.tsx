@@ -1,7 +1,8 @@
 'use client';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, formatAppVersion, lagosDateYmd, matchDayKickoffWindow, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, type ModeKey } from '@myodd/shared';
 import { ProgressQuest } from './ProgressQuest';
 import { MatchDayPicker } from './MatchDayPicker';
 import { OptionsPopover } from './OptionsPopover';
@@ -21,10 +22,10 @@ import {
 } from '@/lib/prediction-book';
 
 const MODES = [
-  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: 'Ticket 2–5 · each game 1.10–1.50', icon: '◈', tone: 'investor', recommended: true },
-  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Ticket 5.01–20 · each game ≤1.80', icon: '♧', tone: 'gambler', recommended: false },
-  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false },
-  { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: `Ticket 100.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: 'ϟ', tone: 'lagos', recommended: false },
+  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: 'Ticket 2–5 · each game 1.10–1.50', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
+  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Ticket 5.01–20 · each game ≤1.80', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
+  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
+  { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: `Ticket 100.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
 ];
 
 const TICKET_CHOICES = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
@@ -103,6 +104,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const wantsSplit = splitEnabled || (operation === 'auto' && parsedChat.isSplit);
   const edited = useRef(false);
   const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
+  const [bookOpen, setBookOpen] = useState(false);
   const bookApplied = useRef(false);
   const [ticketCount, setTicketCount] = useState(() => settings.defaultTickets ? String(settings.defaultTickets) : '5');
   const [scope, setScope] = useState(settings.defaultScope);
@@ -172,8 +174,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   }, [initialInstruction, settings.defaultTickets]);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submittedAt, setSubmittedAt] = useState<string>();
 
@@ -181,8 +181,13 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     touch();
     setPreferSource(false);
     setInstruction(current => appendPrompt(current, text));
-    setNotice('Voice added to your prompt.');
+    toast('Voice added');
   });
+  useEffect(() => {
+    if (!speech.error) return;
+    toast(speech.error, { sticky: true });
+    speech.setError('');
+  }, [speech.error, speech.setError, toast]);
 
   const optionsSummary = useMemo(() => {
     if (wantsSplit) return `${effectiveSplit || '?'} parts`;
@@ -240,8 +245,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   async function onImportFile(file: File | undefined) {
     if (!file) return;
     setImporting(true);
-    setError(null);
-    setNotice('');
     try {
       const { text, truncated } = await extractPromptFromFile(file);
       touch();
@@ -249,10 +252,10 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       setInstruction(text);
       play('import');
       play('prompt');
-      setNotice(truncated ? `Imported ${file.name} (trimmed to ${MAX_PROMPT} characters).` : `Imported ${file.name}.`);
+      toast(truncated ? `Imported ${file.name} (trimmed to ${MAX_PROMPT} characters).` : `Imported ${file.name}.`);
     } catch (e) {
       play('error');
-      setError((e as Error).message);
+      toast((e as Error).message, { sticky: true });
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -262,7 +265,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   async function submit(event: FormEvent) {
     event.preventDefault(); if (loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !predictionBook.length)) return;
     speech.stop();
-    setError(null);
     const typedCode = parsedChat.bookingCode;
     const effectiveCode = (preferSource ? bookingCode : typedCode ?? bookingCode).trim().toUpperCase();
     const uiTickets = !wantsSplit && ticketCount ? Number(ticketCount) : undefined;
@@ -279,8 +281,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     });
     if (guard) {
       play('error');
-      toast(guard);
-      setError(guard);
+      toast(guard, { sticky: true });
       setOptionsOpen(true);
       return;
     }
@@ -345,7 +346,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         setPredictionBook([]);
       }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { play('error'); setError((err as Error).message); setLoading(false); }
+    } catch (err) { play('error'); toast((err as Error).message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
@@ -363,21 +364,33 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       <legend>Pick your mode <span>Investor recommended for best-ranked tickets</span></legend>
       <div className="mode-grid">
         {MODES.map(item => (
-          <button
-            type="button"
-            key={item.name}
-            aria-pressed={mode === item.name}
-            onClick={() => { touch(); setMode(item.name); }}
-            className={`mode-option ${item.tone} ${mode === item.name ? 'selected' : ''}`}
-          >
-            <span className="mode-icon" aria-hidden>{item.icon}</span>
-            <span>
-              <strong>{item.name}{item.recommended ? <em className="mode-recommended">Recommended</em> : null}</strong>
-              <span className="mode-risk">{item.risk}</span>
-              <small>{item.detail}</small>
-            </span>
-            <span className="mode-check" aria-hidden>{mode === item.name ? '✓' : ''}</span>
-          </button>
+          <div key={item.name} className={`mode-option-wrap ${item.tone}${mode === item.name ? ' selected' : ''}`}>
+            <button
+              type="button"
+              aria-pressed={mode === item.name}
+              onClick={() => { touch(); setMode(item.name); }}
+              className={`mode-option ${item.tone}${mode === item.name ? ' selected' : ''}`}
+            >
+              <span className="mode-icon" aria-hidden>{item.icon}</span>
+              <span>
+                <strong>
+                  {item.name}
+                  {item.recommended ? <em className="mode-recommended">Recommended</em> : null}
+                </strong>
+                <span className="mode-risk">{item.risk}</span>
+                <small>{item.detail}</small>
+              </span>
+              <span className="mode-check" aria-hidden>{mode === item.name ? '✓' : ''}</span>
+            </button>
+            <Link
+              href={`/terms#${item.termsHash}`}
+              className="mode-info"
+              aria-label={`About ${item.name}`}
+              title={`Learn about ${item.name}`}
+            >
+              <span aria-hidden>ⓘ</span>
+            </Link>
+          </div>
         ))}
       </div>
     </fieldset>
@@ -386,50 +399,73 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       {predictionBook.length > 0 && (
         <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
           <div className="prediction-book-panel-head">
-            <strong>Prediction book · {predictionBook.length}</strong>
-            <button type="button" className="quiet-button" onClick={() => { clearPredictionBook(); setPredictionBook([]); touch(); }}>Clear book</button>
+            <button
+              type="button"
+              className="prediction-book-toggle"
+              aria-expanded={bookOpen}
+              title={bookOpen ? 'Hide booked picks' : 'Show booked picks'}
+              onClick={() => setBookOpen(open => !open)}
+            >
+              <span aria-hidden>{bookOpen ? '▾' : '▸'}</span>
+              <strong>Book · {predictionBook.length}</strong>
+            </button>
+            <button
+              type="button"
+              className="quiet-button"
+              title="Clear prediction book"
+              onClick={() => { clearPredictionBook(); setPredictionBook([]); setBookOpen(false); touch(); }}
+            >
+              Clear
+            </button>
           </div>
-          <ul className="prediction-book-list">
-            {predictionBook.map((pick) => (
-              <li key={`${pick.eventId}:${pick.marketId}:${pick.outcomeId}:${pick.specifier}`}>
-                <span>
-                  <b>{pick.homeTeam} vs {pick.awayTeam}</b>
-                  <small>{pick.marketName}: {pick.selectionName} @ {pick.odds}</small>
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${pick.homeTeam} vs ${pick.awayTeam}`}
-                  onClick={() => {
-                    const next = removePredictionBookPick(pick.eventId);
-                    setPredictionBook(next);
-                    setInstruction(next.length ? predictionBookPrompt(next) : '');
-                    touch();
-                  }}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="prediction-book-hint">Generate will book these exact myOdd picks on SportyBet.</p>
+          {bookOpen && (
+            <ul className="prediction-book-list">
+              {predictionBook.map((pick) => (
+                <li key={`${pick.eventId}:${pick.marketId}:${pick.outcomeId}:${pick.specifier}`}>
+                  <span title={`${pick.marketName}: ${pick.selectionName} @ ${pick.odds}`}>
+                    <b>{pick.homeTeam} vs {pick.awayTeam}</b>
+                    <small>{pick.selectionName} @ {pick.odds}</small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${pick.homeTeam} vs ${pick.awayTeam}`}
+                    title="Remove pick"
+                    onClick={() => {
+                      const next = removePredictionBookPick(pick.eventId);
+                      setPredictionBook(next);
+                      setInstruction(next.length ? predictionBookPrompt(next) : '');
+                      if (!next.length) setBookOpen(false);
+                      touch();
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
-      <label htmlFor={promptId} className="sr-only">Message myOdd</label>
+      <label htmlFor={promptId} className="sr-only">Describe your tickets</label>
       <textarea
         id={promptId}
         value={instruction}
-        onChange={e => { touch(); setInstruction(e.target.value); setPreferSource(false); setNotice(''); }}
+        onChange={e => { touch(); setInstruction(e.target.value); setPreferSource(false); }}
         onKeyDown={shortcut}
         maxLength={MAX_PROMPT}
         rows={2}
-        placeholder="Optional: type, speak, or import a prompt — e.g. ‘4–5 odds, double chance…’"
+        placeholder={'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
       />
       {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && (
-        <p className="parsed-code-hint">Using {parsedChat.bookingCode} from your message</p>
+        <p className="parsed-code-hint" title={`Using ${parsedChat.bookingCode} from your message`}>Using {parsedChat.bookingCode}</p>
       )}
-      {speech.listening && <p className="composer-live-hint" role="status"><span className="live-dot" aria-hidden />Listening… tap the mic to stop</p>}
-      {notice && <p className="composer-live-hint" role="status">{notice}</p>}
-      <p className="applied-settings" role="status">{appliedSummary}</p>
+      {speech.listening && (
+        <p className="composer-live-hint" role="status" title="Tap the mic to stop">
+          <span className="live-dot" aria-hidden />
+          {speech.interim ? speech.interim : 'Listening…'}
+        </p>
+      )}
+      <p className="applied-settings" role="status" title={appliedSummary}>{appliedSummary}</p>
 
       <div className="chat-input-footer">
         <div className="composer-tools">
@@ -544,13 +580,9 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         </div>
 
         <button className="primary-button" disabled={loading || busy || importing || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !predictionBook.length)} type="submit">
-          {loading ? 'Sending…' : busy ? 'Creating…' : wantsSplit ? `Split${effectiveSplit ? ` · ${effectiveSplit}` : ''}` : predictionBook.length ? 'Book predictions' : 'Generate codes'} <span aria-hidden>↑</span>
+          {loading ? 'Sending…' : busy ? 'Creating…' : wantsSplit ? `Split${effectiveSplit ? ` · ${effectiveSplit}` : ''}` : predictionBook.length ? 'Submit book' : 'Generate codes'} <span aria-hidden>↑</span>
         </button>
       </div>
-      <p className="app-version" aria-label="Deployed app version">
-        <strong>{formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)}</strong>
-      </p>
-      {(error || speech.error) && <p className="form-error" role="alert">{error || speech.error}</p>}
     </div>
   </form>;
 }

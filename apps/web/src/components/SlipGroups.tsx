@@ -12,9 +12,10 @@ import { loadTicketOnSportyBet, sportyLoadUrl } from '@/lib/sportybet';
 import { formatTicketCopy, formatTicketsCopy } from '@/lib/ticket-copy';
 import { useToast } from './ToastProvider';
 import { useUiSound } from './SettingsProvider';
-import { CutCallout } from './CutCallout';
 import { VerifiedBookmakerLink } from './VerifiedBookmakerLink';
+import { CollectionMenu } from './CollectionMenu';
 import Link from 'next/link';
+import type { CollectionSummary } from '@/lib/api';
 
 const STATUS_LABEL: Record<NonNullable<GeneratedSlip['displayStatus']>, string> = {
   ACTIVE: 'Active',
@@ -25,43 +26,51 @@ const STATUS_LABEL: Record<NonNullable<GeneratedSlip['displayStatus']>, string> 
   UNKNOWN: 'Stored',
 };
 
+function isDoneSlip(status?: SlipPlayStatus | null) {
+  return status === 'ALL_PLAYED' || status === 'CUT';
+}
+
+function isDoneLeg(status?: LegPlayStatus | null) {
+  return status === 'PLAYED' || status === 'CUT';
+}
+
 const PLAY_LABEL: Record<SlipPlayStatus, string> = {
   OPEN: 'Open',
   LIVE: 'Live',
-  CUT: 'Cut',
-  ALL_PLAYED: 'All played',
+  CUT: 'Done',
+  ALL_PLAYED: 'Done',
   UNKNOWN: 'Not checked',
 };
 
 const LEG_LABEL: Record<LegPlayStatus, string> = {
   UPCOMING: 'Upcoming',
   LIVE: 'Live',
-  PLAYED: 'Played',
-  CUT: 'Cut',
+  PLAYED: 'Done',
+  CUT: 'Done',
   UNKNOWN: 'Unknown',
 };
 
 function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
+  const done = slips.filter(s => isDoneSlip(s.playStatus)).length;
+  const legsDone = slips.reduce((n, s) => n + (s.playedLegs ?? 0) + (s.cutLegs ?? 0), 0);
   return {
     tickets: slips.length,
     open: slips.filter(s => s.playStatus === 'OPEN').length,
     live: slips.filter(s => s.playStatus === 'LIVE').length,
-    cut: slips.filter(s => s.playStatus === 'CUT').length,
-    allPlayed: slips.filter(s => s.playStatus === 'ALL_PLAYED').length,
+    done,
     unknown: slips.filter(s => !s.playStatus || s.playStatus === 'UNKNOWN').length,
     legsOpen: slips.reduce((n, s) => n + (s.openLegs ?? 0), 0),
     legsLive: slips.reduce((n, s) => n + (s.liveLegs ?? 0), 0),
-    legsPlayed: slips.reduce((n, s) => n + (s.playedLegs ?? 0), 0),
-    legsCut: slips.reduce((n, s) => n + (s.cutLegs ?? 0), 0),
+    legsDone,
   };
 }
 
 function playLine(summary: PlaySummary) {
+  const done = summary.done ?? summary.allPlayed ?? 0;
   const bits = [
-    summary.allPlayed ? `${summary.allPlayed} all played` : '',
-    summary.cut ? `${summary.cut} cut` : '',
     summary.live ? `${summary.live} live` : '',
     summary.open ? `${summary.open} open` : '',
+    done ? `${done} done` : '',
   ].filter(Boolean);
   return bits.join(' · ') || 'No play check yet';
 }
@@ -308,7 +317,7 @@ function PicksModal({
             <h3>{slip.bookingCode}</h3>
             <div className="picks-modal-tags">
               {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
-              {playLabel && <span className={`play-chip play-${(slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
+              {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
               <span className="code-badge">{STATUS_LABEL[slip.displayStatus ?? 'UNKNOWN']} · {slip.selectionCount} picks</span>
             </div>
           </div>
@@ -319,14 +328,13 @@ function PicksModal({
           {slip.createdAt && <time dateTime={slip.createdAt}>{formatLagosDateTime(slip.createdAt)}</time>}
           <Link href={`/code/${slip.bookingCode}`} onClick={onClose}>Open ticket page ↗</Link>
         </div>
-        <CutCallout selections={slip.selections} cutSummary={slip.cutSummary} />
         <ul className="picks-modal-list">
           {slip.selections.map((pick, i) => (
-            <li key={i} className={pick.playStatus === 'CUT' ? 'is-cut-leg' : pick.playStatus === 'LIVE' ? 'is-live-leg' : pick.playStatus === 'PLAYED' ? 'is-played-leg' : ''}>
+            <li key={i} className={pick.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(pick.playStatus) ? 'is-played-leg' : ''}>
               <div className="picks-modal-row">
                 <strong>{pick.homeTeam} vs {pick.awayTeam}</strong>
                 {pick.playStatus && pick.playStatus !== 'UNKNOWN' && (
-                  <span className={`play-chip play-${pick.playStatus.toLowerCase()}`}>{LEG_LABEL[pick.playStatus]}</span>
+                  <span className={`play-chip play-${isDoneLeg(pick.playStatus) ? 'all_played' : pick.playStatus.toLowerCase()}`}>{LEG_LABEL[pick.playStatus]}</span>
                 )}
               </div>
               <span className="picks-modal-league">{pick.league}</span>
@@ -362,6 +370,7 @@ export function SlipGroups({
   slips,
   groupPublicId,
   onEdit,
+  collection,
   splitDetails,
   playSummary,
   createdAt,
@@ -371,6 +380,7 @@ export function SlipGroups({
   slips: GeneratedSlip[];
   groupPublicId: string;
   onEdit?: (code: string) => void;
+  collection?: Pick<CollectionSummary, 'publicId' | 'title' | 'isPublic' | 'isOwner' | 'creator'>;
   splitDetails?: GenerationReport['splitDetails'];
   playSummary?: PlaySummary;
   createdAt?: string;
@@ -387,11 +397,16 @@ export function SlipGroups({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [picksFor, setPicksFor] = useState<GeneratedSlip | null>(null);
   const [shareFor, setShareFor] = useState<GeneratedSlip | null>(null);
-  const [playFilter, setPlayFilter] = useState<'ALL_PLAYED' | 'CUT' | 'LIVE' | 'OPEN' | null>(null);
-  const [status, setStatus] = useState('');
-  const summary = useMemo(() => playSummary ?? summarizeLocal(slips), [playSummary, slips]);
+  const [playFilter, setPlayFilter] = useState<'DONE' | 'LIVE' | 'OPEN' | null>(null);
+  const summary = useMemo(() => {
+    const base = playSummary ?? summarizeLocal(slips);
+    const done = base.done ?? base.allPlayed ?? 0;
+    const legsDone = base.legsDone ?? ((base.legsPlayed ?? 0) + (base.legsCut ?? 0));
+    return { ...base, done, legsDone };
+  }, [playSummary, slips]);
   const visibleSlips = useMemo(() => {
     if (!playFilter) return slips;
+    if (playFilter === 'DONE') return slips.filter(s => isDoneSlip(s.playStatus));
     return slips.filter(s => s.playStatus === playFilter);
   }, [slips, playFilter]);
   const collectionMode = modeTag(riskMode) ?? modeTag(slips[0]?.riskMode);
@@ -399,7 +414,7 @@ export function SlipGroups({
   const expired = (slip: GeneratedSlip) => slip.displayStatus === 'EXPIRED' || (!!slip.expiresAt && new Date(slip.expiresAt).getTime() <= Date.now());
   const canLoad = (slip: GeneratedSlip) => !expired(slip) || !!slip.shareUrl;
 
-  function togglePlayFilter(next: 'ALL_PLAYED' | 'CUT' | 'LIVE' | 'OPEN') {
+  function togglePlayFilter(next: 'DONE' | 'LIVE' | 'OPEN') {
     play('click');
     setPlayFilter(current => current === next ? null : next);
     setMenuFor(null);
@@ -411,14 +426,11 @@ export function SlipGroups({
       const checked = await api.verifyGroup(groupPublicId);
       const valid = new Set(checked.codes.map(code => code.toUpperCase()));
       const active = slips.filter(slip => valid.has(slip.bookingCode.toUpperCase()));
-      if (!active.length) { toast('No active codes right now.'); setStatus('No active codes right now.'); return; }
+      if (!active.length) { toast('No active codes right now.', { sticky: true }); return; }
       await copyText(formatTicketsCopy(active, riskMode));
-      const msg = `Copied ${active.length} tickets${checked.unavailable ? ` · ${checked.unavailable} skipped` : ''}`;
-      toast(msg);
-      setStatus(msg);
+      toast(`Copied ${active.length} tickets${checked.unavailable ? ` · ${checked.unavailable} skipped` : ''}`);
     } catch {
-      toast('Could not verify codes right now.');
-      setStatus('Could not verify codes right now. Please try again.');
+      toast('Could not verify codes right now.', { sticky: true });
     } finally { setCheckingCopy(false); }
   }
 
@@ -435,17 +447,15 @@ export function SlipGroups({
         try {
           await copyText(url);
           toast('Link copied');
-          setStatus('Link copied');
         } catch {
-          toast('Could not share this collection.');
+          toast('Could not share this collection.', { sticky: true });
         }
       });
       return;
     }
     void copyText(url).then(() => {
       toast('Link copied');
-      setStatus('Link copied');
-    }).catch(() => toast('Could not share this collection.'));
+    }).catch(() => toast('Could not share this collection.', { sticky: true }));
   }
 
   async function checkAllPlayed() {
@@ -457,13 +467,11 @@ export function SlipGroups({
         query.invalidateQueries({ queryKey: ['group', groupPublicId] }),
         query.invalidateQueries({ queryKey: ['history'] }),
       ]);
-      play(result.summary.cut ? 'error' : 'done');
-      toast(playLine(result.summary));
-      setStatus(playLine(result.summary));
+      play('done');
+      toast(playLine(result.summary), { sticky: true });
     } catch {
       play('error');
-      toast('Could not check play results.');
-      setStatus('Could not check play results. Please try again.');
+      toast('Could not check play results.', { sticky: true });
     } finally { setCheckingPlay(false); }
   }
 
@@ -477,16 +485,12 @@ export function SlipGroups({
         query.invalidateQueries({ queryKey: ['code', code] }),
         query.invalidateQueries({ queryKey: ['history'] }),
       ]);
-      play(result.playStatus === 'CUT' ? 'error' : result.playStatus === 'ALL_PLAYED' ? 'done' : 'tick');
-      const cutHint = result.cuts?.length
-        ? ` · cut by ${result.cuts.map(c => `${c.homeTeam} vs ${c.awayTeam}`).join(', ')}`
-        : result.cutSummary ? ` · ${result.cutSummary}` : result.cutLegs ? ` · ${result.cutLegs} cut` : '';
-      const msg = `${code}: ${PLAY_LABEL[result.playStatus]}${cutHint}${result.playedLegs && result.playStatus !== 'CUT' ? ` · ${result.playedLegs} played` : ''}`;
-      toast(msg);
-      setStatus(msg);
+      play(isDoneSlip(result.playStatus) ? 'done' : result.playStatus === 'LIVE' ? 'tick' : 'tick');
+      const doneLegs = result.playedLegs || 0;
+      toast(`${code}: ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
     } catch {
       play('error');
-      toast('Could not check this ticket.');
+      toast('Could not check this ticket.', { sticky: true });
     } finally { setCheckingTicket(null); }
   }
 
@@ -495,7 +499,7 @@ export function SlipGroups({
       await copyText(formatTicketCopy(slip, riskMode));
       toast('Copied');
     } catch {
-      toast('Could not copy this ticket');
+      toast('Could not copy this ticket', { sticky: true });
     }
   }
 
@@ -507,7 +511,7 @@ export function SlipGroups({
       toast('Opening SportyBet…');
     } catch (e) {
       play('error');
-      toast((e as Error).message || 'Could not load ticket');
+      toast((e as Error).message || 'Could not load ticket', { sticky: true });
     } finally {
       setLoadingTicket(null);
     }
@@ -526,28 +530,29 @@ export function SlipGroups({
       <div className="bulk-actions">
         {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Verify played'}</button>}
         <button onClick={() => void copyAll()} disabled={!slips.length || checkingCopy} className="primary-button">{checkingCopy ? 'Checking…' : 'Copy all'}</button>
-        <button onClick={() => void shareAll()} className="outline-button">Share</button>
+        {collection && (
+          <CollectionMenu
+            collection={collection}
+            onShare={() => void shareAll()}
+          />
+        )}
       </div>
     </div>
-    {slips.length > 0 && (allowPlayCheck || summary.allPlayed + summary.cut + summary.live > 0) && <div className="play-kpi" aria-label="Filter by play result" role="toolbar">
-      <button type="button" className={`play-kpi-btn play-all_played${playFilter === 'ALL_PLAYED' ? ' is-active' : ''}`} aria-pressed={playFilter === 'ALL_PLAYED'} onClick={() => togglePlayFilter('ALL_PLAYED')} disabled={!summary.allPlayed}>
-        <b>{summary.allPlayed}</b> all played
-      </button>
-      <button type="button" className={`play-kpi-btn play-cut${playFilter === 'CUT' ? ' is-active' : ''}`} aria-pressed={playFilter === 'CUT'} onClick={() => togglePlayFilter('CUT')} disabled={!summary.cut}>
-        <b>{summary.cut}</b> cut
-      </button>
+    {slips.length > 0 && (allowPlayCheck || summary.done + summary.live + summary.open > 0) && <div className="play-kpi" aria-label="Filter by play result" role="toolbar">
       <button type="button" className={`play-kpi-btn play-live${playFilter === 'LIVE' ? ' is-active' : ''}`} aria-pressed={playFilter === 'LIVE'} onClick={() => togglePlayFilter('LIVE')} disabled={!summary.live}>
         <b>{summary.live}</b> live
       </button>
       <button type="button" className={`play-kpi-btn play-open${playFilter === 'OPEN' ? ' is-active' : ''}`} aria-pressed={playFilter === 'OPEN'} onClick={() => togglePlayFilter('OPEN')} disabled={!summary.open}>
         <b>{summary.open}</b> open
       </button>
-      <span className="play-kpi-legs">{summary.legsPlayed} played · {summary.legsCut} cut legs{playFilter ? ` · showing ${visibleSlips.length}` : ''}</span>
+      <button type="button" className={`play-kpi-btn play-all_played${playFilter === 'DONE' ? ' is-active' : ''}`} aria-pressed={playFilter === 'DONE'} onClick={() => togglePlayFilter('DONE')} disabled={!summary.done}>
+        <b>{summary.done}</b> done
+      </button>
+      <span className="play-kpi-legs">{summary.legsLive} live · {summary.legsDone} done{playFilter ? ` · showing ${visibleSlips.length}` : ''}</span>
       {playFilter && (
         <button type="button" className="play-kpi-clear" onClick={() => { play('click'); setPlayFilter(null); }}>Show all</button>
       )}
     </div>}
-    {status && <p className="action-status" role="status">{status}</p>}
     <ul className="code-grid">{visibleSlips.map((slip, index) => {
       const label = STATUS_LABEL[slip.displayStatus ?? (expired(slip) ? 'EXPIRED' : 'ACTIVE')];
       const playLabel = slip.playStatus && slip.playStatus !== 'UNKNOWN' ? PLAY_LABEL[slip.playStatus] : null;
@@ -555,7 +560,7 @@ export function SlipGroups({
       const ticketModeKey = (slip.riskMode ?? riskMode ?? '').toLowerCase();
       const gamesLabel = `${slip.selectionCount} ${slip.selectionCount === 1 ? 'game' : 'games'}`;
       return (
-        <li key={slip.id} className={`code-card ${expired(slip) || slip.displayStatus === 'UNAVAILABLE' ? 'is-expired' : ''} ${slip.playStatus === 'CUT' ? 'is-cut' : ''} ${slip.playStatus === 'ALL_PLAYED' ? 'is-played' : ''} ${menuFor === slip.id ? 'is-menu-open' : ''}`}>
+        <li key={slip.id} className={`code-card ${expired(slip) || slip.displayStatus === 'UNAVAILABLE' ? 'is-expired' : ''} ${isDoneSlip(slip.playStatus) ? 'is-played' : ''} ${slip.playStatus === 'LIVE' ? 'is-live' : ''} ${menuFor === slip.id ? 'is-menu-open' : ''}`}>
           <button
             type="button"
             className="code-card-main"
@@ -580,7 +585,7 @@ export function SlipGroups({
           <div className="ticket-footer">
             <div className="ticket-tags">
               {ticketMode && <span className={`mode-tag mode-${ticketModeKey}`}>{ticketMode}</span>}
-              {playLabel && <span className={`play-chip play-${(slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
+              {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
             </div>
             <TicketMenu
               open={menuFor === slip.id}
@@ -603,7 +608,7 @@ export function SlipGroups({
     })}</ul>
     {!slips.length && <p className="empty-state">No codes yet.</p>}
     {!!slips.length && !visibleSlips.length && playFilter && (
-      <p className="empty-state">No {PLAY_LABEL[playFilter].toLowerCase()} tickets. <button type="button" className="text-link" onClick={() => setPlayFilter(null)}>Show all</button></p>
+      <p className="empty-state">No {playFilter === 'DONE' ? 'done' : playFilter.toLowerCase()} tickets. <button type="button" className="text-link" onClick={() => setPlayFilter(null)}>Show all</button></p>
     )}
     {picksFor && (
       <PicksModal

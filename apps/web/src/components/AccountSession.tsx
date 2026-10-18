@@ -5,6 +5,7 @@ import { useAuth, UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { accountApi, configureApiAuth } from '@/lib/api';
+import { useToast } from './ToastProvider';
 
 const SessionContext = createContext({ configured: false, signedIn: false, userId: null as string | null });
 export const useAccountSession = () => useContext(SessionContext);
@@ -21,22 +22,24 @@ function SettingsIcon() {
 export function AccountSession({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId, getToken } = useAuth();
   const query = useQueryClient();
+  const toast = useToast();
   const [readyId, setReadyId] = useState<string | null | undefined>(undefined);
-  const [syncError, setSyncError] = useState('');
   useEffect(() => {
     if (!isLoaded) return;
     configureApiAuth(() => getToken(), !!userId);
     query.clear();
     setReadyId(userId ?? null);
-    setSyncError('');
-    if (userId) void accountApi.sync().catch(() => setSyncError('Your account could not sync yet. Refresh to retry; existing saves remain in the database.'));
-  }, [isLoaded, userId, getToken, query]);
+    if (userId) {
+      void accountApi.sync().catch(() => {
+        toast('Your account could not sync yet. Refresh to retry; existing saves remain in the database.', { sticky: true });
+      });
+    }
+  }, [isLoaded, userId, getToken, query, toast]);
   if (!isLoaded || readyId !== (userId ?? null)) {
     return <div className="session-loading"><LogoLoader compact label="Opening your myOdd workspace" /></div>;
   }
   return (
     <SessionContext.Provider value={{ configured: true, signedIn: !!userId, userId: userId ?? null }}>
-      {syncError && <p role="alert" className="account-sync-error">{syncError}</p>}
       {children}
     </SessionContext.Provider>
   );
@@ -51,7 +54,6 @@ export function AccountControls() {
   if (!session.configured) {
     return (
       <div className="account-controls">
-        <Link href="/settings" className="settings-link">Settings</Link>
         <span className="auth-pending">Sign-in setup pending</span>
       </div>
     );
@@ -59,7 +61,6 @@ export function AccountControls() {
   if (!session.signedIn) {
     return (
       <div className="account-controls">
-        <Link href="/settings" className="settings-link">Settings</Link>
         <Link href="/sign-in" className="sign-in-link">Sign in</Link>
         <Link href="/sign-up" className="sign-up-link">Create account</Link>
       </div>
