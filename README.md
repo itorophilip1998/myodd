@@ -2,6 +2,8 @@
 
 Generate ranked SportyBet Nigeria booking-code variations from an existing code or a natural-language request. Football, pre-match, booking codes only; myOdd never stakes or places wagers.
 
+**Docs:** [docs/README.md](./docs/README.md) — architecture, software guide, and feature notes.
+
 ## Services
 
 ```text
@@ -165,7 +167,14 @@ docker compose cp api:/tmp/myodd-training.jsonl ./myodd-training.jsonl
 docker compose cp api:/tmp/myodd-training.jsonl.manifest.json ./myodd-training.jsonl.manifest.json
 ```
 
-Exports are local-only, contain complete journal payloads and are not available from a public endpoint. Keep exports private. Redis uses `appendfsync always`; PostgreSQL data remains on its named volume. A backup container writes consistent compressed SQL backups at startup and daily to the separate `postgres_backups` volume, with no automatic deletion. Storage must remain available; backups cannot make external data truthful or eliminate every possible infrastructure failure. `docker compose down -v` deletes all named data/backup volumes.
+Exports are local-only, contain complete journal payloads and are not available from a public endpoint. Keep exports private. Redis uses `appendfsync always`; PostgreSQL data remains on its named volume. Database dumps work like `.env`: they live only in the local `backup/` folder (gitignored; deploy never syncs them).
+
+```bash
+./scripts/backup.sh          # dump local Compose Postgres → backup/
+./scripts/backup.sh --pull   # copy production dumps from Hetzner → backup/
+```
+
+The Compose `backup` service also writes daily `.sql.gz` files into host `backup/` on the server. A Mac LaunchAgent runs `./scripts/backup.sh --pull` once a day. Keeps the newest 30 dumps. `docker compose down -v` deletes named data volumes, not `backup/`.
 
 ## Split one booking code into parts
 
