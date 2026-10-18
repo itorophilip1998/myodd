@@ -121,6 +121,7 @@ export class GroupsService {
         checking: availability.checking,
         unavailable: availability.unavailable,
       },
+      playSummary: this.playCheck.summarize(group.slips),
       slips,
       counts: {
         lower: slips.filter((s) => s.riskLevel === 'LOWER').length,
@@ -128,6 +129,33 @@ export class GroupsService {
         higher: slips.filter((s) => s.riskLevel === 'HIGHER').length,
       },
     };
+  }
+
+  async checkPlayGroup(publicId: string, userId?: string) {
+    const group = await this.prisma.slipGroup.findUnique({
+      where: { publicId },
+      include: { slips: { select: { id: true } } },
+    });
+    if (!group || !canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
+    if (!group.userSaved && !(userId && group.ownerId === userId)) {
+      throw new NotFoundException('Save this collection before verifying play results');
+    }
+    const slips = await this.playCheck.checkSlips(group.slips.map(s => s.id));
+    return { publicId, isPublic: group.isPublic, slips, summary: this.playCheck.summarize(slips) };
+  }
+
+  async checkPlayCode(code: string, userId?: string) {
+    const slip = await this.prisma.generatedSlip.findFirst({
+      where: { bookingCode: code.toUpperCase(), group: { deletedAt: null } },
+      include: { group: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!slip || !canAccessGroup(slip.group, userId)) throw new NotFoundException('Code not found');
+    if (!slip.group.userSaved && !(userId && slip.group.ownerId === userId)) {
+      throw new NotFoundException('Save this collection before verifying play results');
+    }
+    const [result] = await this.playCheck.checkSlips([slip.id]);
+    return { ...result, summary: this.playCheck.summarize([result]) };
   }
 
   async verifyGroup(publicId: string, userId?: string) {

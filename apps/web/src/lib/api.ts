@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Empty = same origin (Next proxies /api → backend). Needed for public tunnels.
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 let sessionToken: () => Promise<string | null> = async () => null;
 let signedIn = false;
@@ -29,7 +30,48 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export interface CreatorSummary { publicId: string; username: string | null; name: string }
-export interface CollectionSummary { publicId: string; title: string; createdAt: string; originalBookingCode?: string | null; slipCount: number; saved?: boolean; isPublic?: boolean; isOwner?: boolean; creator?: CreatorSummary | null }
+export type CollectionPlayResult = 'ALL_PLAYED' | 'CUT' | 'MIXED' | 'LIVE' | 'OPEN' | 'UNKNOWN';
+export type RiskMode = 'INVESTOR' | 'GAMBLER' | 'JAPA' | 'LAGOS_LIFE';
+export type SlipPlayStatus = 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
+export type LegPlayStatus = 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+export interface PlaySummary {
+  tickets: number;
+  open: number;
+  live: number;
+  cut: number;
+  allPlayed: number;
+  unknown: number;
+  legsOpen: number;
+  legsLive: number;
+  legsPlayed: number;
+  legsCut: number;
+}
+export interface CutLegDetail {
+  homeTeam: string;
+  awayTeam: string;
+  marketName?: string;
+  selectionName?: string;
+  playNote?: string | null;
+}
+
+export interface CollectionSummary {
+  publicId: string;
+  title: string;
+  createdAt: string;
+  originalBookingCode?: string | null;
+  slipCount: number;
+  saved?: boolean;
+  isPublic?: boolean;
+  isOwner?: boolean;
+  creator?: CreatorSummary | null;
+  riskMode?: RiskMode | null;
+  playResult?: CollectionPlayResult;
+  playCheckedAt?: string | null;
+  cut?: number;
+  allPlayed?: number;
+  open?: number;
+  live?: number;
+}
 
 export interface GenerateResponse {
   jobId: string;
@@ -75,15 +117,24 @@ export interface GeneratedSlip {
   totalOdds: number;
   confidence: number;
   riskLevel: 'LOWER' | 'MODERATE' | 'HIGHER';
+  riskMode?: RiskMode | null;
   selectionCount: number;
   rankOrder?: number;
   slipScore?: number;
   playStatus?: 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
+  playCheckedAt?: string | null;
+  openLegs?: number;
+  liveLegs?: number;
+  playedLegs?: number;
+  cutLegs?: number;
   cutSummary?: string | null;
   expiresAt: string | null;
+  createdAt?: string;
   displayStatus?: 'ACTIVE' | 'CHECKING' | 'PARTIAL' | 'UNAVAILABLE' | 'EXPIRED' | 'UNKNOWN';
   selections: SlipSelection[];
   groupPublicId?: string;
+  userSaved?: boolean;
+  isPublic?: boolean;
 }
 
 export interface GenerationReport {
@@ -106,10 +157,12 @@ export interface SlipGroup {
   isPublic?: boolean;
   title: string;
   description: string | null;
+  riskMode?: RiskMode | null;
   createdAt: string;
   expiresAt: string | null;
   originalBookingCode: string | null;
   availability?: { saved: number; active?: number; checking: number; unavailable: number };
+  playSummary?: PlaySummary;
   generationReport: GenerationReport | null;
   job: Pick<JobProgress, 'createdAt' | 'updatedAt' | 'status' | 'stage' | 'stageDetail' | 'error' | 'progress' | 'total' | 'failedCount'> | null;
   slips: GeneratedSlip[];
@@ -168,6 +221,12 @@ export const api = {
   publishGroup(id: string) { return request<{ isPublic: boolean }>(`/groups/${encodeURIComponent(id)}/share`, { method: 'POST' }); },
   verifyCode(code: string) { return request<{ codes: string[]; unavailable: number }>(`/codes/${encodeURIComponent(code)}/verify`, { method: 'POST' }); },
   verifyGroup(id: string) { return request<{ codes: string[]; unavailable: number }>(`/groups/${encodeURIComponent(id)}/verify`, { method: 'POST' }); },
+  checkPlayGroup(id: string) {
+    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: CutLegDetail[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
+  },
+  checkPlayCode(code: string) {
+    return request<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: CutLegDetail[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
+  },
   getJob(jobId: string) {
     return request<JobProgress>(`/jobs/${jobId}`);
   },
