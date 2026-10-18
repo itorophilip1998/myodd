@@ -50,6 +50,21 @@ const ticketOddsFields = {
   maximumOdds: z.number().finite().min(1.1).nullable().optional(),
 };
 
+/** Exact SportyBet outcomes pinned from the predictions book. */
+export const pinnedSelectionSchema = z.object({
+  eventId: z.string().min(1).max(64),
+  marketId: z.string().min(1).max(64),
+  outcomeId: z.string().min(1).max(64),
+  specifier: z.string().max(128).default(''),
+  odds: z.number().finite().min(1.01).optional(),
+  marketName: z.string().max(200).optional(),
+  selectionName: z.string().max(200).optional(),
+  homeTeam: z.string().max(200).optional(),
+  awayTeam: z.string().max(200).optional(),
+  league: z.string().max(200).optional(),
+  kickoffAt: z.string().optional(),
+});
+
 export const generateFromCodeSchema = z.object({
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
@@ -61,6 +76,7 @@ export const generateFromCodeSchema = z.object({
   matchDate: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
+  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(30).optional(),
 });
 
 export const generateFromPromptSchema = z.object({
@@ -73,6 +89,7 @@ export const generateFromPromptSchema = z.object({
   matchDate: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
+  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(30).optional(),
 });
 
 export type AnalyzeSlipInput = z.infer<typeof analyzeSlipSchema>;

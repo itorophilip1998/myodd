@@ -8,3 +8,15 @@ Read `docs/README.md` inside that installed package first, then read the relevan
 
 This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
 <!-- END:turborepo-agent-rules -->
+
+# myOdd agent notes
+
+## Branch naming
+
+Bug/fix branches must use:
+
+```
+bug/[version]-[what-you-fixed]
+```
+
+Bump patch `APP_VERSION` (+ workspace `package.json` versions) to match. Details: `docs/features/branching.md` and `.cursor/rules/branch-naming.mdc`.

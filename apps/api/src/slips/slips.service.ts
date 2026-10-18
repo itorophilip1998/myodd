@@ -13,7 +13,33 @@ import { SlipValidatorService } from './slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from '../jobs/job.constants';
 import { slipFingerprint } from './slip-fingerprint';
 
-export interface GenerateRequest { userId?: string; instruction: string; bookingCode?: string; splitInto?: number; operation?: 'generate' | 'split'; profileId?: string; ticketCount?: number; gamesPerTicket?: number; matchDate?: string; minimumOdds?: number; maximumOdds?: number | null }
+export interface GenerateRequest {
+  userId?: string;
+  instruction: string;
+  bookingCode?: string;
+  splitInto?: number;
+  operation?: 'generate' | 'split';
+  profileId?: string;
+  ticketCount?: number;
+  gamesPerTicket?: number;
+  matchDate?: string;
+  minimumOdds?: number;
+  maximumOdds?: number | null;
+  /** Exact prediction-book outcomes to create and preserve as the source ticket. */
+  pinnedSelections?: Array<{
+    eventId: string;
+    marketId: string;
+    outcomeId: string;
+    specifier?: string;
+    odds?: number;
+    marketName?: string;
+    selectionName?: string;
+    homeTeam?: string;
+    awayTeam?: string;
+    league?: string;
+    kickoffAt?: string;
+  }>;
+}
 export interface PrepareJob extends GenerateRequest { jobId: string; groupId: string }
 export interface RankedCandidate { selections: ScoredSelection[]; rankOrder: number; slipScore: number }
 export interface BookingJob {
@@ -89,7 +115,13 @@ export class SlipsService implements OnModuleInit {
         // Draft until the user explicitly saves; never auto-publish to history/public feeds.
         isPublic: false,
         userSaved: false,
-        title: req.splitInto ? `Split ${req.bookingCode ?? 'master code'} into ${req.splitInto} parts` : req.bookingCode ? `Variations of ${req.bookingCode.toUpperCase()}` : "Today's myOdd slips",
+        title: req.splitInto
+          ? `Split ${req.bookingCode ?? 'master code'} into ${req.splitInto} parts`
+          : req.pinnedSelections?.length
+            ? `Prediction book · ${req.pinnedSelections.length} picks`
+            : req.bookingCode
+              ? `Variations of ${req.bookingCode.toUpperCase()}`
+              : "Today's myOdd slips",
         description: req.instruction, instruction: req.instruction,
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
         expiresAt: codeExpiry(new Date()),
@@ -116,6 +148,30 @@ export class SlipsService implements OnModuleInit {
     if (current.status === JobStatus.COMPLETED || current.status === JobStatus.FAILED) return;
     await this.prisma.generationJob.update({ where: { id: input.jobId }, data: { status: JobStatus.RUNNING } });
     await this.stage(input, 'READING', 'Loading your source code and available games');
+    if (input.pinnedSelections?.length && !input.bookingCode) {
+      await this.stage(input, 'READING', `Booking ${input.pinnedSelections.length} prediction picks on SportyBet`);
+      const created = await this.bookmaker.createBooking(input.pinnedSelections.map((s) => ({
+        eventId: s.eventId,
+        marketId: s.marketId,
+        outcomeId: s.outcomeId,
+        specifier: s.specifier ?? '',
+        odds: s.odds,
+        marketName: s.marketName,
+        selectionName: s.selectionName,
+        homeTeam: s.homeTeam,
+        awayTeam: s.awayTeam,
+        league: s.league,
+        kickoffAt: s.kickoffAt,
+      })));
+      input = { ...input, bookingCode: created.code };
+      await this.prisma.slipGroup.update({
+        where: { id: input.groupId },
+        data: {
+          originalBookingCode: created.code,
+          title: `Prediction book · ${created.code}`,
+        },
+      });
+    }
     const master = input.bookingCode ? null : await this.catalog.master();
     const original = input.bookingCode ? await this.bookmaker.getBooking(input.bookingCode, { fresh: true }) : master?.booking ?? null;
     if (input.bookingCode && original && !input.userId) await this.catalog.remember(input.bookingCode, 'user', undefined, original);
@@ -154,8 +210,22 @@ export class SlipsService implements OnModuleInit {
     if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
     if (!input.splitInto) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
     if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
+    // Prediction book: keep the exact pinned outcomes; do not let mode odds bands reject them.
+    if (input.pinnedSelections?.length && !input.splitInto) {
+      const legs = input.gamesPerTicket ?? input.pinnedSelections.length;
+      config = {
+        ...config,
+        fixtureMode: 'original_only',
+        preserveOriginalSelections: true,
+        minimumSelections: legs,
+        maximumSelections: legs,
+        minimumOdds: 1.1,
+        maximumOdds: null,
+        allowOddsAdjustment: false,
+      };
+    }
     // UI ticket-odds range is authoritative and always clamped into the selected mode band.
-    if (!input.splitInto && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
+    if (!input.splitInto && !input.pinnedSelections?.length && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
       const clamped = clampOddsToMode(
         input.minimumOdds ?? config.minimumOdds,
         input.maximumOdds === undefined ? config.maximumOdds : input.maximumOdds,

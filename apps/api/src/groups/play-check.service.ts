@@ -1,9 +1,17 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { LegPlayStatus, SlipPlayStatus } from '@prisma/client';
-import type { BookmakerBooking, BookmakerFixture, LiveFixture } from '@myodd/shared';
+import {
+  settlementKey,
+  type BookmakerBooking,
+  type BookmakerFixture,
+  type LiveFixture,
+  type SelectionSettlement,
+} from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
+import { SportyBetSettlementService } from '../bookmaker/sportybet.settlement';
 import { CatalogService } from '../catalog/catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { decideLegPlayStatus, matchPhase } from './play-leg-status';
 
 type LegInput = {
   id: string;
@@ -29,16 +37,6 @@ export type CutLegDetail = {
   playNote: string | null;
 };
 
-function finishedStatus(matchStatus: string) {
-  const value = matchStatus.toLowerCase();
-  return /ended|finished|ft|aet|pen|closed|final|complete/.test(value) || value === '3' || value === '100';
-}
-
-function liveStatus(matchStatus: string) {
-  const value = matchStatus.toLowerCase();
-  return value === '1' || /live|inplay|in play|1st|2nd|ht|half/.test(value);
-}
-
 function matchLabel(leg: LegInput) {
   const home = leg.homeTeam?.trim() || 'Home';
   const away = leg.awayTeam?.trim() || 'Away';
@@ -53,9 +51,12 @@ function pickLabel(leg: LegInput) {
 
 @Injectable()
 export class PlayCheckService {
+  private readonly logger = new Logger(PlayCheckService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
+    private readonly settlement: SportyBetSettlementService,
     @Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider,
   ) {}
 
@@ -84,6 +85,23 @@ export class PlayCheckService {
     for (const f of fixtures) byEvent.set(f.eventId, f);
     for (const f of live) byEvent.set(f.eventId, f);
 
+    const needsScrape = selections.some(leg => {
+      const kickoff = leg.kickoffAt?.getTime() ?? null;
+      const fixture = byEvent.get(leg.sportyEventId);
+      const phase = matchPhase({ kickoffMs: kickoff, nowMs: Date.now(), matchStatus: fixture?.matchStatus });
+      const bookSel = findBookingSelection(booking, leg);
+      const settlement = bookSel?.settlement ?? 'UNKNOWN';
+      return (phase === 'finished' || phase === 'unknown') && (settlement === 'UNKNOWN' || settlement === 'PENDING');
+    });
+
+    let scraped = new Map<string, SelectionSettlement>();
+    if (needsScrape) {
+      scraped = await this.settlement.fetchShareSettlement(bookingCode).catch(err => {
+        this.logger.warn(`Settlement scrape skipped for ${bookingCode}: ${(err as Error).message}`);
+        return new Map<string, SelectionSettlement>();
+      });
+    }
+
     const now = Date.now();
     let openLegs = 0, liveLegs = 0, playedLegs = 0, cutLegs = 0;
     const cuts: CutLegDetail[] = [];
@@ -91,50 +109,43 @@ export class PlayCheckService {
     for (const leg of selections) {
       const kickoff = leg.kickoffAt?.getTime() ?? null;
       const fixture = byEvent.get(leg.sportyEventId);
-      const bookSel = booking?.selections.find(s =>
-        s.eventId === leg.sportyEventId
-        && s.marketId === leg.marketId
-        && s.outcomeId === leg.outcomeId
-        && (s.specifier ?? '') === (leg.specifier ?? ''));
+      const bookSel = findBookingSelection(booking, leg);
       const unavailable = booking?.unavailableOutcomes?.some(s =>
         s.eventId === leg.sportyEventId
         && s.marketId === leg.marketId
         && s.outcomeId === leg.outcomeId) ?? false;
-      const active = !!bookSel && bookSel.isActive !== false && !unavailable;
-      const score = fixture && 'score' in fixture ? (fixture.score ?? null) : null;
-      const match = matchLabel(leg);
-      const pick = pickLabel(leg);
-
-      let playStatus: LegPlayStatus = 'UNKNOWN';
-      let playNote: string | null = null;
-
-      if (kickoff != null && kickoff > now + 2 * 60_000) {
-        playStatus = unavailable ? 'CUT' : 'UPCOMING';
-        playNote = playStatus === 'CUT'
-          ? `Cut · ${match} · ${pick} unavailable before kickoff`
-          : 'Not kicked off yet';
-      } else if (fixture && finishedStatus(fixture.matchStatus)) {
-        playStatus = unavailable || (booking && !active) ? 'CUT' : 'PLAYED';
-        playNote = playStatus === 'CUT'
-          ? `Cut · ${match}${score ? ` (${score})` : ''} · ${pick} lost / unavailable`
-          : `Finished${score ? ` · ${score}` : ''}`;
-      } else if ((fixture && liveStatus(fixture.matchStatus)) || (kickoff != null && kickoff <= now && kickoff > now - 3 * 3600_000)) {
-        playStatus = unavailable || (booking && !active) ? 'CUT' : 'LIVE';
-        playNote = playStatus === 'CUT'
-          ? `Cut while live · ${match}${score ? ` (${score})` : ''} · ${pick}`
-          : `In play${score ? ` · ${score}` : ''}`;
-      } else if (kickoff != null && kickoff <= now - 3 * 3600_000) {
-        playStatus = unavailable || (booking && !active) ? 'CUT' : 'PLAYED';
-        playNote = playStatus === 'CUT'
-          ? `Cut · ${match}${score ? ` (${score})` : ''} · ${pick} unavailable after kickoff`
-          : `Likely finished${score ? ` · ${score}` : ''}`;
-      } else if (unavailable || (booking && !active)) {
-        playStatus = 'CUT';
-        playNote = `Cut · ${match} · ${pick} unavailable`;
-      } else {
-        playStatus = 'UNKNOWN';
-        playNote = 'Could not confirm play state';
+      const phase = matchPhase({
+        kickoffMs: kickoff,
+        nowMs: now,
+        matchStatus: fixture?.matchStatus,
+      });
+      const key = settlementKey({
+        eventId: leg.sportyEventId,
+        marketId: leg.marketId,
+        outcomeId: leg.outcomeId,
+        specifier: leg.specifier ?? '',
+      });
+      const keyNoSpec = settlementKey({
+        eventId: leg.sportyEventId,
+        marketId: leg.marketId,
+        outcomeId: leg.outcomeId,
+        specifier: '',
+      });
+      let settlement: SelectionSettlement = bookSel?.settlement ?? 'UNKNOWN';
+      if (settlement === 'UNKNOWN' || settlement === 'PENDING') {
+        settlement = scraped.get(key) ?? scraped.get(keyNoSpec) ?? settlement;
       }
+
+      const score = fixture && 'score' in fixture ? (fixture.score ?? null) : null;
+      const decision = decideLegPlayStatus({
+        phase,
+        settlement,
+        unavailablePrematch: phase === 'prematch' && unavailable,
+        score,
+        matchLabel: matchLabel(leg),
+        pickLabel: pickLabel(leg),
+      });
+      const { playStatus, playNote } = decision;
 
       if (playStatus === 'UPCOMING') openLegs++;
       else if (playStatus === 'LIVE') liveLegs++;
@@ -214,4 +225,12 @@ export class PlayCheckService {
       legsCut: rows.reduce((n, r) => n + r.cutLegs, 0),
     };
   }
+}
+
+function findBookingSelection(booking: BookmakerBooking | null, leg: LegInput) {
+  return booking?.selections.find(s =>
+    s.eventId === leg.sportyEventId
+    && s.marketId === leg.marketId
+    && s.outcomeId === leg.outcomeId
+    && (s.specifier ?? '') === (leg.specifier ?? ''));
 }

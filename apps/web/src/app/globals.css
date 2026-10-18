@@ -266,6 +266,42 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .prediction-market-options button[aria-pressed=true] { background:var(--accent); color:#132015; border-color:var(--accent); }
 .prediction-market-options button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .prediction-outcomes { max-height:300px; overflow-y:auto; padding-right:7px; overscroll-behavior:contain; }
+.prediction-book-actions { margin: 0 0 12px; }
+.prediction-book-btn { border: 1px solid #c6f28c40; background: #c6f28c0c; color: var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 11px; width: 100%; }
+.prediction-book-btn.is-in-book { border-color: #e9a48b55; color: #e9a48b; background: #d78d740d; }
+.prediction-book-btn.outcome-add { width: auto; margin-top: 8px; padding: 5px 10px; font-size: 10px; }
+.outcome-row.is-booked { outline: 1px solid #c6f28c33; border-radius: 8px; padding: 6px; background: #c6f28c08; }
+.explore-workspace.has-prediction-book { padding-bottom: 96px; }
+.prediction-book-bar {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  width: min(720px, calc(100% - 28px)); z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 14px 16px; border-radius: 14px;
+  background: linear-gradient(135deg, #1c2a21, #152019ee); border: 1px solid #c6f28c40;
+  box-shadow: 0 18px 50px #00000066; backdrop-filter: blur(10px);
+}
+.prediction-book-bar-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.prediction-book-bar-copy strong { font-size: 13px; color: #e7f0df; font-weight: 500; }
+.prediction-book-bar-copy span { font-size: 11px; color: #93a790; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prediction-book-bar-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.prediction-book-panel {
+  margin: 0 0 14px; padding: 14px; border-radius: 12px;
+  border: 1px solid #c6f28c33; background: #c6f28c08;
+}
+.prediction-book-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.prediction-book-panel-head strong { font-size: 13px; color: var(--accent); font-weight: 500; }
+.prediction-book-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.prediction-book-list li { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; font-size: 12px; }
+.prediction-book-list li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.prediction-book-list li b { color: #e2eadc; font-weight: 500; }
+.prediction-book-list li small { color: #93a790; }
+.prediction-book-list li button { color: #e9a48b; font-size: 16px; line-height: 1; padding: 2px 6px; }
+.prediction-book-hint { margin-top: 10px; font-size: 11px; color: #8fa592; }
+@media (max-width: 600px) {
+  .prediction-book-bar { flex-direction: column; align-items: stretch; bottom: 12px; }
+  .prediction-book-bar-actions { width: 100%; }
+  .prediction-book-bar-actions .primary-button, .prediction-book-bar-actions .quiet-button { flex: 1; }
+}
 .chat-input-footer { flex-wrap:wrap; }
 .chat-input-footer .composer-options[open] { flex-basis:100%; min-width:0; }
 .chat-input-footer .primary-button { margin-left:auto; }

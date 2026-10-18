@@ -23,3 +23,5 @@ Product docs for the myOdd monorepo: SportyBet Nigeria booking-code variations f
 | Settings (UI) | [features/settings.md](./features/settings.md) |
 | Jobs & progress | [features/jobs.md](./features/jobs.md) |
 | App versioning | [features/versioning.md](./features/versioning.md) |
+| Branch naming | [features/branching.md](./features/branching.md) |
+| Play verification | [features/play-verification.md](./features/play-verification.md) |

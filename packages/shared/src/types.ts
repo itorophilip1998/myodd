@@ -1,5 +1,8 @@
 import type { SupportedMarket, VarianceLevel, JobStatus } from './enums';
 
+/** Settlement of a booked selection (win/loss), separate from bettability (`isActive`). */
+export type SelectionSettlement = 'WON' | 'LOST' | 'VOID' | 'PENDING' | 'UNKNOWN';
+
 export interface BookmakerSelection {
   eventId: string;
   marketId: string;
@@ -12,7 +15,10 @@ export interface BookmakerSelection {
   awayTeam?: string;
   league?: string;
   kickoffAt?: string;
+  /** Still open for betting (pre-match / not suspended). Not the same as won/lost. */
   isActive?: boolean;
+  /** Explicit settlement when SportyBet exposes it on the share ticket. */
+  settlement?: SelectionSettlement;
 }
 
 export interface BookmakerBooking {
