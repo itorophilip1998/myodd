@@ -60,5 +60,6 @@ jobs:
           DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
         run: |
           DEST="${DEPLOY_PATH:-/opt/myodd}"
+          SHA="${GITHUB_SHA}"
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$DEPLOY_SSH" \
-            "DEPLOY_DIR=${DEST} bash ${DEST}/scripts/deploy-remote.sh"
+            "DEPLOY_DIR=${DEST} APP_GIT_SHA=${SHA} bash ${DEST}/scripts/deploy-remote.sh"

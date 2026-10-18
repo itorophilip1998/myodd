@@ -63,6 +63,9 @@ export interface SlipSelection {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
+  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+  score?: string | null;
+  playNote?: string | null;
 }
 
 export interface GeneratedSlip {
@@ -75,6 +78,8 @@ export interface GeneratedSlip {
   selectionCount: number;
   rankOrder?: number;
   slipScore?: number;
+  playStatus?: 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
+  cutSummary?: string | null;
   expiresAt: string | null;
   displayStatus?: 'ACTIVE' | 'CHECKING' | 'PARTIAL' | 'UNAVAILABLE' | 'EXPIRED' | 'UNKNOWN';
   selections: SlipSelection[];

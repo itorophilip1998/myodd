@@ -101,7 +101,7 @@ export class PlayCheckService {
         && s.marketId === leg.marketId
         && s.outcomeId === leg.outcomeId) ?? false;
       const active = !!bookSel && bookSel.isActive !== false && !unavailable;
-      const score = fixture?.score ?? null;
+      const score = fixture && 'score' in fixture ? (fixture.score ?? null) : null;
       const match = matchLabel(leg);
       const pick = pickLabel(leg);
 
