@@ -20,6 +20,22 @@ enum JobStatus {
   FAILED
 }
 
+enum SlipPlayStatus {
+  OPEN
+  LIVE
+  CUT
+  ALL_PLAYED
+  UNKNOWN
+}
+
+enum LegPlayStatus {
+  UPCOMING
+  LIVE
+  PLAYED
+  CUT
+  UNKNOWN
+}
+
 model SlipGroup {
   deletedAt            DateTime?       @map("deleted_at")
   id                   String          @id @default(cuid())
@@ -58,6 +74,13 @@ model GeneratedSlip {
   fingerprint    String
   rankOrder      Int              @default(0) @map("rank_order")
   slipScore      Float            @default(0) @map("slip_score")
+  playStatus     SlipPlayStatus   @default(UNKNOWN) @map("play_status")
+  playCheckedAt  DateTime?        @map("play_checked_at")
+  openLegs       Int              @default(0) @map("open_legs")
+  liveLegs       Int              @default(0) @map("live_legs")
+  playedLegs     Int              @default(0) @map("played_legs")
+  cutLegs        Int              @default(0) @map("cut_legs")
+  cutSummary     String?          @map("cut_summary")
   expiresAt      DateTime?        @map("expires_at")
   createdAt      DateTime         @default(now()) @map("created_at")
   selections     SlipSelection[]
@@ -66,6 +89,7 @@ model GeneratedSlip {
   @@index([groupId, rankOrder])
   @@index([bookingCode])
   @@index([fingerprint])
+  @@index([playStatus])
   @@map("generated_slips")
 }
 
@@ -87,8 +111,12 @@ model SlipSelection {
   predictionScore       Float         @map("prediction_score")
   modelVersion          String        @default("odds-v1") @map("model_version")
   kickoffAt             DateTime?     @map("kickoff_at")
+  playStatus            LegPlayStatus @default(UNKNOWN) @map("play_status")
+  score                 String?
+  playNote              String?       @map("play_note")
 
   @@index([slipId])
+  @@index([playStatus])
   @@map("slip_selections")
 }
 

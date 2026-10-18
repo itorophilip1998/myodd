@@ -59,6 +59,8 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .primary-button:hover:not(:disabled) { background: #daf9b4; transform: translateY(-1px); }
 .primary-button span { font-size: 19px; line-height: 1; }
 .form-error { color: #ffa18c; font-size: 13px; margin-top: 14px; }
+.app-version { margin: 14px 0 0; text-align: right; font-size: 12px; letter-spacing: 0.04em; color: #c6f28c; }
+.app-version strong { font-weight: 800; color: #e8ffc8; }
 .home-footnote { display: flex; justify-content: space-between; gap: 20px; margin: 21px 5px; font-size: 11px; color: #718074; }
 .home-footnote a { color: #b7c8b6; }
 .workspace { max-width: 1180px; margin: 0 auto; padding: 38px 30px 60px; }

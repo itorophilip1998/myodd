@@ -1,7 +1,7 @@
 'use client';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, matchDayMaxYmd, modeKeyFromLabel, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MODE_ODDS, clampOddsToMode, formatAppVersion, lagosDateYmd, matchDayKickoffWindow, matchDayMaxYmd, modeKeyFromLabel, readChatRequest, type ModeKey } from '@myodd/shared';
 import { ProgressQuest } from './ProgressQuest';
 import { api } from '@/lib/api';
 
@@ -338,6 +338,9 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
           {loading ? 'Sending…' : busy ? 'Creating codes…' : wantsSplit ? `Split${effectiveSplit ? ` into ${effectiveSplit}` : ''}` : 'Generate'} <span aria-hidden>↑</span>
         </button>
       </div>
+      <p className="app-version" aria-label="Deployed app version">
+        <strong>{formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)}</strong>
+      </p>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>
   </form>;
