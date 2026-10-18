@@ -19,6 +19,17 @@ Browser → web (Next.js, :3000) → api (NestJS, :3001)
 
 Each application has its own container. PostgreSQL, Redis, and a one-shot migration container are supporting services.
 
+## Branches and deployment
+
+| Branch | Role |
+|--------|------|
+| `development` | Default. Local/dev work only. Direct pushes blocked — open a PR. |
+| `production` | Live Hetzner app. Push/merge here runs GitHub Actions deploy. |
+
+Deploy syncs code to `/opt/myodd` and runs `docker compose up -d --build --wait`. Server files `.env` and `apps/web/.env.local` are never overwritten. When you introduce a new environment variable, add it to `.env.production.example` and set it manually on the Hetzner host before relying on it in production.
+
+Promote work with: feature branch → PR into `development` → PR into `production`.
+
 ## Run everything locally
 
 ```bash
@@ -101,12 +112,12 @@ Four selectable modes also work as typed keywords and enforce **hard per-ticket 
 |------|-------------|--------------------|
 | Investor Mode (recommended) | 2–5 inclusive | 1.10–1.50 |
 | Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.80 |
-| Japa Mode | 20.01–100 | 1.10–2.00 |
-| Lagoslife / Lagos-Lifes Mode | 100.01+, no app ceiling | 1.10–2.00 |
+| Japa Mode | 20.01–50 | 1.10–2.00 |
+| Lagoslife / Lagos-Lifes Mode | 35–50 | 1.10–2.00 |
 
-Explicit odds targets narrow the mode band. A typed contradictory target fails clearly; a final mode selected in the controls overrides an older conflicting range and reports that change. Nearest-odds adjustment cannot escape a named band. Inventory, selection-count, numerical and bookmaker constraints still apply. These names do not promise prediction accuracy or a guaranteed outcome.
+Ticket odds never exceed **50** in any mode. Explicit odds targets narrow the mode band; asking above 50 is blocked before generate starts. A typed contradictory target fails clearly; a final mode selected in the controls overrides an older conflicting range and reports that change. Nearest-odds adjustment cannot escape a named band. Inventory, selection-count, numerical and bookmaker constraints still apply. These names do not promise prediction accuracy or a guaranteed outcome.
 
-Ticket count (1–100) and games per ticket (1–30) can be set inside the chat input’s Options panel or in the prompt. The compact panel also includes the generate/split action, split count, match scope and market/odds toggles. `Exactly 4 games per ticket` sets both minimum and maximum to four. Split part counts and exact games must also preserve all eligible original picks; contradictory sizes fail instead of repeating picks. Results are paginated (12/24/48 per page), searched and sorted before pagination; Copy all checks and copies the entire valid collection.
+Ticket count (1–10) can be set in Options or the prompt. Games per ticket are chosen automatically between 1 and 50 unless the prompt asks for an exact count (hard max 50). The compact panel also includes the generate/split action, split count, match scope and market/odds toggles. Split part counts must preserve all eligible original picks; contradictory sizes fail instead of repeating picks. Results are paginated (12/24/48 per page), searched and sorted before pagination; Copy all checks and copies the entire valid collection.
 
 ## Progress, working codes and retained training data
 
@@ -142,7 +153,7 @@ Unavailable or filtered picks are counted and explained. Impossible counts, cont
 
 Minute ranges are not odds targets. A draw request without an explicit odds band or mode does not inherit an arbitrary 2.5–5 band. Explicit odds, modes and game counts remain binding. Matching accuracy is covered by regression tests; this does not establish improved win probability or a trained betting advantage.
 
-Odds display uses compact rounded labels: `184775.21` → `185ks`, then `1ms`, `10ms`, `100ms`, `1b`, `1t`, etc. Prompt parsing accepts the same compact forms (`20ks`, `1.5ms`, `2k`, `1m`). Low odds retain up to two decimals. Full totals remain in PostgreSQL, calculations and accessible card tooltips. Compact labels do not alter mode-boundary checks or bookmaker validation.
+Odds display uses compact rounded labels: `184775.21` → `185k`, then `1m`, `10m`, `100m`, `1b`, `1t`, etc. Prompt parsing accepts the same compact forms (`2k`, `1.5m`) and still understands legacy `ks`/`ms`. Low odds retain up to two decimals. Full totals remain in PostgreSQL, calculations and accessible card tooltips. Compact labels do not alter mode-boundary checks or bookmaker validation.
 
 ## Saved codes and automatic master selection
 
