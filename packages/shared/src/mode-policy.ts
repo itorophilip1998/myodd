@@ -1,6 +1,34 @@
 /** Lowest accepted price for any single selection / game leg. */
 export const MIN_SELECTION_ODDS = 1.1;
 
+/** Hard ceiling for combined ticket odds in UI preflight (Lagoslife may still use “no max” inside mode bands below this). */
+export const MAX_TICKET_ODDS = 10_000;
+
+/** Best-effort parse of ticket odds from a free-text prompt for preflight checks. */
+export function previewOddsFromPrompt(instruction: string): { minimum: number; maximum: number | null } | null {
+  const text = instruction.trim();
+  if (!text) return null;
+  const between = text.match(/\b(?:between|from)\s+(\d+(?:\.\d+)?)\s*(?:and|to|-)\s*(\d+(?:\.\d+)?)\b/i);
+  if (between) {
+    const minimum = Number(between[1]);
+    const maximum = Number(between[2]);
+    if (Number.isFinite(minimum) && Number.isFinite(maximum)) return { minimum, maximum };
+  }
+  const around = text.match(/\b(?:around|about|~)\s*(\d+(?:\.\d+)?)\b/i);
+  if (around) {
+    const mid = Number(around[1]);
+    if (Number.isFinite(mid)) return { minimum: mid * 0.9, maximum: mid * 1.1 };
+  }
+  const minOnly = text.match(/\b(?:min(?:imum)?|at\s*least)\s*(\d+(?:\.\d+)?)\b/i);
+  const maxOnly = text.match(/\b(?:max(?:imum)?|up\s*to|under|below)\s*(\d+(?:\.\d+)?)\b/i);
+  if (minOnly || maxOnly) {
+    const minimum = minOnly ? Number(minOnly[1]) : 1;
+    const maximum = maxOnly ? Number(maxOnly[1]) : null;
+    if (Number.isFinite(minimum) && (maximum == null || Number.isFinite(maximum))) return { minimum, maximum };
+  }
+  return null;
+}
+
 /** Ticket (combined) odds bands for named modes. */
 export const MODE_ODDS = {
   INVESTOR: { minimum: 2, maximum: 5 },

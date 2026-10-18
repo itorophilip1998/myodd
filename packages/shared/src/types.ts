@@ -88,6 +88,9 @@ export interface SlipSelectionDto {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
+  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+  score?: string | null;
+  playNote?: string | null;
 }
 
 export interface SlipGroupDto {
