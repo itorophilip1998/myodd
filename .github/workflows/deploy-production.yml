@@ -1,0 +1,62 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HOST: ${{ secrets.HETZNER_HOST }}
+          DEPLOY_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          test -n "$SSH_KEY" || { echo "Missing secret HETZNER_SSH_KEY"; exit 1; }
+          test -n "$HOST" || { echo "Missing secret HETZNER_HOST"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "Missing secret HETZNER_USER"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          echo "DEPLOY_SSH=$DEPLOY_USER@$HOST" >> "$GITHUB_ENV"
+
+      - name: Sync code (preserve server env)
+        env:
+          DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
+        run: |
+          DEST="${DEPLOY_PATH:-/opt/myodd}"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            --exclude 'apps/web/.env.local' \
+            --exclude 'node_modules/' \
+            --exclude '.next/' \
+            --exclude 'dist/' \
+            --exclude '.turbo/' \
+            --exclude '.venv/' \
+            --exclude '__pycache__/' \
+            --exclude '.DS_Store' \
+            --exclude '.vscode/' \
+            ./ "${DEPLOY_SSH}:${DEST}/"
+
+      - name: Build and restart Compose
+        env:
+          DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
+        run: |
+          DEST="${DEPLOY_PATH:-/opt/myodd}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$DEPLOY_SSH" \
+            "DEPLOY_DIR=${DEST} bash ${DEST}/scripts/deploy-remote.sh"
