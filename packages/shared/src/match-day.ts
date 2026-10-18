@@ -11,7 +11,7 @@ export function lagosDateYmd(date = new Date()): string {
   }).format(date);
 }
 
-function addLagosDays(ymd: string, days: number): string {
+export function addLagosDays(ymd: string, days: number): string {
   const [y, m, d] = ymd.split('-').map(Number);
   const utc = Date.UTC(y, m - 1, d + days);
   return new Intl.DateTimeFormat('en-CA', {

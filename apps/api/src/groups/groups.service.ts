@@ -6,10 +6,15 @@ import {
 import { CatalogService } from '../catalog/catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { canAccessGroup } from './group-access';
+import { PlayCheckService } from './play-check.service';
 
 @Injectable()
 export class GroupsService {
-  constructor(private readonly prisma: PrismaService, private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalog: CatalogService,
+    private readonly playCheck: PlayCheckService,
+  ) {}
 
   async listRecent(page = 1, userId: string) {
     const groups = await this.prisma.slipGroup.findMany({
@@ -67,6 +72,13 @@ export class GroupsService {
         selectionCount: s.selectionCount,
         rankOrder: s.rankOrder,
         slipScore: s.slipScore,
+        playStatus: s.playStatus,
+        playCheckedAt: s.playCheckedAt?.toISOString() ?? null,
+        openLegs: s.openLegs,
+        liveLegs: s.liveLegs,
+        playedLegs: s.playedLegs,
+        cutLegs: s.cutLegs,
+        cutSummary: s.cutSummary,
         expiresAt: s.expiresAt?.toISOString() ?? null,
         displayStatus,
         selections: s.selections.map((sel) => ({
@@ -80,6 +92,9 @@ export class GroupsService {
           predictionScore: sel.predictionScore,
           modelVersion: sel.modelVersion,
           kickoffAt: sel.kickoffAt?.toISOString() ?? null,
+          playStatus: sel.playStatus,
+          score: sel.score,
+          playNote: sel.playNote,
         })),
       };
     });
@@ -118,7 +133,13 @@ export class GroupsService {
   async verifyGroup(publicId: string, userId?: string) {
     const group = await this.prisma.slipGroup.findUnique({ where: { publicId }, include: { slips: true } });
     if (!group || !canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
-    return this.catalog.verifyCodes([...new Set(group.slips.map(s => s.bookingCode))]);
+    const availability = await this.catalog.verifyCodes([...new Set(group.slips.map(s => s.bookingCode))]);
+    const play = await this.playCheck.checkSlips(group.slips.map(s => s.id));
+    return {
+      ...availability,
+      play: this.playCheck.summarize(play),
+      slips: play,
+    };
   }
   async verifyCode(code: string, userId?: string) {
     const slip = await this.prisma.generatedSlip.findFirst({
@@ -127,7 +148,12 @@ export class GroupsService {
       orderBy: { createdAt: 'desc' },
     });
     if (!slip || !canAccessGroup(slip.group, userId)) throw new NotFoundException('Code not found');
-    return this.catalog.verifyCodes([slip.bookingCode]);
+    const availability = await this.catalog.verifyCodes([slip.bookingCode]);
+    const [play] = await this.playCheck.checkSlips([slip.id]);
+    return {
+      ...availability,
+      play,
+    };
   }
 
   async saveForUser(publicId: string, userId: string) {
@@ -196,6 +222,13 @@ export class GroupsService {
       confidence: slip.confidence,
       riskLevel: slip.riskLevel,
       selectionCount: slip.selectionCount,
+      playStatus: slip.playStatus,
+      playCheckedAt: slip.playCheckedAt?.toISOString() ?? null,
+      openLegs: slip.openLegs,
+      liveLegs: slip.liveLegs,
+      playedLegs: slip.playedLegs,
+      cutLegs: slip.cutLegs,
+      cutSummary: slip.cutSummary,
       expiresAt: slip.expiresAt?.toISOString() ?? null,
       displayStatus,
       groupPublicId: slip.group.publicId,
@@ -210,6 +243,9 @@ export class GroupsService {
         predictionScore: sel.predictionScore,
         modelVersion: sel.modelVersion,
         kickoffAt: sel.kickoffAt?.toISOString() ?? null,
+        playStatus: sel.playStatus,
+        score: sel.score,
+        playNote: sel.playNote,
       })),
     };
   }

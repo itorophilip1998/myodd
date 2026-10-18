@@ -1,11 +1,13 @@
 import {
   MIN_SELECTION_ODDS,
+  inferSettlementFromStatus,
   type LiveFixture,
   type BookmakerBooking,
   type BookmakerFixture,
   type BookmakerMarket,
   type BookmakerOutcome,
   type BookmakerSelection,
+  type SelectionSettlement,
 } from '@myodd/shared';
 
 interface RawOutcome {
@@ -13,6 +15,10 @@ interface RawOutcome {
   desc: string;
   odds: string | number;
   isActive?: boolean | number | string;
+  status?: string | number;
+  result?: string | number;
+  settleStatus?: string | number;
+  outcomeStatus?: string | number;
 }
 
 interface RawMarket {
@@ -61,6 +67,10 @@ interface ShareOutcome {
   tournamentName?: string;
   estimateStartTime?: number;
   status?: string | number;
+  result?: string | number;
+  settleStatus?: string | number;
+  outcomeStatus?: string | number;
+  selectionStatus?: string | number;
   markets?: RawMarket[];
   sport?: { category?: { tournament?: { name?: string } } };
 }
@@ -71,7 +81,12 @@ interface ShareData {
   deadline?: number;
   outcomes?: ShareOutcome[];
   unavailableOutcomes?: ShareOutcome[];
-  ticket?: { selections?: ShareOutcome[]; displayTotalOdds?: string | number };
+  ticket?: {
+    selections?: ShareOutcome[];
+    displayTotalOdds?: string | number;
+    status?: string | number;
+    ticketStatus?: string | number;
+  };
 }
 
 export function mapFixtures(data: UpcomingEventsData): BookmakerFixture[] {
@@ -154,6 +169,18 @@ export function mapShareResponse(
   };
 }
 
+function pickSettlement(...candidates: unknown[]): SelectionSettlement {
+  for (const candidate of candidates) {
+    const value = inferSettlementFromStatus(candidate);
+    if (value !== 'UNKNOWN' && value !== 'PENDING') return value;
+  }
+  for (const candidate of candidates) {
+    const value = inferSettlementFromStatus(candidate);
+    if (value === 'PENDING') return value;
+  }
+  return 'UNKNOWN';
+}
+
 function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]): BookmakerSelection[] {
   return events.flatMap(event => {
     if (!event.markets?.length) return [mapShareOutcome(event)];
@@ -166,12 +193,26 @@ function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]):
       const market = event.markets!.find(m => String(m.id) === String(selection.marketId)
         && (m.specifier ?? '') === (selection.specifier ?? ''));
       const outcome = market?.outcomes?.find(o => String(o.id) === String(selection.outcomeId));
+      const base = mapShareOutcome({ ...event, ...selection, odds: outcome?.odds,
+        marketDesc: market?.desc, outcomeDesc: outcome?.desc,
+        tournamentName: event.sport?.category?.tournament?.name ?? event.tournamentName });
       return {
-        ...mapShareOutcome({ ...event, ...selection, odds: outcome?.odds,
-          marketDesc: market?.desc, outcomeDesc: outcome?.desc,
-          tournamentName: event.sport?.category?.tournament?.name ?? event.tournamentName }),
+        ...base,
+        // Bettability only — finished events are inactive for betting, not necessarily lost.
         isActive: !!outcome && mapOutcome(outcome).isActive
           && String(market?.status ?? '0') === '0' && String(event.status ?? '0') === '0',
+        settlement: pickSettlement(
+          (selection as ShareOutcome).settleStatus,
+          (selection as ShareOutcome).outcomeStatus,
+          (selection as ShareOutcome).selectionStatus,
+          (selection as ShareOutcome).result,
+          outcome?.settleStatus,
+          outcome?.outcomeStatus,
+          outcome?.result,
+          // Flat share rows sometimes put won/lost in `status`; ignore numeric event codes.
+          typeof (selection as ShareOutcome).status === 'string' ? (selection as ShareOutcome).status : undefined,
+          typeof outcome?.status === 'string' ? outcome.status : undefined,
+        ),
       };
     });
   });
@@ -193,6 +234,7 @@ function mapShareOutcome(o: ShareOutcome): BookmakerSelection {
       ? new Date(o.estimateStartTime).toISOString()
       : undefined,
     isActive: o.status !== 'suspended',
+    settlement: pickSettlement(o.settleStatus, o.outcomeStatus, o.selectionStatus, o.result, o.status),
   };
 }
 

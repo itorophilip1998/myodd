@@ -22,7 +22,13 @@ else
   echo "DOMAIN unset — serving on :3000 only (set DOMAIN after Spaceship DNS points here)"
 fi
 
+# Bake deploy identity into web/api images (shown on create page + /api/health).
+export APP_GIT_SHA="${APP_GIT_SHA:-${GITHUB_SHA:-local}}"
+APP_GIT_SHA="$(printf '%s' "$APP_GIT_SHA" | cut -c1-7)"
+export APP_GIT_SHA
+echo "APP_GIT_SHA=$APP_GIT_SHA"
+
 docker compose "${COMPOSE_ARGS[@]}" config --quiet
 docker compose "${COMPOSE_ARGS[@]}" up -d --build --wait --wait-timeout 300
 docker compose "${COMPOSE_ARGS[@]}" ps
-echo "Deployed $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git rev-parse --short HEAD 2>/dev/null || echo 'rsync')"
+echo "Deployed $(date -u +%Y-%m-%dT%H:%M:%SZ) sha=$APP_GIT_SHA"

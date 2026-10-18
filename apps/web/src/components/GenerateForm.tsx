@@ -1,9 +1,16 @@
 'use client';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, matchDayMaxYmd, modeKeyFromLabel, readChatRequest, type ModeKey } from '@myodd/shared';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { MODE_ODDS, clampOddsToMode, formatAppVersion, lagosDateYmd, matchDayKickoffWindow, matchDayMaxYmd, modeKeyFromLabel, readChatRequest, type ModeKey } from '@myodd/shared';
 import { ProgressQuest } from './ProgressQuest';
 import { api } from '@/lib/api';
+import {
+  clearPredictionBook,
+  predictionBookPrompt,
+  readPredictionBook,
+  removePredictionBookPick,
+  type PredictionBookPick,
+} from '@/lib/prediction-book';
 
 const MODES = [
   { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Low risk', detail: '2–5 · legs 1.10–1.50', icon: '◈', tone: 'investor', recommended: true },
@@ -55,11 +62,13 @@ function oddsPresets(key: ModeKey): Array<{ label: string; min: number; max: num
 
 export function GenerateForm({ initialBookingCode = '', initialInstruction = '', sourceCode, initialMode = '', initialSplitInto, sourceRevision = 0, busy = false }: { initialBookingCode?: string; initialInstruction?: string; sourceCode?: string; initialMode?: string; initialSplitInto?: number; sourceRevision?: number; busy?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const promptId = useId();
   const dateId = useId();
   const bookingCode = sourceCode ?? initialBookingCode;
   const [preferSource, setPreferSource] = useState(false);
   useEffect(() => { if (sourceRevision) setPreferSource(true); }, [sourceRevision]);
+  const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
   const [instruction, setInstruction] = useState(initialInstruction);
   const [mode, setMode] = useState(() => MODES.find(item => item.name.toLowerCase() === initialMode.replace(/gamler/i, 'Gambler').replace(/lagos[ -]*li(?:f|v)es?/i, 'Lagoslife').toLowerCase())?.name ?? 'Investor Mode');
   const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(initialSplitInto ? 'split' : 'generate');
@@ -99,6 +108,39 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     return () => window.clearInterval(timer);
   }, []);
   const matchWindow = matchDayKickoffWindow(matchDate);
+  const [scope, setScope] = useState('prompt');
+  const [strict, setStrict] = useState(false);
+  const [nearest, setNearest] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [submittedAt, setSubmittedAt] = useState<string>();
+  const bookApplied = useRef(false);
+  useEffect(() => {
+    const sync = () => setPredictionBook(readPredictionBook());
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('myodd:prediction-book', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('myodd:prediction-book', sync);
+    };
+  }, []);
+  useEffect(() => {
+    if (bookApplied.current || searchParams.get('book') !== '1') return;
+    const picks = readPredictionBook();
+    if (!picks.length) return;
+    bookApplied.current = true;
+    setPredictionBook(picks);
+    setInstruction(predictionBookPrompt(picks));
+    setScope('original_only');
+    setTicketCount('1');
+    setGamesCount(String(picks.length));
+    setOddsSource('prompt');
+    setOperation('generate');
+    setOptionsOpen(true);
+    edited.current = true;
+  }, [searchParams]);
   useEffect(() => {
     if (initialInstruction) return;
     void api.preferences().then(({ preferences }) => {
@@ -109,13 +151,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       if (preferences.gamesPerTicket) setGamesCount(String(preferences.gamesPerTicket));
     }).catch(() => {});
   }, [initialInstruction]);
-  const [scope, setScope] = useState('prompt');
-  const [strict, setStrict] = useState(false);
-  const [nearest, setNearest] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [submittedAt, setSubmittedAt] = useState<string>();
 
   const optionsSummary = useMemo(() => {
     if (wantsSplit) return `Split · ${effectiveSplit || '?'} parts`;
@@ -143,20 +178,22 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setMaxOdds(max == null ? '' : String(max));
   }
   async function submit(event: FormEvent) {
-    event.preventDefault(); if (loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount)) return;
+    event.preventDefault();
+    const hasBook = predictionBook.length > 0;
+    if (loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount && !hasBook)) return;
     setSubmittedAt(new Date().toISOString()); setLoading(true); setError(null);
     const typedCode = parsedChat.bookingCode;
     const effectiveCode = (preferSource ? bookingCode : typedCode ?? bookingCode).trim().toUpperCase();
     const dayLabel = matchWindow.within24Hours ? 'today (next 24 hours)' : matchWindow.matchDate;
-    const odds = !wantsSplit ? resolvedOdds() : null;
-    if (!wantsSplit && oddsSource === 'manual' && !odds) {
+    const odds = !wantsSplit && !hasBook ? resolvedOdds() : null;
+    if (!wantsSplit && !hasBook && oddsSource === 'manual' && !odds) {
       setError('Enter a valid ticket odds range, pick a preset, or choose “From prompt”.'); setLoading(false); setOptionsOpen(true); return;
     }
     if (!wantsSplit && odds && odds.maximum != null && odds.minimum > odds.maximum) {
       setError('Minimum ticket odds cannot be higher than the maximum.'); setLoading(false); setOptionsOpen(true); return;
     }
     const uiTickets = !wantsSplit && ticketCount ? Number(ticketCount) : undefined;
-    const uiGames = gamesCount ? Number(gamesCount) : undefined;
+    const uiGames = gamesCount ? Number(gamesCount) : (hasBook ? predictionBook.length : undefined);
     if (uiTickets != null && (!Number.isInteger(uiTickets) || uiTickets < 1 || uiTickets > 10)) {
       setError('Choose 1–10 tickets.'); setLoading(false); setOptionsOpen(true); return;
     }
@@ -168,19 +205,22 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       : '';
     const dateLine = !wantsSplit ? `Match day: ${dayLabel} (${matchWindow.matchDate}).` : '';
     const settings = [
+      hasBook ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
       uiTickets ? `Generate ${uiTickets} tickets.` : '',
       uiGames ? `Exactly ${uiGames} games per ticket.` : '',
-      scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
+      hasBook || scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
-      mode ? `Risk mode: ${mode}.` : '',
+      !hasBook && mode ? `Risk mode: ${mode}.` : '',
       oddsLabel,
       dateLine,
       'Never repeat the same game twice in one ticket.',
     ].filter(Boolean).join(' ');
-    const basePrompt = instruction.trim() || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
+    const basePrompt = instruction.trim()
+      || (hasBook ? predictionBookPrompt(predictionBook) : '')
+      || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
     const prompt = dateLine && !basePrompt.toLowerCase().includes('match day') ? `${basePrompt}\n${dateLine}` : basePrompt;
     if (wantsSplit && (!Number.isInteger(effectiveSplit) || effectiveSplit! < 1 || effectiveSplit! > 10)) {
       setError('Choose 1–10 parts.'); setLoading(false); setOptionsOpen(true); return;
@@ -188,15 +228,32 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     try {
       const result = await api.generate({
         bookingCode: effectiveCode || undefined,
-        ticketCount: uiTickets,
+        ticketCount: uiTickets ?? (hasBook ? 1 : undefined),
         gamesPerTicket: uiGames,
         operation: wantsSplit ? 'split' : 'generate',
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
-        minimumOdds: odds?.minimum,
-        maximumOdds: odds ? odds.maximum : undefined,
+        minimumOdds: hasBook ? undefined : odds?.minimum,
+        maximumOdds: hasBook ? undefined : (odds ? odds.maximum : undefined),
         instruction: prompt + (settings ? `\nFinal request settings (take precedence): ${settings}` : ''),
+        pinnedSelections: hasBook
+          ? predictionBook.map((p) => ({
+              eventId: p.eventId,
+              marketId: p.marketId,
+              outcomeId: p.outcomeId,
+              specifier: p.specifier ?? '',
+              odds: p.odds,
+              marketName: p.marketName,
+              selectionName: p.selectionName,
+              homeTeam: p.homeTeam,
+              awayTeam: p.awayTeam,
+              league: p.league,
+              kickoffAt: p.kickoffAt,
+            }))
+          : undefined,
       });
+      clearPredictionBook();
+      setPredictionBook([]);
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
     } catch (err) { setError((err as Error).message); setLoading(false); }
   }
@@ -207,6 +264,38 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
 
   return <form onSubmit={submit} className="chat-composer">
     <div className="composer chat-input-box">
+      {predictionBook.length > 0 && (
+        <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
+          <div className="prediction-book-panel-head">
+            <strong>Prediction book · {predictionBook.length}</strong>
+            <button type="button" className="quiet-button" onClick={() => { clearPredictionBook(); setPredictionBook([]); touch(); }}>Clear book</button>
+          </div>
+          <ul className="prediction-book-list">
+            {predictionBook.map((p) => (
+              <li key={`${p.eventId}:${p.marketId}:${p.outcomeId}:${p.specifier}`}>
+                <span>
+                  <b>{p.homeTeam} vs {p.awayTeam}</b>
+                  <small>{p.marketName}: {p.selectionName} @ {p.odds}</small>
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${p.homeTeam} vs ${p.awayTeam}`}
+                  onClick={() => {
+                    const next = removePredictionBookPick(p.eventId);
+                    setPredictionBook(next);
+                    setInstruction(next.length ? predictionBookPrompt(next) : '');
+                    if (next.length) setGamesCount(String(next.length));
+                    touch();
+                  }}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="prediction-book-hint">Generate will book these exact myOdd picks on SportyBet.</p>
+        </div>
+      )}
       <label htmlFor={promptId} className="sr-only">Message myOdd</label>
       <textarea
         id={promptId}
@@ -215,7 +304,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         onKeyDown={shortcut}
         maxLength={4000}
         rows={3}
-        placeholder="Optional note — e.g. ‘only double chance’ or a booking code…"
+        placeholder={predictionBook.length ? 'Optional note for this prediction book…' : 'Optional note — e.g. ‘only double chance’ or a booking code…'}
       />
       {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && <p className="parsed-code-hint">Using {parsedChat.bookingCode} from your message</p>}
 
@@ -334,10 +423,13 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
           </div>
         </details>
 
-        <button className="primary-button" disabled={loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount)} type="submit">
-          {loading ? 'Sending…' : busy ? 'Creating codes…' : wantsSplit ? `Split${effectiveSplit ? ` into ${effectiveSplit}` : ''}` : 'Generate'} <span aria-hidden>↑</span>
+        <button className="primary-button" disabled={loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount && !predictionBook.length)} type="submit">
+          {loading ? 'Sending…' : busy ? 'Creating codes…' : wantsSplit ? `Split${effectiveSplit ? ` into ${effectiveSplit}` : ''}` : predictionBook.length ? 'Book predictions' : 'Generate'} <span aria-hidden>↑</span>
         </button>
       </div>
+      <p className="app-version" aria-label="Deployed app version">
+        <strong>{formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)}</strong>
+      </p>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>
   </form>;

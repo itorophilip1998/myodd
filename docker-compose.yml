@@ -11,6 +11,7 @@ services:
         # Empty = browser same-origin /api. Do not bake a public :3001 URL.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
+        NEXT_PUBLIC_APP_GIT_SHA: ${APP_GIT_SHA:-local}
     environment:
       API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
     restart: unless-stopped
@@ -35,10 +36,13 @@ services:
       context: .
       dockerfile: Dockerfile.node
       target: api
+      args:
+        APP_GIT_SHA: ${APP_GIT_SHA:-local}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       API_PORT: 3001
+      APP_GIT_SHA: ${APP_GIT_SHA:-local}
       DATABASE_URL: postgresql://myodd:myodd@postgres:5432/myodd
       REDIS_URL: redis://redis:6379
       CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}

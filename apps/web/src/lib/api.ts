@@ -63,6 +63,9 @@ export interface SlipSelection {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
+  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+  score?: string | null;
+  playNote?: string | null;
 }
 
 export interface GeneratedSlip {
@@ -75,6 +78,8 @@ export interface GeneratedSlip {
   selectionCount: number;
   rankOrder?: number;
   slipScore?: number;
+  playStatus?: 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
+  cutSummary?: string | null;
   expiresAt: string | null;
   displayStatus?: 'ACTIVE' | 'CHECKING' | 'PARTIAL' | 'UNAVAILABLE' | 'EXPIRED' | 'UNKNOWN';
   selections: SlipSelection[];
@@ -127,7 +132,31 @@ export const api = {
   listGroups(page = 1) {
     return request<CollectionSummary[]>(`/groups?page=${page}`);
   },
-  generate(body: { bookingCode?: string; instruction: string; splitInto?: number; ticketCount?: number; gamesPerTicket?: number; matchDate?: string; minimumOdds?: number; maximumOdds?: number | null; profileId?: string; operation?: 'generate' | 'split' }) {
+  generate(body: {
+    bookingCode?: string;
+    instruction: string;
+    splitInto?: number;
+    ticketCount?: number;
+    gamesPerTicket?: number;
+    matchDate?: string;
+    minimumOdds?: number;
+    maximumOdds?: number | null;
+    profileId?: string;
+    operation?: 'generate' | 'split';
+    pinnedSelections?: Array<{
+      eventId: string;
+      marketId: string;
+      outcomeId: string;
+      specifier?: string;
+      odds?: number;
+      marketName?: string;
+      selectionName?: string;
+      homeTeam?: string;
+      awayTeam?: string;
+      league?: string;
+      kickoffAt?: string;
+    }>;
+  }) {
     const path = body.bookingCode
       ? '/slips/generate'
       : '/slips/generate-from-prompt';

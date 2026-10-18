@@ -54,6 +54,7 @@ export class SlipsController {
       minimumOdds: parsed.data.minimumOdds,
       maximumOdds: parsed.data.maximumOdds,
       bookingCode: parsed.data.bookingCode,
+      pinnedSelections: parsed.data.pinnedSelections,
     });
   }
 
@@ -76,6 +77,7 @@ export class SlipsController {
       matchDate: parsed.data.matchDate,
       minimumOdds: parsed.data.minimumOdds,
       maximumOdds: parsed.data.maximumOdds,
+      pinnedSelections: parsed.data.pinnedSelections,
     });
   }
 }
