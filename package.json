@@ -1,6 +1,6 @@
 {
   "name": "myodd",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "myOdd — SportyBet booking code variations from odds-first scoring",
   "scripts": {
