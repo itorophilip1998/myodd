@@ -1,0 +1,1972 @@
+[
+    {
+        "label": "ipaddress",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "ipaddress",
+        "description": "ipaddress",
+        "detail": "ipaddress",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "socket",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "socket",
+        "description": "socket",
+        "detail": "socket",
+        "documentation": {}
+    },
+    {
+        "label": "ThreadPoolExecutor",
+        "importPath": "concurrent.futures",
+        "description": "concurrent.futures",
+        "isExtraImport": true,
+        "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
+        "label": "ProcessPoolExecutor",
+        "importPath": "concurrent.futures",
+        "description": "concurrent.futures",
+        "isExtraImport": true,
+        "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
+        "label": "HTMLParser",
+        "importPath": "html.parser",
+        "description": "html.parser",
+        "isExtraImport": true,
+        "detail": "html.parser",
+        "documentation": {}
+    },
+    {
+        "label": "urljoin",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "urlparse",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "parse_qs",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "RobotFileParser",
+        "importPath": "urllib.robotparser",
+        "description": "urllib.robotparser",
+        "isExtraImport": true,
+        "detail": "urllib.robotparser",
+        "documentation": {}
+    },
+    {
+        "label": "httpx",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "httpx",
+        "description": "httpx",
+        "detail": "httpx",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "FastAPI",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "model_validator",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "hashlib",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "hashlib",
+        "description": "hashlib",
+        "detail": "hashlib",
+        "documentation": {}
+    },
+    {
+        "label": "math",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "math",
+        "description": "math",
+        "detail": "math",
+        "documentation": {}
+    },
+    {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "field",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Annotated",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "asynccontextmanager",
+        "importPath": "contextlib",
+        "description": "contextlib",
+        "isExtraImport": true,
+        "detail": "contextlib",
+        "documentation": {}
+    },
+    {
+        "label": "asyncio",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "asyncio",
+        "description": "asyncio",
+        "detail": "asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "multiprocessing",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "multiprocessing",
+        "description": "multiprocessing",
+        "detail": "multiprocessing",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "StrEnum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "argparse",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "argparse",
+        "description": "argparse",
+        "detail": "argparse",
+        "documentation": {}
+    },
+    {
+        "label": "csv",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "csv",
+        "description": "csv",
+        "detail": "csv",
+        "documentation": {}
+    },
+    {
+        "label": "defaultdict",
+        "importPath": "collections",
+        "description": "collections",
+        "isExtraImport": true,
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "tempfile",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tempfile",
+        "description": "tempfile",
+        "detail": "tempfile",
+        "documentation": {}
+    },
+    {
+        "label": "unittest",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "unittest",
+        "description": "unittest",
+        "detail": "unittest",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "TestClient",
+        "importPath": "fastapi.testclient",
+        "description": "fastapi.testclient",
+        "isExtraImport": true,
+        "detail": "fastapi.testclient",
+        "documentation": {}
+    },
+    {
+        "label": "TestClient",
+        "importPath": "fastapi.testclient",
+        "description": "fastapi.testclient",
+        "isExtraImport": true,
+        "detail": "fastapi.testclient",
+        "documentation": {}
+    },
+    {
+        "label": "fingerprint",
+        "importPath": "app.generation",
+        "description": "app.generation",
+        "isExtraImport": true,
+        "detail": "app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate",
+        "importPath": "app.generation",
+        "description": "app.generation",
+        "isExtraImport": true,
+        "detail": "app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate_report",
+        "importPath": "app.generation",
+        "description": "app.generation",
+        "isExtraImport": true,
+        "detail": "app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate_report",
+        "importPath": "app.generation",
+        "description": "app.generation",
+        "isExtraImport": true,
+        "detail": "app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate_report",
+        "importPath": "app.generation",
+        "description": "app.generation",
+        "isExtraImport": true,
+        "detail": "app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "parse_rules",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_intent",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "_intent_cache",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_intent",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_intent",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "_intent_cache",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_intent",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_rules",
+        "importPath": "app.intent",
+        "description": "app.intent",
+        "isExtraImport": true,
+        "detail": "app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "importPath": "app.main",
+        "description": "app.main",
+        "isExtraImport": true,
+        "detail": "app.main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "importPath": "app.main",
+        "description": "app.main",
+        "isExtraImport": true,
+        "detail": "app.main",
+        "documentation": {}
+    },
+    {
+        "label": "OddsModel",
+        "importPath": "app.predictions",
+        "description": "app.predictions",
+        "isExtraImport": true,
+        "detail": "app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "PoissonModel",
+        "importPath": "app.predictions",
+        "description": "app.predictions",
+        "isExtraImport": true,
+        "detail": "app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "score_fixtures",
+        "importPath": "app.predictions",
+        "description": "app.predictions",
+        "isExtraImport": true,
+        "detail": "app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "OddsModel",
+        "importPath": "app.predictions",
+        "description": "app.predictions",
+        "isExtraImport": true,
+        "detail": "app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "score_fixtures",
+        "importPath": "app.predictions",
+        "description": "app.predictions",
+        "isExtraImport": true,
+        "detail": "app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Fixture",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Market",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Selection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Market",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "MarketRule",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "ScoredSelection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Selection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Fixture",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Market",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "MarketRule",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "ScoredSelection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Selection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Selection",
+        "importPath": "app.schemas",
+        "description": "app.schemas",
+        "isExtraImport": true,
+        "detail": "app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "train",
+        "importPath": "app.train",
+        "description": "app.train",
+        "isExtraImport": true,
+        "detail": "app.train",
+        "documentation": {}
+    },
+    {
+        "label": "extract_codes",
+        "importPath": "app.discovery",
+        "description": "app.discovery",
+        "isExtraImport": true,
+        "detail": "app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "extract_hub_codes",
+        "importPath": "app.discovery",
+        "description": "app.discovery",
+        "isExtraImport": true,
+        "detail": "app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "validate_public_url",
+        "importPath": "app.discovery",
+        "description": "app.discovery",
+        "isExtraImport": true,
+        "detail": "app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "discover",
+        "importPath": "app.discovery",
+        "description": "app.discovery",
+        "isExtraImport": true,
+        "detail": "app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "DiscoveryRequest",
+        "importPath": "app.discovery",
+        "description": "app.discovery",
+        "isExtraImport": true,
+        "detail": "app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "draw_request",
+        "importPath": "app.draw_markets",
+        "description": "app.draw_markets",
+        "isExtraImport": true,
+        "detail": "app.draw_markets",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_preferences",
+        "importPath": "app.market_preferences",
+        "description": "app.market_preferences",
+        "isExtraImport": true,
+        "detail": "app.market_preferences",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_preferences",
+        "importPath": "app.market_preferences",
+        "description": "app.market_preferences",
+        "isExtraImport": true,
+        "detail": "app.market_preferences",
+        "documentation": {}
+    },
+    {
+        "label": "GroqIntentError",
+        "importPath": "app.groq",
+        "description": "app.groq",
+        "isExtraImport": true,
+        "detail": "app.groq",
+        "documentation": {}
+    },
+    {
+        "label": "parse_groq",
+        "importPath": "app.groq",
+        "description": "app.groq",
+        "isExtraImport": true,
+        "detail": "app.groq",
+        "documentation": {}
+    },
+    {
+        "label": "strict_schema",
+        "importPath": "app.groq",
+        "description": "app.groq",
+        "isExtraImport": true,
+        "detail": "app.groq",
+        "documentation": {}
+    },
+    {
+        "label": "IntentProviderError",
+        "importPath": "app.llm",
+        "description": "app.llm",
+        "isExtraImport": true,
+        "detail": "app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "parse_chat_completions",
+        "importPath": "app.llm",
+        "description": "app.llm",
+        "isExtraImport": true,
+        "detail": "app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_settings",
+        "importPath": "app.llm",
+        "description": "app.llm",
+        "isExtraImport": true,
+        "detail": "app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "select_model",
+        "importPath": "app.llm",
+        "description": "app.llm",
+        "isExtraImport": true,
+        "detail": "app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "strict_schema",
+        "importPath": "app.llm",
+        "description": "app.llm",
+        "isExtraImport": true,
+        "detail": "app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "selection",
+        "importPath": "test_flexible_generation",
+        "description": "test_flexible_generation",
+        "isExtraImport": true,
+        "detail": "test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "selection",
+        "importPath": "test_flexible_generation",
+        "description": "test_flexible_generation",
+        "isExtraImport": true,
+        "detail": "test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "split_report",
+        "importPath": "app.splitting",
+        "description": "app.splitting",
+        "isExtraImport": true,
+        "detail": "app.splitting",
+        "documentation": {}
+    },
+    {
+        "label": "DiscoveryRequest",
+        "kind": 6,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "class DiscoveryRequest(BaseModel):\n    sources: list[str] = Field(default_factory=list, max_length=8)\nclass Page(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.links = []\n        self.parts = []\n        self.hidden = 0\n    def handle_starttag(self, tag, attrs):\n        if tag in ('script', 'style'):",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "Page",
+        "kind": 6,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "class Page(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.links = []\n        self.parts = []\n        self.hidden = 0\n    def handle_starttag(self, tag, attrs):\n        if tag in ('script', 'style'):\n            self.hidden += 1\n        if tag == 'a':",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "extract_codes",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def extract_codes(html: str, source_url: str = \"\"):\n    page = Page()\n    page.feed(html)\n    candidates = []\n    for href in page.links:\n        parsed = urlparse(href)\n        # A converter's unrelated links and referral codes are not booking-code evidence.\n        if (parsed.hostname or '').lower().removeprefix('www.') != 'sportybet.com':\n            continue\n        query = parse_qs(parsed.query)",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "validate_public_url",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def validate_public_url(url: str):\n    parsed = urlparse(url)\n    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):\n        raise ValueError('Sources must be public HTTPS URLs')\n    addresses = socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)\n    if not addresses or any(not ipaddress.ip_address(address[4][0]).is_global for address in addresses):\n        raise ValueError('Private or local crawl destinations are not allowed')\n    return parsed\ndef read_page(client, url, limit=1_500_000):\n    origin = validate_public_url(url)",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "read_page",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def read_page(client, url, limit=1_500_000):\n    origin = validate_public_url(url)\n    for _ in range(4):\n        with client.stream('GET', url) as response:\n            if response.is_redirect:\n                destination = urljoin(url, response.headers.get('location', ''))\n                parsed = validate_public_url(destination)\n                if parsed.hostname != origin.hostname:\n                    raise ValueError('Cross-host source redirects are not followed')\n                url = destination",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "extract_hub_codes",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def extract_hub_codes(payload):\n    if not isinstance(payload, dict) or payload.get('bizCode') != 10000 or not isinstance(payload.get('data'), list):\n        raise ValueError('Unexpected Code Hub feed response')\n    codes = []\n    for item in payload['data'][:20]:\n        code = item.get('shareCode') if isinstance(item, dict) else None\n        if isinstance(code, str) and re.fullmatch(r'[A-Za-z0-9_]{3,32}', code) and code.upper() not in codes:\n            codes.append(code.upper())\n    return codes\ndef discover_source(url):",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "discover_source",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def discover_source(url):\n    try:\n        parsed = validate_public_url(url)\n        with httpx.Client(headers={'User-Agent': USER_AGENT}, timeout=20, follow_redirects=False) as client:\n            robots = client.get(f'{parsed.scheme}://{parsed.netloc}/robots.txt')\n            if robots.status_code == 200:\n                policy = RobotFileParser()\n                policy.parse(robots.text.splitlines())\n                if not policy.can_fetch(USER_AGENT, url):\n                    return {'url': url, 'codes': [], 'error': 'Source robots policy does not allow discovery'}",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "discover",
+        "kind": 2,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "def discover(request: DiscoveryRequest):\n    allowed = [url.strip() for url in os.getenv('CODE_SOURCE_URLS', DEFAULT_SOURCE).split(',') if url.strip()]\n    sources = request.sources or allowed\n    if any(url not in allowed for url in sources):\n        raise HTTPException(400, 'Only configured code sources can be crawled')\n    with ThreadPoolExecutor(max_workers=3) as executor:\n        return {'sources': list(executor.map(discover_source, sources[:8]))}",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "DEFAULT_SOURCE",
+        "kind": 5,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "DEFAULT_SOURCE = 'https://www.sportybet.com/ng/m/code-hub/codes'\nUSER_AGENT = 'myOdd-CodeDiscovery/1.0'\nclass DiscoveryRequest(BaseModel):\n    sources: list[str] = Field(default_factory=list, max_length=8)\nclass Page(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.links = []\n        self.parts = []\n        self.hidden = 0",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "USER_AGENT",
+        "kind": 5,
+        "importPath": "apps.ai.app.discovery",
+        "description": "apps.ai.app.discovery",
+        "peekOfCode": "USER_AGENT = 'myOdd-CodeDiscovery/1.0'\nclass DiscoveryRequest(BaseModel):\n    sources: list[str] = Field(default_factory=list, max_length=8)\nclass Page(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.links = []\n        self.parts = []\n        self.hidden = 0\n    def handle_starttag(self, tag, attrs):",
+        "detail": "apps.ai.app.discovery",
+        "documentation": {}
+    },
+    {
+        "label": "period",
+        "kind": 2,
+        "importPath": "apps.ai.app.draw_markets",
+        "description": "apps.ai.app.draw_markets",
+        "peekOfCode": "def period(label):\n    text = label.casefold().replace('–', '-').replace('—', '-')\n    interval = re.search(r'\\b(\\d{1,2})\\s*(?:to|-)\\s*(\\d{1,2})\\b', text)\n    if interval:\n        start, end = map(int, interval.groups())\n        if 0 <= start < end <= 90:\n            return ('minutes', max(1, start), end)\n    minute = re.search(r'\\b(\\d{1,2})\\s*(?:minutes?|mins?)\\b', text)\n    if minute:\n        end = int(minute[1])",
+        "detail": "apps.ai.app.draw_markets",
+        "documentation": {}
+    },
+    {
+        "label": "draw_request",
+        "kind": 2,
+        "importPath": "apps.ai.app.draw_markets",
+        "description": "apps.ai.app.draw_markets",
+        "peekOfCode": "def draw_request(instruction):\n    text = instruction.casefold()\n    if not re.search(r'\\bdraws?\\b', text) or re.search(r'\\b(?:no|avoid|exclude|without)\\s+draws?\\b|draw no bet', text):\n        return None\n    # An explicit union is handled by the normal market resolver, not a draw-only guard.\n    if re.search(r'\\b(?:or|and|also)\\s+(?:double chance|over\\b|under\\b|btts|home win|away win)', text):\n        return None\n    # Ignore odds/count settings when identifying the requested football period.\n    text = re.sub(r'between\\s+\\d+(?:\\.\\d+)?\\s*(?:and|to|-)\\s*\\d+(?:\\.\\d+)?\\s*odds', '', text)\n    text = re.sub(r'\\d+(?:\\.\\d+)?\\s*(?:to|-)\\s*\\d+(?:\\.\\d+)?\\s*odds', '', text)",
+        "detail": "apps.ai.app.draw_markets",
+        "documentation": {}
+    },
+    {
+        "label": "draw_rules",
+        "kind": 2,
+        "importPath": "apps.ai.app.draw_markets",
+        "description": "apps.ai.app.draw_markets",
+        "peekOfCode": "def draw_rules(catalog, requested, alternatives=True):\n    exact, related = [], []\n    for market in catalog:\n        name = market['marketName'].casefold()\n        # These settle on a different object or condition even if their labels contain Draw.\n        if re.search(r'corners?|cards?|goal kicks?|throw|offside|penalt|handicap|double chance|draw no bet|&|\\band\\b', name):\n            continue\n        if period(name) != requested:\n            continue\n        # Full-match matching must not accidentally accept an unfamiliar time/period market.",
+        "detail": "apps.ai.app.draw_markets",
+        "documentation": {}
+    },
+    {
+        "label": "enforce_draw_intent",
+        "kind": 2,
+        "importPath": "apps.ai.app.draw_markets",
+        "description": "apps.ai.app.draw_markets",
+        "peekOfCode": "def enforce_draw_intent(config, catalog, instruction):\n    requested = draw_request(instruction)\n    if requested is None:\n        return config\n    strict = bool(re.search(r'no alternatives|exact market only|only (?:use )?(?:the )?(?:1x2|requested markets)', instruction, re.I))\n    exact, related = draw_rules(catalog, requested, alternatives=not strict)\n    if not config.riskMode and not re.search(r'\\bodds\\b|\\baround\\s+\\d', instruction, re.I):\n        # A minute interval is not an odds target. Do not impose an unrequested 2.5-5 band.\n        from .odds_policy import MIN_SELECTION_ODDS\n        config.minimumOdds, config.maximumOdds = MIN_SELECTION_ODDS, None",
+        "detail": "apps.ai.app.draw_markets",
+        "documentation": {}
+    },
+    {
+        "label": "fingerprint",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def fingerprint(selections):\n    return hashlib.sha256('\\n'.join(sorted(f'{s.eventId}|{s.marketId}|{s.outcomeId}|{s.specifier}' for s in selections)).encode()).hexdigest()\ndef match_key(selection):\n    \"\"\"Normalize a fixture so the same game cannot appear twice under different event IDs.\"\"\"\n    home = ' '.join((selection.homeTeam or '').casefold().split())\n    away = ' '.join((selection.awayTeam or '').casefold().split())\n    return '|'.join(sorted((home, away)))\ndef unique_ticket(selections):\n    event_ids = [s.eventId for s in selections]\n    matches = [match_key(s) for s in selections]",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "match_key",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def match_key(selection):\n    \"\"\"Normalize a fixture so the same game cannot appear twice under different event IDs.\"\"\"\n    home = ' '.join((selection.homeTeam or '').casefold().split())\n    away = ' '.join((selection.awayTeam or '').casefold().split())\n    return '|'.join(sorted((home, away)))\ndef unique_ticket(selections):\n    event_ids = [s.eventId for s in selections]\n    matches = [match_key(s) for s in selections]\n    return len(event_ids) == len(set(event_ids)) == len(selections) and len(matches) == len(set(matches))\ndef matches_preference(selection, config):",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "unique_ticket",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def unique_ticket(selections):\n    event_ids = [s.eventId for s in selections]\n    matches = [match_key(s) for s in selections]\n    return len(event_ids) == len(set(event_ids)) == len(selections) and len(matches) == len(set(matches))\ndef matches_preference(selection, config):\n    if config.marketRules:\n        return selection.supportedMarket in config.markets or any(selection.marketId == rule.marketId\n                   and (rule.specifier is None or selection.specifier == rule.specifier)\n                   and (not rule.outcomeIds or selection.outcomeId in rule.outcomeIds)\n                   for rule in config.marketRules)",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "matches_preference",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def matches_preference(selection, config):\n    if config.marketRules:\n        return selection.supportedMarket in config.markets or any(selection.marketId == rule.marketId\n                   and (rule.specifier is None or selection.specifier == rule.specifier)\n                   and (not rule.outcomeIds or selection.outcomeId in rule.outcomeIds)\n                   for rule in config.marketRules)\n    return selection.supportedMarket in config.markets if config.markets else not config.marketQueries\ndef matches_related(selection, config):\n    return any(selection.marketId == rule.marketId\n               and (rule.specifier is None or selection.specifier == rule.specifier)",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "matches_related",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def matches_related(selection, config):\n    return any(selection.marketId == rule.marketId\n               and (rule.specifier is None or selection.specifier == rule.specifier)\n               and (not rule.outcomeIds or selection.outcomeId in rule.outcomeIds)\n               for rule in config.relatedMarketRules)\ndef eligible(selection, config):\n    teams = f'{selection.homeTeam} {selection.awayTeam}'.casefold()\n    league = selection.league.casefold()\n    now = datetime.now(timezone.utc)\n    return (selection.isActive and selection.kickoffAt > now",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "eligible",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def eligible(selection, config):\n    teams = f'{selection.homeTeam} {selection.awayTeam}'.casefold()\n    league = selection.league.casefold()\n    now = datetime.now(timezone.utc)\n    return (selection.isActive and selection.kickoffAt > now\n            and within_mode_selection_odds(selection.odds, config.riskMode)\n            and not any(t.casefold() in teams for t in config.excludedTeams)\n            and not any(t.casefold() in league for t in config.excludedLeagues)\n            and (not config.includedLeagues or any(t.casefold() in league for t in config.includedLeagues))\n            and (not config.kickoffBefore or selection.kickoffAt <= config.kickoffBefore)",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "event_choices",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def event_choices(pool, config):\n    # Collapse duplicate listings of the same match (different event IDs) to one game.\n    by_match: dict[str, list] = {}\n    for selection in pool:\n        by_match.setdefault(match_key(selection), []).append(selection)\n    deduped = []\n    for group in by_match.values():\n        best_event = max(group, key=lambda s: (s.probability, -s.odds)).eventId\n        deduped.extend(s for s in group if s.eventId == best_event)\n    events = {}",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "search",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def search(pool, config, original, allow_nearest=False):\n    events = event_choices(pool, config)\n    if len(events) < config.minimumSelections:\n        return [], None\n    original_ids = {s.eventId for s in original}\n    original_keys = {(s.eventId, s.marketId, s.outcomeId, s.specifier) for s in original}\n    if config.preserveOriginalSelections:\n        for event in original_ids:\n            events[event] = [s for s in pool if (s.eventId, s.marketId, s.outcomeId, s.specifier) in original_keys and s.eventId == event]\n        if any(not events[event] for event in original_ids) or len(original_keys) != len(original_ids):",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate_report",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def generate_report(pool: list[ScoredSelection], config: Config, original: list[Selection], expansion_attempted=False):\n    notices = list(config.unhandledRequests)\n    original_ids = {s.eventId for s in original}\n    filtered = [s for s in pool if eligible(s, config)]\n    if config.fixtureMode == 'original_only' and original:\n        filtered = [s for s in filtered if s.eventId in original_ids]\n    elif config.fixtureMode == 'upcoming':\n        filtered = [s for s in filtered if s.eventId not in original_ids]\n    original_pool = [s for s in filtered if s.eventId in original_ids]\n    available_original = len({s.eventId for s in original_pool})",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "generate",
+        "kind": 2,
+        "importPath": "apps.ai.app.generation",
+        "description": "apps.ai.app.generation",
+        "peekOfCode": "def generate(pool, config, original):\n    return generate_report(pool, config, original)['candidates']",
+        "detail": "apps.ai.app.generation",
+        "documentation": {}
+    },
+    {
+        "label": "__all__",
+        "kind": 5,
+        "importPath": "apps.ai.app.groq",
+        "description": "apps.ai.app.groq",
+        "peekOfCode": "__all__ = ['GroqIntentError', 'IntentProviderError', 'parse_chat_completions', 'parse_groq', 'strict_schema']",
+        "detail": "apps.ai.app.groq",
+        "documentation": {}
+    },
+    {
+        "label": "parse_rules",
+        "kind": 2,
+        "importPath": "apps.ai.app.intent",
+        "description": "apps.ai.app.intent",
+        "peekOfCode": "def parse_rules(instruction: str) -> Config:\n    text = instruction.lower()\n    def number(pattern, default):\n        match = re.search(pattern, text)\n        return int(match[1]) if match else default\n    data = {}\n    count = re.search(r'(?:create|generate|give me)\\s+(\\d+)\\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\\d+)(?:\\s+[\\w-]+){0,3}\\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)\n    data['numberOfSlips'] = min(10, max(1, int(count[1]) if count else 10))\n    low, high = extract_odds_bounds(instruction)\n    if low is not None:",
+        "detail": "apps.ai.app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "local_fallback_supported",
+        "kind": 2,
+        "importPath": "apps.ai.app.intent",
+        "description": "apps.ai.app.intent",
+        "peekOfCode": "def local_fallback_supported(instruction: str) -> bool:\n    text = instruction.casefold()\n    numeric = bool(re.search(r'(?:create|generate|give me)\\s+\\d+', text) and re.search(r'between\\s+\\d+(?:\\.\\d+)?\\s*(?:and|to|-|–)\\s*\\d+', text))\n    numeric = numeric or bool(re.search(r'\\b(?:split|spilt|splate|divide|partition)\\b', text) and re.search(r'\\binto\\s+(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\b', text))\n    # Simple mode buttons and count controls remain usable during provider outages.\n    # Reject unfamiliar clauses rather than silently dropping their constraints.\n    simple_request = False\n    if draw_request(instruction) is not None or any(re.search(pattern, text) for pattern, *_ in MODES):\n        remaining = text\n        for pattern, *_ in MODES:",
+        "detail": "apps.ai.app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "parse_intent",
+        "kind": 2,
+        "importPath": "apps.ai.app.intent",
+        "description": "apps.ai.app.intent",
+        "peekOfCode": "def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None) -> Config:\n    config = _parse_intent(instruction, available_markets)\n    memory = learned_defaults or {}\n    text = instruction.casefold()\n    if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\\s+\\d+|\\d+\\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\\bsplit\\b', text):\n        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))\n    games = extract_games_per_ticket(instruction)\n    if games is not None:\n        config.minimumSelections = config.maximumSelections = games\n    elif memory.get('gamesPerTicket') and not re.search(r'\\d+\\s+(?:games?|matches?|picks?|legs?|selections?)', text):",
+        "detail": "apps.ai.app.intent",
+        "documentation": {}
+    },
+    {
+        "label": "IntentProviderError",
+        "kind": 6,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "class IntentProviderError(RuntimeError):\n    pass\n# Backward-compatible alias used by older imports and tests.\nGroqIntentError = IntentProviderError\n@dataclass(frozen=True)\nclass ProviderSpec:\n    name: str\n    label: str\n    default_model: str\n    default_base_url: str",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "ProviderSpec",
+        "kind": 6,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "class ProviderSpec:\n    name: str\n    label: str\n    default_model: str\n    default_base_url: str\n    key_envs: tuple[str, ...] = ('AI_API_KEY',)\n    model_envs: tuple[str, ...] = ('AI_MODEL',)\n    token_field: str = 'max_tokens'\n    request_extras: dict[str, Any] = field(default_factory=dict)\n    requires_key: bool = True",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "LlmSettings",
+        "kind": 6,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "class LlmSettings:\n    provider: str\n    model: str | None\n    accurate_model: str | None\n    fast_model: str | None\n    route: str\n    temperature: float\n    api_key: str\n    base_url: str\n    label: str",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_provider_name",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def resolve_provider_name() -> str:\n    raw = _first_env('AI_PROVIDER', 'INTENT_PROVIDER', 'LLM_PROVIDER', default='rules')\n    return raw.casefold()\ndef resolve_settings() -> LlmSettings:\n    provider = resolve_provider_name()\n    if provider in ('rules', 'ollama'):\n        model = os.getenv('OLLAMA_MODEL', 'llama3.2').strip() if provider == 'ollama' else None\n        return LlmSettings(\n            provider=provider, model=model, accurate_model=model, fast_model=model,\n            route='rules', temperature=0.0, api_key='', base_url='', label=provider,",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_settings",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def resolve_settings() -> LlmSettings:\n    provider = resolve_provider_name()\n    if provider in ('rules', 'ollama'):\n        model = os.getenv('OLLAMA_MODEL', 'llama3.2').strip() if provider == 'ollama' else None\n        return LlmSettings(\n            provider=provider, model=model, accurate_model=model, fast_model=model,\n            route='rules', temperature=0.0, api_key='', base_url='', label=provider,\n        )\n    spec = PROVIDERS.get(provider)\n    if spec is None:",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "needs_accurate_model",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def needs_accurate_model(instruction: str, available_markets: list[dict] | None = None) -> bool:\n    \"\"\"Complex market/language requests use the accurate model; simple mode/count prompts stay fast.\"\"\"\n    text = instruction.casefold()\n    if len(instruction) > 220:\n        return True\n    if available_markets and len(available_markets) >= 8:\n        return True\n    complex_markers = (\n        r'\\b(?:draw|draws|handicap|correct score|interval|minute|minutes|btts|double chance|'\n        r'over|under|corners?|cards?|league|include|exclude|before|after|tomorrow|tonight|'",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "select_model",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def select_model(instruction: str, available_markets: list[dict] | None = None, settings: LlmSettings | None = None) -> str:\n    settings = settings or resolve_settings()\n    accurate = settings.accurate_model or settings.model or 'gpt-4o'\n    fast = settings.fast_model or accurate\n    if settings.route == 'accurate':\n        return accurate\n    if settings.route == 'fast':\n        return fast\n    return accurate if needs_accurate_model(instruction, available_markets) else fast\ndef strict_schema():",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "strict_schema",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def strict_schema():\n    schema = Config.model_json_schema()\n    def visit(node):\n        if isinstance(node, dict):\n            node.pop('default', None)\n            if node.get('type') == 'object':\n                node['additionalProperties'] = False\n                node['required'] = list(node.get('properties', {}))\n            for value in node.values():\n                visit(value)",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "parse_chat_completions",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def parse_chat_completions(instruction: str, available_markets: list[dict] | None = None, model: str | None = None) -> Config:\n    settings = resolve_settings()\n    spec = PROVIDERS.get(settings.provider)\n    if spec is None:\n        raise ValueError(f'Unsupported AI_PROVIDER: {settings.provider}')\n    if spec.requires_key and not settings.api_key:\n        raise IntentProviderError(f'AI_API_KEY is required for {spec.label}')\n    catalog = _trim_catalog(available_markets)\n    output_mode = 'json_schema'\n    label = settings.label",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "parse_groq",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def parse_groq(instruction: str, available_markets: list[dict] | None = None) -> Config:\n    \"\"\"Compatibility wrapper; prefer parse_chat_completions with AI_PROVIDER set.\"\"\"\n    return parse_chat_completions(instruction, available_markets)\ndef health_intent_fields() -> dict[str, Any]:\n    settings = resolve_settings()\n    return {\n        'intentProvider': settings.provider,\n        'intentModel': settings.accurate_model,\n        'intentModelFast': settings.fast_model,\n        'intentModelRoute': settings.route,",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "health_intent_fields",
+        "kind": 2,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "def health_intent_fields() -> dict[str, Any]:\n    settings = resolve_settings()\n    return {\n        'intentProvider': settings.provider,\n        'intentModel': settings.accurate_model,\n        'intentModelFast': settings.fast_model,\n        'intentModelRoute': settings.route,\n        'intentBaseUrl': settings.base_url or None,\n    }",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "GroqIntentError",
+        "kind": 5,
+        "importPath": "apps.ai.app.llm",
+        "description": "apps.ai.app.llm",
+        "peekOfCode": "GroqIntentError = IntentProviderError\n@dataclass(frozen=True)\nclass ProviderSpec:\n    name: str\n    label: str\n    default_model: str\n    default_base_url: str\n    key_envs: tuple[str, ...] = ('AI_API_KEY',)\n    model_envs: tuple[str, ...] = ('AI_MODEL',)\n    token_field: str = 'max_tokens'",
+        "detail": "apps.ai.app.llm",
+        "documentation": {}
+    },
+    {
+        "label": "health",
+        "kind": 2,
+        "importPath": "apps.ai.app.main",
+        "description": "apps.ai.app.main",
+        "peekOfCode": "def health():\n    return {'ok': True, 'service': 'myodd-ai', 'modelVersion': app.state.model.version, **health_intent_fields()}\n@app.post('/tools/discover-codes')\ndef discover_codes(body: DiscoveryRequest):\n    return discover(body)\n@app.post('/intent')\ndef intent(body: Instruction):\n    try:\n        return parse_intent(body.instruction, body.availableMarkets, body.learnedDefaults.model_dump()).model_dump(mode='json')\n    except IntentProviderError as exc:",
+        "detail": "apps.ai.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "discover_codes",
+        "kind": 2,
+        "importPath": "apps.ai.app.main",
+        "description": "apps.ai.app.main",
+        "peekOfCode": "def discover_codes(body: DiscoveryRequest):\n    return discover(body)\n@app.post('/intent')\ndef intent(body: Instruction):\n    try:\n        return parse_intent(body.instruction, body.availableMarkets, body.learnedDefaults.model_dump()).model_dump(mode='json')\n    except IntentProviderError as exc:\n        raise HTTPException(502, str(exc)) from None\n    except ModeConstraintError as exc:\n        raise HTTPException(422, str(exc)) from None",
+        "detail": "apps.ai.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "intent",
+        "kind": 2,
+        "importPath": "apps.ai.app.main",
+        "description": "apps.ai.app.main",
+        "peekOfCode": "def intent(body: Instruction):\n    try:\n        return parse_intent(body.instruction, body.availableMarkets, body.learnedDefaults.model_dump()).model_dump(mode='json')\n    except IntentProviderError as exc:\n        raise HTTPException(502, str(exc)) from None\n    except ModeConstraintError as exc:\n        raise HTTPException(422, str(exc)) from None\n    except ValueError as exc:\n        raise HTTPException(422, 'Instructions contain invalid generation settings') from exc\n@app.post('/resolve')",
+        "detail": "apps.ai.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "resolve",
+        "kind": 2,
+        "importPath": "apps.ai.app.main",
+        "description": "apps.ai.app.main",
+        "peekOfCode": "def resolve(body: ResolveInput):\n    return resolve_preferences(body.config, body.availableMarkets, body.instruction).model_dump(mode='json')\n@app.post('/generate')\nasync def generation(body: GenerateInput):\n    loop = asyncio.get_running_loop()\n    # Separate processes execute fixture scoring in parallel, including CPU-bound models.\n    chunks = [body.fixtures[i::app.state.prediction_workers] for i in range(app.state.prediction_workers)]\n    batches = await asyncio.gather(*[\n        loop.run_in_executor(app.state.executor, score_fixtures, chunk, app.state.model)\n        for chunk in chunks if chunk",
+        "detail": "apps.ai.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "kind": 5,
+        "importPath": "apps.ai.app.main",
+        "description": "apps.ai.app.main",
+        "peekOfCode": "app = FastAPI(title='myOdd AI', version='1.0.0', lifespan=lifespan)\n@app.get('/health')\ndef health():\n    return {'ok': True, 'service': 'myodd-ai', 'modelVersion': app.state.model.version, **health_intent_fields()}\n@app.post('/tools/discover-codes')\ndef discover_codes(body: DiscoveryRequest):\n    return discover(body)\n@app.post('/intent')\ndef intent(body: Instruction):\n    try:",
+        "detail": "apps.ai.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "normalized",
+        "kind": 2,
+        "importPath": "apps.ai.app.market_preferences",
+        "description": "apps.ai.app.market_preferences",
+        "peekOfCode": "def normalized(text):\n    text = re.sub(r'\\b(mins?|minutes?)\\b', 'minute', text.casefold())\n    text = re.sub(r'\\b(gg/ng|btts)\\b', 'both teams score', text)\n    return re.findall(r'\\d+(?:\\.\\d+)?|[a-z]+', text)\ndef resolve_preferences(config: Config, catalog: list[dict], instruction: str = \"\") -> Config:\n    config.relatedMarketRules = []  # Alternatives are derived locally, never trusted from a model.\n    by_key = {(str(m['marketId']), m.get('specifier', '')): m for m in catalog}\n    valid_rules = []\n    for rule in config.marketRules:\n        matches = [market for (market_id, specifier), market in by_key.items()",
+        "detail": "apps.ai.app.market_preferences",
+        "documentation": {}
+    },
+    {
+        "label": "resolve_preferences",
+        "kind": 2,
+        "importPath": "apps.ai.app.market_preferences",
+        "description": "apps.ai.app.market_preferences",
+        "peekOfCode": "def resolve_preferences(config: Config, catalog: list[dict], instruction: str = \"\") -> Config:\n    config.relatedMarketRules = []  # Alternatives are derived locally, never trusted from a model.\n    by_key = {(str(m['marketId']), m.get('specifier', '')): m for m in catalog}\n    valid_rules = []\n    for rule in config.marketRules:\n        matches = [market for (market_id, specifier), market in by_key.items()\n                   if market_id == rule.marketId and (rule.specifier is None or rule.specifier == specifier)]\n        for market in matches:\n            allowed = {str(o['outcomeId']) for o in market.get('outcomes', [])}\n            ids = [outcome for outcome in rule.outcomeIds if outcome in allowed]",
+        "detail": "apps.ai.app.market_preferences",
+        "documentation": {}
+    },
+    {
+        "label": "format_odds",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def format_odds(value: float) -> str:\n    if not math.isfinite(value) or value < 0:\n        return '—'\n    if value < 1000:\n        text = f'{value:.2f}'.rstrip('0').rstrip('.')\n        return text or '0'\n    if value >= 1e18:\n        return f'{value:.1e}'.replace('.0e', 'e').replace('e+', 'e')\n    unit = min(len(_SUFFIXES) - 1, int(math.floor(math.log10(value) / 3)))\n    rounded = round(value / (1000 ** unit))",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "parse_odds_token",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def parse_odds_token(raw: str) -> float | None:\n    match = re.fullmatch(r'\\s*(\\d+(?:\\.\\d+)?)\\s*(ks?|ms?|b|t|q)?\\s*', str(raw), re.I)\n    if not match:\n        return None\n    value = float(match[1])\n    mult = _PARSE_MULT.get((match[2] or '').lower(), 1.0)\n    parsed = value * mult\n    return parsed if math.isfinite(parsed) and parsed > 0 else None\ndef odds_token_pattern() -> str:\n    return r'(\\d+(?:\\.\\d+)?\\s*(?:ks?|ms?|b|t|q)?)'",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "odds_token_pattern",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def odds_token_pattern() -> str:\n    return r'(\\d+(?:\\.\\d+)?\\s*(?:ks?|ms?|b|t|q)?)'\ndef extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:\n    \"\"\"Parse ticket-odds floors/ceilings from natural language.\n    Understands ``between 4 and 5``, ``4-5 odds``, ``only 4–5 odds``,\n    ``not below 4``, ``at least 4 odds``, ``not above 5``, etc.\n    \"\"\"\n    text = instruction\n    token = odds_token_pattern()\n    low: float | None = None",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "extract_odds_bounds",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:\n    \"\"\"Parse ticket-odds floors/ceilings from natural language.\n    Understands ``between 4 and 5``, ``4-5 odds``, ``only 4–5 odds``,\n    ``not below 4``, ``at least 4 odds``, ``not above 5``, etc.\n    \"\"\"\n    text = instruction\n    token = odds_token_pattern()\n    low: float | None = None\n    high: float | None = None\n    ranges = list(re.finditer(",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "extract_games_per_ticket",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def extract_games_per_ticket(instruction: str) -> int | None:\n    \"\"\"Parse an exact games/picks-per-ticket count from natural language.\"\"\"\n    text = instruction.casefold()\n    patterns = (\n        r'(?:exactly\\s+|make(?:\\s+it)?\\s+)(\\d+)\\s+(?:games?|matches?|picks?|legs?|selections?)\\b',\n        r'(\\d+)\\s+(?:games?|matches?|picks?|legs?|selections?)\\s+(?:per\\s+(?:ticket|slip|code)|each|on each)\\b',\n        r'(?:with|using)\\s+(\\d+)\\s+(?:games?|matches?|picks?|legs?|selections?)\\b',\n        r'(?:games?|matches?|picks?|legs?|selections?)\\s*[:=]\\s*(\\d+)\\b',\n    )\n    for pattern in patterns:",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "has_explicit_odds_request",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "def has_explicit_odds_request(instruction: str) -> bool:\n    low, high = extract_odds_bounds(instruction)\n    if low is not None or high is not None:\n        return True\n    return bool(re.search(\n        rf'\\b(?:between|around|odds(?:\\s+(?:of|above|below|over|under|from|at))?)\\s+\\d|\\d(?:\\.\\d+)?\\s*(?:ks?|ms?|b|t|q)?\\s*odds',\n        instruction, re.I))",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "_SUFFIXES",
+        "kind": 5,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "_SUFFIXES = ('', 'ks', 'ms', 'b', 't', 'q')\n_PARSE_MULT = {\n    '': 1.0,\n    'k': 1e3,\n    'ks': 1e3,\n    'm': 1e6,\n    'ms': 1e6,\n    'b': 1e9,\n    't': 1e12,\n    'q': 1e15,",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "_PARSE_MULT",
+        "kind": 5,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "_PARSE_MULT = {\n    '': 1.0,\n    'k': 1e3,\n    'ks': 1e3,\n    'm': 1e6,\n    'ms': 1e6,\n    'b': 1e9,\n    't': 1e12,\n    'q': 1e15,\n}",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "_TOKEN",
+        "kind": 5,
+        "importPath": "apps.ai.app.odds_format",
+        "description": "apps.ai.app.odds_format",
+        "peekOfCode": "_TOKEN = re.compile(r'(\\d+(?:\\.\\d+)?)\\s*(ks?|ms?|b|t|q)?', re.I)\ndef format_odds(value: float) -> str:\n    if not math.isfinite(value) or value < 0:\n        return '—'\n    if value < 1000:\n        text = f'{value:.2f}'.rstrip('0').rstrip('.')\n        return text or '0'\n    if value >= 1e18:\n        return f'{value:.1e}'.replace('.0e', 'e').replace('e+', 'e')\n    unit = min(len(_SUFFIXES) - 1, int(math.floor(math.log10(value) / 3)))",
+        "detail": "apps.ai.app.odds_format",
+        "documentation": {}
+    },
+    {
+        "label": "selection_odds_bounds",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_policy",
+        "description": "apps.ai.app.odds_policy",
+        "peekOfCode": "def selection_odds_bounds(mode: str | None) -> tuple[float, float | None]:\n    if not mode:\n        return MIN_SELECTION_ODDS, None\n    return MODE_SELECTION_ODDS.get(mode, (MIN_SELECTION_ODDS, None))\ndef within_mode_selection_odds(odds: float, mode: str | None) -> bool:\n    if not isinstance(odds, (int, float)) or odds != odds:  # NaN guard\n        return False\n    low, high = selection_odds_bounds(mode)\n    return odds >= low and (high is None or odds <= high)",
+        "detail": "apps.ai.app.odds_policy",
+        "documentation": {}
+    },
+    {
+        "label": "within_mode_selection_odds",
+        "kind": 2,
+        "importPath": "apps.ai.app.odds_policy",
+        "description": "apps.ai.app.odds_policy",
+        "peekOfCode": "def within_mode_selection_odds(odds: float, mode: str | None) -> bool:\n    if not isinstance(odds, (int, float)) or odds != odds:  # NaN guard\n        return False\n    low, high = selection_odds_bounds(mode)\n    return odds >= low and (high is None or odds <= high)",
+        "detail": "apps.ai.app.odds_policy",
+        "documentation": {}
+    },
+    {
+        "label": "MIN_SELECTION_ODDS",
+        "kind": 5,
+        "importPath": "apps.ai.app.odds_policy",
+        "description": "apps.ai.app.odds_policy",
+        "peekOfCode": "MIN_SELECTION_ODDS = 1.1\n# Safe per-game / per-leg odds inside a ticket for named modes.\n# Ticket totals still use risk_modes.MODES; these keep individual picks safer.\nMODE_SELECTION_ODDS = {\n    'INVESTOR': (MIN_SELECTION_ODDS, 1.5),\n    'GAMBLER': (MIN_SELECTION_ODDS, 1.8),\n    'JAPA': (MIN_SELECTION_ODDS, 2.0),\n    'LAGOS_LIFE': (MIN_SELECTION_ODDS, 2.0),\n}\ndef selection_odds_bounds(mode: str | None) -> tuple[float, float | None]:",
+        "detail": "apps.ai.app.odds_policy",
+        "documentation": {}
+    },
+    {
+        "label": "MODE_SELECTION_ODDS",
+        "kind": 5,
+        "importPath": "apps.ai.app.odds_policy",
+        "description": "apps.ai.app.odds_policy",
+        "peekOfCode": "MODE_SELECTION_ODDS = {\n    'INVESTOR': (MIN_SELECTION_ODDS, 1.5),\n    'GAMBLER': (MIN_SELECTION_ODDS, 1.8),\n    'JAPA': (MIN_SELECTION_ODDS, 2.0),\n    'LAGOS_LIFE': (MIN_SELECTION_ODDS, 2.0),\n}\ndef selection_odds_bounds(mode: str | None) -> tuple[float, float | None]:\n    if not mode:\n        return MIN_SELECTION_ODDS, None\n    return MODE_SELECTION_ODDS.get(mode, (MIN_SELECTION_ODDS, None))",
+        "detail": "apps.ai.app.odds_policy",
+        "documentation": {}
+    },
+    {
+        "label": "OddsModel",
+        "kind": 6,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "class OddsModel:\n    version = 'odds-v2'\n    def probability(self, fixture, market, outcome, supported):\n        active = [o for o in market.outcomes if o.isActive]\n        raw = 1 / outcome.odds\n        if supported == Market.OTHER:\n            if complete_interval_result(market):\n                return raw / sum(1 / o.odds for o in active)\n            return min(.999, raw)\n        # Double-chance outcomes overlap: each match result is covered twice.",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "PoissonModel",
+        "kind": 6,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "class PoissonModel:\n    def __init__(self, path: str):\n        self.artifact = json.loads(Path(path).read_text())\n        self.version = self.artifact['version']\n        if self.artifact['model'] != 'poisson-v1':\n            raise ValueError('Unsupported model artifact')\n        self.fallback = OddsModel()\n    def probability(self, fixture, market, outcome, supported):\n        league = self.artifact['leagues'].get(fixture.league)\n        if supported == Market.OTHER or not league:",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "supported_market",
+        "kind": 2,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "def supported_market(market_id: str, specifier: str, outcome_id: str, name: str):\n    name = name.lower().strip()\n    if market_id == '1':\n        if outcome_id == '1' or name in ('home', '1'):\n            return Market.HOME\n        if outcome_id == '2' or name in ('draw', 'x'):\n            return Market.DRAW\n        if outcome_id == '3' or name in ('away', '2'):\n            return Market.AWAY\n    if market_id == '10':",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "complete_interval_result",
+        "kind": 2,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "def complete_interval_result(market):\n    \"\"\"Only normalize a complete, mutually exclusive interval home/draw/away market.\"\"\"\n    name = market.marketName.casefold()\n    if not ('1x2' in name and re.search(r'min(?:ute)?s?\\b', name)):\n        return False\n    if re.search(r'\\b[12]up\\b|early|payout|&|\\band\\b', name):\n        return False\n    aliases = {'home': 'home', '1': 'home', 'draw': 'draw', 'x': 'draw', 'away': 'away', '2': 'away'}\n    return len(market.outcomes) == 3 and all(o.isActive for o in market.outcomes) and {\n        aliases.get(o.outcomeName.strip().casefold()) for o in market.outcomes",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "load_model",
+        "kind": 2,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "def load_model():\n    name = os.getenv('PREDICTION_MODEL', 'odds')\n    if name == 'odds':\n        return OddsModel()\n    if name == 'poisson':\n        return PoissonModel(os.getenv('MODEL_PATH', '/data/model.json'))\n    raise ValueError(f'Unknown prediction model: {name}')\ndef score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:\n    scored = []\n    now = datetime.now(timezone.utc)",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "score_fixtures",
+        "kind": 2,
+        "importPath": "apps.ai.app.predictions",
+        "description": "apps.ai.app.predictions",
+        "peekOfCode": "def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:\n    scored = []\n    now = datetime.now(timezone.utc)\n    for fixture in fixtures:\n        if fixture.kickoffAt.tzinfo is None or fixture.kickoffAt <= now:\n            continue\n        for market in fixture.markets:\n            if market.status.lower() not in ('', '0', 'active', 'open'):\n                continue\n            for outcome in market.outcomes:",
+        "detail": "apps.ai.app.predictions",
+        "documentation": {}
+    },
+    {
+        "label": "ModeConstraintError",
+        "kind": 6,
+        "importPath": "apps.ai.app.risk_modes",
+        "description": "apps.ai.app.risk_modes",
+        "peekOfCode": "class ModeConstraintError(ValueError):\n    pass\nMODES = (\n    (r'\\binvestor\\s+modes?\\b', 'INVESTOR', 'VERY_LOW', 2., 5.),\n    (r'\\bgam(?:b)?ler\\s+modes?\\b', 'GAMBLER', 'MODERATE', 5.01, 20.),\n    (r'\\bjapa\\s+modes?\\b', 'JAPA', 'HIGHER', 20.01, 100.),\n    (r'\\blagos[\\s-]*(?:li(?:f|v)es?|life)(?:\\s+modes?)?\\b', 'LAGOS_LIFE', 'VERY_HIGH', 100.01, None),\n)\ndef apply_named_mode(config: Config, instruction: str) -> Config:\n    matches = [(m.start(), mode, preference, low, high) for pattern, mode, preference, low, high in MODES for m in re.finditer(pattern, instruction, re.I)]",
+        "detail": "apps.ai.app.risk_modes",
+        "documentation": {}
+    },
+    {
+        "label": "apply_named_mode",
+        "kind": 2,
+        "importPath": "apps.ai.app.risk_modes",
+        "description": "apps.ai.app.risk_modes",
+        "peekOfCode": "def apply_named_mode(config: Config, instruction: str) -> Config:\n    matches = [(m.start(), mode, preference, low, high) for pattern, mode, preference, low, high in MODES for m in re.finditer(pattern, instruction, re.I)]\n    if not matches:\n        # A provider may return a named mode even when the input uses an abbreviation.\n        found = next((entry[1:] for entry in MODES if entry[1] == config.riskMode), None)\n        if not found:\n            return config\n        mode, preference, low, high = found\n    else:\n        _, mode, preference, low, high = max(matches, key=lambda item: item[0])",
+        "detail": "apps.ai.app.risk_modes",
+        "documentation": {}
+    },
+    {
+        "label": "apply_default_investor",
+        "kind": 2,
+        "importPath": "apps.ai.app.risk_modes",
+        "description": "apps.ai.app.risk_modes",
+        "peekOfCode": "def apply_default_investor(config: Config, instruction: str) -> Config:\n    \"\"\"Recommend Investor Mode when the user did not name another mode.\"\"\"\n    if config.riskMode or any(re.search(pattern, instruction, re.I) for pattern, *_ in MODES):\n        return config\n    return apply_named_mode(config, f'{instruction}\\nInvestor Mode')",
+        "detail": "apps.ai.app.risk_modes",
+        "documentation": {}
+    },
+    {
+        "label": "MODES",
+        "kind": 5,
+        "importPath": "apps.ai.app.risk_modes",
+        "description": "apps.ai.app.risk_modes",
+        "peekOfCode": "MODES = (\n    (r'\\binvestor\\s+modes?\\b', 'INVESTOR', 'VERY_LOW', 2., 5.),\n    (r'\\bgam(?:b)?ler\\s+modes?\\b', 'GAMBLER', 'MODERATE', 5.01, 20.),\n    (r'\\bjapa\\s+modes?\\b', 'JAPA', 'HIGHER', 20.01, 100.),\n    (r'\\blagos[\\s-]*(?:li(?:f|v)es?|life)(?:\\s+modes?)?\\b', 'LAGOS_LIFE', 'VERY_HIGH', 100.01, None),\n)\ndef apply_named_mode(config: Config, instruction: str) -> Config:\n    matches = [(m.start(), mode, preference, low, high) for pattern, mode, preference, low, high in MODES for m in re.finditer(pattern, instruction, re.I)]\n    if not matches:\n        # A provider may return a named mode even when the input uses an abbreviation.",
+        "detail": "apps.ai.app.risk_modes",
+        "documentation": {}
+    },
+    {
+        "label": "Market",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Market(StrEnum):\n    OTHER = 'OTHER'\n    DRAW = 'DRAW'\n    HOME = 'HOME'\n    AWAY = 'AWAY'\n    DOUBLE_CHANCE_1X = 'DOUBLE_CHANCE_1X'\n    DOUBLE_CHANCE_X2 = 'DOUBLE_CHANCE_X2'\n    DOUBLE_CHANCE_12 = 'DOUBLE_CHANCE_12'\n    OVER_1_5 = 'OVER_1_5'\n    OVER_2_5 = 'OVER_2_5'",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "MarketRule",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class MarketRule(BaseModel):\n    marketId: str\n    specifier: str | None = None\n    outcomeIds: list[str] = Field(default_factory=list)\nclass Config(BaseModel):\n    numberOfSlips: int = Field(default=10, ge=1, le=10)\n    minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)\n    maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)\n    maximumSelections: int = Field(default=20, ge=1, le=30)\n    minimumSelections: int = Field(default=2, ge=1, le=30)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Config(BaseModel):\n    numberOfSlips: int = Field(default=10, ge=1, le=10)\n    minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)\n    maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)\n    maximumSelections: int = Field(default=20, ge=1, le=30)\n    minimumSelections: int = Field(default=2, ge=1, le=30)\n    markets: list[Market] = Field(default_factory=list)\n    marketQueries: list[str] = Field(default_factory=list)\n    marketRules: list[MarketRule] = Field(default_factory=list)\n    relatedMarketRules: list[MarketRule] = Field(default_factory=list)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "LearnedDefaults",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class LearnedDefaults(BaseModel):\n    riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')\n    ticketCount: int | None = Field(default=None, ge=1, le=10)\n    gamesPerTicket: int | None = Field(default=None, ge=1, le=30)\nclass Instruction(BaseModel):\n    learnedDefaults: LearnedDefaults = Field(default_factory=LearnedDefaults)\n    instruction: str = Field(min_length=3, max_length=6000)\n    availableMarkets: list[dict] = Field(default_factory=list, max_length=500)\nclass ResolveInput(Instruction):\n    config: Config",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Instruction",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Instruction(BaseModel):\n    learnedDefaults: LearnedDefaults = Field(default_factory=LearnedDefaults)\n    instruction: str = Field(min_length=3, max_length=6000)\n    availableMarkets: list[dict] = Field(default_factory=list, max_length=500)\nclass ResolveInput(Instruction):\n    config: Config\nclass Outcome(BaseModel):\n    outcomeId: str\n    outcomeName: str\n    odds: float = Field(gt=1, allow_inf_nan=False)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "ResolveInput",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class ResolveInput(Instruction):\n    config: Config\nclass Outcome(BaseModel):\n    outcomeId: str\n    outcomeName: str\n    odds: float = Field(gt=1, allow_inf_nan=False)\n    isActive: bool\nclass BookmakerMarket(BaseModel):\n    marketId: str\n    marketName: str",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Outcome",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Outcome(BaseModel):\n    outcomeId: str\n    outcomeName: str\n    odds: float = Field(gt=1, allow_inf_nan=False)\n    isActive: bool\nclass BookmakerMarket(BaseModel):\n    marketId: str\n    marketName: str\n    specifier: str = ''\n    status: str = ''",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "BookmakerMarket",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class BookmakerMarket(BaseModel):\n    marketId: str\n    marketName: str\n    specifier: str = ''\n    status: str = ''\n    outcomes: list[Outcome]\nclass Fixture(BaseModel):\n    eventId: str\n    homeTeam: str\n    awayTeam: str",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Fixture",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Fixture(BaseModel):\n    eventId: str\n    homeTeam: str\n    awayTeam: str\n    league: str\n    kickoffAt: datetime\n    matchStatus: str = ''\n    markets: list[BookmakerMarket]\nclass Selection(BaseModel):\n    model_config = ConfigDict(extra='ignore')",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "Selection",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class Selection(BaseModel):\n    model_config = ConfigDict(extra='ignore')\n    eventId: str\n    marketId: str\n    outcomeId: str\n    specifier: str = ''\nclass ScoredSelection(Selection):\n    odds: float\n    homeTeam: str\n    awayTeam: str",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "ScoredSelection",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class ScoredSelection(Selection):\n    odds: float\n    homeTeam: str\n    awayTeam: str\n    league: str\n    marketName: str\n    selectionName: str\n    kickoffAt: datetime\n    isActive: bool = True\n    supportedMarket: Market",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "PredictionInput",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class PredictionInput(BaseModel):\n    fixtures: Annotated[list[Fixture], Field(max_length=200)]\nclass GenerateInput(BaseModel):\n    expandedSearch: bool = False\n    fixtures: Annotated[list[Fixture], Field(max_length=1000)]\n    config: Config\n    originalSelections: list[Selection] = Field(default_factory=list)\nclass SplitInput(GenerateInput):\n    parts: int = Field(ge=1, le=100)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "GenerateInput",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class GenerateInput(BaseModel):\n    expandedSearch: bool = False\n    fixtures: Annotated[list[Fixture], Field(max_length=1000)]\n    config: Config\n    originalSelections: list[Selection] = Field(default_factory=list)\nclass SplitInput(GenerateInput):\n    parts: int = Field(ge=1, le=100)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "SplitInput",
+        "kind": 6,
+        "importPath": "apps.ai.app.schemas",
+        "description": "apps.ai.app.schemas",
+        "peekOfCode": "class SplitInput(GenerateInput):\n    parts: int = Field(ge=1, le=100)",
+        "detail": "apps.ai.app.schemas",
+        "documentation": {}
+    },
+    {
+        "label": "split_report",
+        "kind": 2,
+        "importPath": "apps.ai.app.splitting",
+        "description": "apps.ai.app.splitting",
+        "peekOfCode": "def split_report(pool: list[ScoredSelection], config: Config, original: list[Selection], parts: int):\n    key = lambda s: (s.eventId, s.marketId, s.outcomeId, s.specifier)\n    live = {key(s): s for s in pool if eligible(s, config)}\n    original_keys = list(dict.fromkeys(key(s) for s in original))\n    picks = [live[k] for k in original_keys if k in live]\n    skipped = len(original_keys) - len(picks)\n    notices = list(config.unhandledRequests)\n    if skipped:\n        notices.append(f'{skipped} original picks are unavailable or conflict with your filters and were skipped. No replacement matches were added.')\n    strategy = {'VERY_LOW': 'balanced risk', 'LOWER': 'balanced risk', 'MODERATE': 'balanced sizes',",
+        "detail": "apps.ai.app.splitting",
+        "documentation": {}
+    },
+    {
+        "label": "train",
+        "kind": 2,
+        "importPath": "apps.ai.app.train",
+        "description": "apps.ai.app.train",
+        "peekOfCode": "def train(csv_path, output, cutoff):\n    leagues = defaultdict(list)\n    with open(csv_path, newline='') as source:\n        for row in csv.DictReader(source):\n            if date.fromisoformat(row['date']) >= cutoff:\n                continue\n            h, a = int(row['homeGoals']), int(row['awayGoals'])\n            if min(h, a) < 0:\n                raise ValueError('Goals must be nonnegative')\n            leagues[row['league']].append((row['homeTeam'], row['awayTeam'], h, a))",
+        "detail": "apps.ai.app.train",
+        "documentation": {}
+    },
+    {
+        "label": "IntentTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_ai",
+        "description": "apps.ai.tests.test_ai",
+        "peekOfCode": "class IntentTests(unittest.TestCase):\n    def test_prompt(self):\n        result = parse_rules('Create 20 lower-risk slips between 3 and 5 odds. Prefer over 1.5 and double chance.')\n        self.assertEqual(result.numberOfSlips, 10)\n        self.assertEqual((result.minimumOdds, result.maximumOdds), (3, 5))\n        self.assertEqual((result.riskMode, result.riskPreference), ('INVESTOR', 'VERY_LOW'))\n        self.assertIn(Market.OVER_1_5, result.markets)\n    def test_negation_exclusions_and_deadline(self):\n        result = parse_rules('Create 3 slips. No straight wins. Remove Arsenal and Chelsea. Before 2099-01-01T10:00:00Z')\n        self.assertNotIn(Market.HOME, result.markets)",
+        "detail": "apps.ai.tests.test_ai",
+        "documentation": {}
+    },
+    {
+        "label": "PredictionTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_ai",
+        "description": "apps.ai.tests.test_ai",
+        "peekOfCode": "class PredictionTests(unittest.TestCase):\n    def test_double_chance_uses_overlapping_outcomes(self):\n        scores = score_fixtures([fixture()], OddsModel())\n        dc = next(s for s in scores if s.supportedMarket == Market.DOUBLE_CHANCE_1X)\n        self.assertAlmostEqual(dc.probability, (1 / 1.5 + 1 / 4) / (1 / 1.5 + 1 / 4 + 1 / 6), places=5)\n    def test_double_chance_without_result_market(self):\n        f = fixture()\n        f.markets = f.markets[1:]\n        for score in score_fixtures([f], OddsModel()):\n            self.assertAlmostEqual(score.probability, 2 / 3, places=5)",
+        "detail": "apps.ai.tests.test_ai",
+        "documentation": {}
+    },
+    {
+        "label": "GenerationTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_ai",
+        "description": "apps.ai.tests.test_ai",
+        "peekOfCode": "class GenerationTests(unittest.TestCase):\n    def test_unique_ranked_slips_preserve_original_fixtures(self):\n        pool = score_fixtures([fixture(str(i)) for i in range(6)], OddsModel())\n        config = Config(numberOfSlips=5, minimumOdds=2, maximumOdds=8, maximumSelections=3)\n        original = [Selection(eventId=str(i), marketId='1', outcomeId='1') for i in range(3)]\n        results = generate(pool, config, original)\n        self.assertGreater(len(results), 0)\n        self.assertEqual(len({r['fingerprint'] for r in results}), len(results))\n        self.assertEqual([r['slipScore'] for r in results], sorted([r['slipScore'] for r in results], reverse=True))\n        for slip in results:",
+        "detail": "apps.ai.tests.test_ai",
+        "documentation": {}
+    },
+    {
+        "label": "HttpTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_ai",
+        "description": "apps.ai.tests.test_ai",
+        "peekOfCode": "class HttpTests(unittest.TestCase):\n    def test_service_contract(self):\n        with patch.dict(os.environ, {'PREDICTION_MODEL': 'odds', 'INTENT_PROVIDER': 'rules', 'AI_PROVIDER': 'rules'}), TestClient(app) as client:\n            self.assertEqual(client.get('/health').json()['modelVersion'], 'odds-v2')\n            config = client.post('/intent', json={'instruction': 'Create 3 slips between 2 and 8 odds'}).json()\n            response = client.post('/generate', json={'fixtures': [fixture(str(i)).model_dump(mode='json') for i in range(4)], 'config': config})\n            self.assertEqual(response.status_code, 200)\n            self.assertGreater(len(response.json()['candidates']), 0)\n            self.assertEqual(client.post('/generate', json={'fixtures': [], 'config': {'numberOfSlips': 999}}).status_code, 422)\nif __name__ == '__main__':",
+        "detail": "apps.ai.tests.test_ai",
+        "documentation": {}
+    },
+    {
+        "label": "fixture",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_ai",
+        "description": "apps.ai.tests.test_ai",
+        "peekOfCode": "def fixture(event='1', **changes):\n    data = dict(eventId=event, homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='Test',\n                kickoffAt='2099-01-01T12:00:00Z', markets=[\n                    {'marketId': '1', 'marketName': '1X2', 'outcomes': [\n                        {'outcomeId': '1', 'outcomeName': 'Home', 'odds': 1.5, 'isActive': True},\n                        {'outcomeId': '2', 'outcomeName': 'Draw', 'odds': 4, 'isActive': True},\n                        {'outcomeId': '3', 'outcomeName': 'Away', 'odds': 6, 'isActive': True}]},\n                    {'marketId': '10', 'marketName': 'Double chance', 'outcomes': [\n                        {'outcomeId': i, 'outcomeName': name, 'odds': 1.5, 'isActive': True}\n                        for i, name in [('9', '1X'), ('10', '12'), ('11', 'X2')]]}])",
+        "detail": "apps.ai.tests.test_ai",
+        "documentation": {}
+    },
+    {
+        "label": "DiscoveryTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_discovery",
+        "description": "apps.ai.tests.test_discovery",
+        "peekOfCode": "class DiscoveryTests(unittest.TestCase):\n    def test_only_booking_evidence_is_extracted(self):\n        html = '<script>code: FAKE123</script><a href=\"https://www.sportybet.com/ng/?shareCode=AB123C\">Open</a><a href=\"https://evil.test/?shareCode=NO1234\">x</a><p>booking code: ZX789A</p>'\n        self.assertEqual(extract_codes(html), ['AB123C', 'ZX789A'])\n    def test_hub_uses_only_structured_share_codes(self):\n        self.assertEqual(extract_hub_codes({'bizCode': 10000, 'data': [{'shareCode': 'ABCDEF'}, {'shareCode': 'abcdef'}, {'shareCode': '../bad'}, {'userId': 'NO1234'}]}), ['ABCDEF'])\n    def test_hub_rejects_error_payload(self):\n        with self.assertRaises(ValueError): extract_hub_codes({'bizCode': 400, 'data': []})\n    @patch('app.discovery.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('127.0.0.1', 443))])\n    def test_local_destination_is_blocked(self, _):",
+        "detail": "apps.ai.tests.test_discovery",
+        "documentation": {}
+    },
+    {
+        "label": "DrawIntentTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "class DrawIntentTests(unittest.TestCase):\n    def test_shorthand_and_explicit_minutes_preserve_the_period(self):\n        for prompt in ['1-10 draws', 'draws in the first 10 minutes', 'draw from 1 to 10 minutes', 'First 1–10 minute draws between 1 and 10 odds']:\n            self.assertEqual(draw_request(prompt), ('minutes', 1, 10))\n        self.assertEqual(draw_request('draw tickets between 1 and 10 odds'), ('full',))\n        self.assertIsNone(draw_request('No draws, use home wins'))\n    def test_a_model_cannot_turn_ten_minute_draws_into_different_markets(self):\n        result = config(markets=[Market.HOME, Market.DRAW], marketRules=[MarketRule(marketId='twenty', outcomeIds=['x'])],\n            relatedMarketRules=[MarketRule(marketId='dc')])\n        self.assertEqual(result.marketPolicy, 'only')",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "IntervalScoringTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "class IntervalScoringTests(unittest.TestCase):\n    def fixture(self):\n        from app.schemas import Fixture\n        return Fixture(eventId='1', homeTeam='A', awayTeam='B', league='L', kickoffAt='2099-01-01T00:00:00Z', markets=[\n            {'marketId':'ten','marketName':'10 minutes - 1X2 from 1 to 10','outcomes':[\n                {'outcomeId':'h','outcomeName':'Home','odds':10,'isActive':True},\n                {'outcomeId':'x','outcomeName':'Draw','odds':1.2,'isActive':True},\n                {'outcomeId':'a','outcomeName':'Away','odds':10,'isActive':True}]}])\n    def test_complete_interval_prices_remove_the_three_way_margin(self):\n        from app.predictions import OddsModel, score_fixtures",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "market",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "def market(id, name, outcomes):\n    return {'marketId': id, 'marketName': name, 'specifier': '', 'outcomes': [{'outcomeId': key, 'outcomeName': label} for key, label in outcomes]}\nCATALOG = [\n    market('full', '1X2', [('x', 'Draw'), ('h', 'Home')]),\n    market('five', '1X2 from 1 to 5 minute', [('x', 'Draw')]),\n    market('ten', '10 minutes - 1X2 from 1 to 10', [('x', 'Draw'), ('h', 'Home'), ('a', 'Away')]),\n    market('twenty', '1X2 from 1 to 20 minute', [('x', 'Draw')]),\n    market('score', 'Correct Score from 1 to 10 minute', [('00', '0:0'), ('11', '1:1'), ('12', '1:2')]),\n    market('goals', 'Over/Under from 1 to 10 minute', [('u', 'Under 0.5'), ('o', 'Over 0.5')]),\n    market('team', 'Home Team Total Goals from 1 to 10 minute', [('u', 'Under 0.5')]),",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "pick",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "def pick(event, id, outcome='x', odds=1.3):\n    m = next(m for m in CATALOG if m['marketId'] == id)\n    label = next(o['outcomeName'] for o in m['outcomes'] if o['outcomeId'] == outcome)\n    return ScoredSelection(eventId=str(event), marketId=id, outcomeId=outcome, specifier='', odds=odds,\n        marketName=m['marketName'], selectionName=label, homeTeam='A', awayTeam='B', league='L',\n        kickoffAt='2099-01-01T00:00:00Z', supportedMarket=Market.DRAW if id == 'full' else Market.OTHER,\n        probability=1/odds, confidence=60, modelVersion='test')\ndef config(**kwargs):\n    return resolve_preferences(Config(numberOfSlips=2, minimumOdds=1.1, maximumOdds=10,\n        minimumSelections=1, maximumSelections=2, **kwargs), CATALOG, 'Create tickets with 1-10 draws')",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "config",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "def config(**kwargs):\n    return resolve_preferences(Config(numberOfSlips=2, minimumOdds=1.1, maximumOdds=10,\n        minimumSelections=1, maximumSelections=2, **kwargs), CATALOG, 'Create tickets with 1-10 draws')\nclass DrawIntentTests(unittest.TestCase):\n    def test_shorthand_and_explicit_minutes_preserve_the_period(self):\n        for prompt in ['1-10 draws', 'draws in the first 10 minutes', 'draw from 1 to 10 minutes', 'First 1–10 minute draws between 1 and 10 odds']:\n            self.assertEqual(draw_request(prompt), ('minutes', 1, 10))\n        self.assertEqual(draw_request('draw tickets between 1 and 10 odds'), ('full',))\n        self.assertIsNone(draw_request('No draws, use home wins'))\n    def test_a_model_cannot_turn_ten_minute_draws_into_different_markets(self):",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "CATALOG",
+        "kind": 5,
+        "importPath": "apps.ai.tests.test_draw_intent",
+        "description": "apps.ai.tests.test_draw_intent",
+        "peekOfCode": "CATALOG = [\n    market('full', '1X2', [('x', 'Draw'), ('h', 'Home')]),\n    market('five', '1X2 from 1 to 5 minute', [('x', 'Draw')]),\n    market('ten', '10 minutes - 1X2 from 1 to 10', [('x', 'Draw'), ('h', 'Home'), ('a', 'Away')]),\n    market('twenty', '1X2 from 1 to 20 minute', [('x', 'Draw')]),\n    market('score', 'Correct Score from 1 to 10 minute', [('00', '0:0'), ('11', '1:1'), ('12', '1:2')]),\n    market('goals', 'Over/Under from 1 to 10 minute', [('u', 'Under 0.5'), ('o', 'Over 0.5')]),\n    market('team', 'Home Team Total Goals from 1 to 10 minute', [('u', 'Under 0.5')]),\n    market('dc', 'Double Chance from 1 to 10 minute', [('1x', 'Home or Draw')]),\n    market('corners', 'Corners 1X2 from 1 to 10 minute', [('x', 'Draw')]),",
+        "detail": "apps.ai.tests.test_draw_intent",
+        "documentation": {}
+    },
+    {
+        "label": "FlexibleGenerationTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_flexible_generation",
+        "description": "apps.ai.tests.test_flexible_generation",
+        "peekOfCode": "class FlexibleGenerationTests(unittest.TestCase):\n    def test_lower_risk_can_rank_high_odds_without_a_probability_floor(self):\n        pool = [selection(i, odds=3, probability=.3) for i in range(8)]\n        report = generate_report(pool, Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500,\n                                             riskPreference='LOWER'), [])\n        self.assertEqual(len(report['candidates']), 10)\n        self.assertTrue(all(100 <= c['totalOdds'] <= 500 for c in report['candidates']))\n    def test_adaptive_mode_adds_matches_and_explains_it(self):\n        pool = [selection(1, 1.2, .8), selection(2, 1.2, .8), selection(3), selection(4)]\n        report = generate_report(pool, Config(numberOfSlips=2, minimumOdds=3, maximumOdds=5), original(1, 2))",
+        "detail": "apps.ai.tests.test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "CatalogTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_flexible_generation",
+        "description": "apps.ai.tests.test_flexible_generation",
+        "peekOfCode": "class CatalogTests(unittest.TestCase):\n    def test_interval_draw_matches_actual_catalog_ids(self):\n        catalog = [{'marketId': '900', 'marketName': '1X2 - First 5 minutes', 'specifier': '',\n                    'outcomes': [{'outcomeId': 'draw-id', 'outcomeName': 'Draw'}, {'outcomeId': 'home-id', 'outcomeName': 'Home'}]}]\n        result = resolve_preferences(Config(marketQueries=['5 minute draw'], marketPolicy='only'), catalog)\n        self.assertEqual(result.marketRules[0].marketId, '900')\n        self.assertEqual(result.marketRules[0].outcomeIds, ['draw-id'])\n    def test_invented_ids_are_discarded(self):\n        catalog = [{'marketId': '900', 'marketName': 'Interval', 'specifier': '', 'outcomes': []}]\n        result = resolve_preferences(Config(marketRules=[MarketRule(marketId='invented')]), catalog)",
+        "detail": "apps.ai.tests.test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "selection",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_flexible_generation",
+        "description": "apps.ai.tests.test_flexible_generation",
+        "peekOfCode": "def selection(event, odds=2, probability=.4, market='1', outcome='1', supported=Market.HOME, **values):\n    return ScoredSelection(eventId=str(event), marketId=market, outcomeId=outcome, specifier='',\n                           odds=odds, probability=probability, confidence=probability * 100,\n                           modelVersion='test', supportedMarket=supported,\n                           homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='League',\n                           marketName='Market', selectionName='Outcome',\n                           kickoffAt='2099-01-01T12:00:00Z', **values)\ndef original(*events):\n    return [Selection(eventId=str(event), marketId='1', outcomeId='1') for event in events]\nclass FlexibleGenerationTests(unittest.TestCase):",
+        "detail": "apps.ai.tests.test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "original",
+        "kind": 2,
+        "importPath": "apps.ai.tests.test_flexible_generation",
+        "description": "apps.ai.tests.test_flexible_generation",
+        "peekOfCode": "def original(*events):\n    return [Selection(eventId=str(event), marketId='1', outcomeId='1') for event in events]\nclass FlexibleGenerationTests(unittest.TestCase):\n    def test_lower_risk_can_rank_high_odds_without_a_probability_floor(self):\n        pool = [selection(i, odds=3, probability=.3) for i in range(8)]\n        report = generate_report(pool, Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500,\n                                             riskPreference='LOWER'), [])\n        self.assertEqual(len(report['candidates']), 10)\n        self.assertTrue(all(100 <= c['totalOdds'] <= 500 for c in report['candidates']))\n    def test_adaptive_mode_adds_matches_and_explains_it(self):",
+        "detail": "apps.ai.tests.test_flexible_generation",
+        "documentation": {}
+    },
+    {
+        "label": "GroqCompatTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_groq",
+        "description": "apps.ai.tests.test_groq",
+        "peekOfCode": "class GroqCompatTests(unittest.TestCase):\n    def setUp(self):\n        self.settings = patch.dict(os.environ, {\n            'AI_PROVIDER': 'groq',\n            'AI_API_KEY': 'test-secret',\n            'AI_MODEL': 'qwen/qwen3.8-27b',\n            'AI_MODEL_TEMPERATURE': '0.7',\n        })\n        self.settings.start()\n        self.addCleanup(self.settings.stop)",
+        "detail": "apps.ai.tests.test_groq",
+        "documentation": {}
+    },
+    {
+        "label": "LlmOrchestratorTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_llm",
+        "description": "apps.ai.tests.test_llm",
+        "peekOfCode": "class LlmOrchestratorTests(unittest.TestCase):\n    def setUp(self):\n        _intent_cache.clear()\n        self.settings = patch.dict(os.environ, {\n            'AI_PROVIDER': 'openai',\n            'AI_API_KEY': 'test-secret',\n            'AI_MODEL': 'gpt-4o',\n            'AI_MODEL_FAST': 'gpt-4o-mini',\n            'AI_MODEL_ROUTE': 'auto',\n            'AI_MODEL_TEMPERATURE': '0.2',",
+        "detail": "apps.ai.tests.test_llm",
+        "documentation": {}
+    },
+    {
+        "label": "RiskModeTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_risk_modes",
+        "description": "apps.ai.tests.test_risk_modes",
+        "peekOfCode": "class RiskModeTests(unittest.TestCase):\n    def test_named_modes_enforce_per_ticket_odds_bands(self):\n        for name, preference, low, high in [('Investor Mode', 'VERY_LOW', 2, 5), ('Investor modes', 'VERY_LOW', 2, 5), ('Gamler Mode', 'MODERATE', 5.01, 20), ('Gambler Mode', 'MODERATE', 5.01, 20), ('Japa Mode', 'HIGHER', 20.01, 100), ('Lagoslife Mode', 'VERY_HIGH', 100.01, None)]:\n            with self.subTest(mode=name):\n                config = parse_rules(f'Create 4 codes. Exclude Chelsea. {name}')\n                self.assertEqual(config.riskPreference, preference)\n                self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (low, high, 4))\n                self.assertIn('Chelsea', config.excludedTeams)\n    def test_conflicting_typed_mode_range_is_explained(self):\n        from app.risk_modes import ModeConstraintError",
+        "detail": "apps.ai.tests.test_risk_modes",
+        "documentation": {}
+    },
+    {
+        "label": "SplittingTests",
+        "kind": 6,
+        "importPath": "apps.ai.tests.test_splitting",
+        "description": "apps.ai.tests.test_splitting",
+        "peekOfCode": "class SplittingTests(unittest.TestCase):\n    def setUp(self):\n        self.pool = [selection(i, odds=1.2 + i * .1, probability=.9 - i * .03) for i in range(12)]\n        self.original = [Selection(**s.model_dump()) for s in self.pool]\n        self.config = Config(numberOfSlips=3, minimumOdds=1.1, maximumOdds=1000000, minimumSelections=1, maximumSelections=30, fixtureMode='original_only', riskPreference='VERY_LOW')\n    def test_each_original_pick_appears_once_in_exact_requested_count(self):\n        for mode in ['VERY_LOW', 'MODERATE', 'HIGHER', 'VERY_HIGH']:\n            result = split_report(self.pool, self.config.model_copy(update={'riskPreference': mode}), self.original, 3)\n            self.assertEqual(len(result['candidates']), 3)\n            ids = [s['eventId'] for c in result['candidates'] for s in c['selections']]",
+        "detail": "apps.ai.tests.test_splitting",
+        "documentation": {}
+    }
+]
