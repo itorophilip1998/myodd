@@ -32,26 +32,32 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 export function useSpeechDictation(onFinal: (text: string) => void) {
   const play = useUiSound();
   const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState('');
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState('');
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const onFinalRef = useRef(onFinal);
   const listeningRef = useRef(false);
+  const restartingRef = useRef(false);
   onFinalRef.current = onFinal;
 
   useEffect(() => {
     setSupported(!!getSpeechRecognition());
     return () => {
+      listeningRef.current = false;
       recognition.current?.abort();
       recognition.current = null;
     };
   }, []);
 
   const stop = useCallback(() => {
-    recognition.current?.stop();
-    if (listeningRef.current) play('mic-off');
     listeningRef.current = false;
+    restartingRef.current = false;
+    recognition.current?.stop();
+    recognition.current = null;
     setListening(false);
+    setInterim('');
+    play('mic-off');
   }, [play]);
 
   const start = useCallback(() => {
@@ -62,34 +68,54 @@ export function useSpeechDictation(onFinal: (text: string) => void) {
       return;
     }
     setError('');
+    setInterim('');
     recognition.current?.abort();
     const session = new Ctor();
     session.continuous = true;
     session.interimResults = true;
     session.lang = 'en-NG';
     session.onresult = event => {
-      let chunk = '';
+      let finalChunk = '';
+      let live = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        if (result.isFinal) chunk += result[0].transcript;
+        const text = result[0].transcript;
+        if (result.isFinal) finalChunk += text;
+        else live += text;
       }
-      const text = chunk.trim();
+      setInterim(live.trim());
+      const text = finalChunk.trim();
       if (text) {
         play('prompt');
         onFinalRef.current(text);
       }
     };
     session.onerror = event => {
+      if (event.error === 'aborted' || event.error === 'no-speech') return;
       if (event.error === 'not-allowed') setError('Microphone permission was blocked.');
-      else if (event.error !== 'aborted' && event.error !== 'no-speech') setError('Could not capture voice. Try again.');
-      if (event.error !== 'aborted' && event.error !== 'no-speech') play('error');
+      else setError('Could not capture voice. Try again.');
+      play('error');
       listeningRef.current = false;
+      restartingRef.current = false;
       setListening(false);
+      setInterim('');
     };
     session.onend = () => {
-      if (listeningRef.current) play('mic-off');
-      listeningRef.current = false;
-      setListening(false);
+      // Browsers end continuous sessions after a pause — keep listening until the user stops.
+      if (listeningRef.current && !restartingRef.current) {
+        restartingRef.current = true;
+        try {
+          session.start();
+          restartingRef.current = false;
+          return;
+        } catch {
+          restartingRef.current = false;
+        }
+      }
+      if (!listeningRef.current) {
+        setListening(false);
+        setInterim('');
+      }
     };
     recognition.current = session;
     try {
@@ -101,6 +127,7 @@ export function useSpeechDictation(onFinal: (text: string) => void) {
       setError('Could not start the microphone.');
       listeningRef.current = false;
       setListening(false);
+      setInterim('');
       play('error');
     }
   }, [play]);
@@ -110,5 +137,5 @@ export function useSpeechDictation(onFinal: (text: string) => void) {
     else start();
   }, [listening, start, stop]);
 
-  return { listening, supported, error, setError, toggle, stop };
+  return { listening, interim, supported, error, setError, toggle, stop };
 }

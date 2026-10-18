@@ -31,9 +31,11 @@ function markSeen(id: string) {
 export function JobNoticeToast({
   noticeKey,
   message,
+  sticky = false,
 }: {
   noticeKey?: string | null;
   message?: string | null;
+  sticky?: boolean;
 }) {
   const toast = useToast();
   const shown = useRef(false);
@@ -46,8 +48,8 @@ export function JobNoticeToast({
     if (readSeen().has(key)) return;
     shown.current = true;
     markSeen(key);
-    toast(text);
-  }, [noticeKey, message, toast]);
+    toast(text, sticky ? { sticky: true } : undefined);
+  }, [noticeKey, message, sticky, toast]);
 
   return null;
 }

@@ -8,7 +8,7 @@ export default function HomePage() {
       <div className="hero">
         <p className="eyebrow"><span className="status-dot" /> SPORTYBET, REIMAGINED</p>
         <h1>Your next code.<br /><span>Your way.</span></h1>
-        <p>Your codes. Your conversation.<br className="hidden sm:block" /> Set options, pick a date, generate.</p>
+        <p>AI prediction power for SportyBet — sharper picks, stronger codes, your edge.</p>
       </div>
       <Suspense fallback={<LogoLoader label="Loading create" />}>
         <GenerateForm />

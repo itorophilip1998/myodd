@@ -1,6 +1,6 @@
 {
   "name": "@myodd/web",
-  "version": "0.2.1",
+  "version": "0.2.4",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
@@ -12,7 +12,9 @@
     "@clerk/nextjs": "^7.9.17",
     "@myodd/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.8",
+    "mammoth": "^1.13.0",
     "next": "^15.1.2",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

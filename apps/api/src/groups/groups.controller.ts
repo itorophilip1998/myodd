@@ -53,6 +53,18 @@ export class GroupsController {
     return this.groups.verifyCode(code, req.account?.id);
   }
 
+  @Post('groups/:groupId/check-play') @HttpCode(200)
+  async checkPlayGroup(@Param('groupId') groupId: string, @Req() req: AuthRequest) {
+    await this.rateLimit.consume('check-play-group', 10);
+    return this.groups.checkPlayGroup(groupId, req.account?.id);
+  }
+
+  @Post('codes/:code/check-play') @HttpCode(200)
+  async checkPlayCode(@Param('code') code: string, @Req() req: AuthRequest) {
+    await this.rateLimit.consume('check-play-code', 30);
+    return this.groups.checkPlayCode(code, req.account?.id);
+  }
+
   @Post('groups/:groupId/share') @HttpCode(200)
   publish(@Param('groupId') groupId: string, @Req() req: AuthRequest) { return this.groups.publish(groupId, req.account?.id); }
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { LegPlayStatus, SlipPlayStatus } from '@prisma/client';
+import { SlipPlayStatus } from '@prisma/client';
 import {
   settlementKey,
   type BookmakerBooking,
@@ -11,7 +11,7 @@ import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmak
 import { SportyBetSettlementService } from '../bookmaker/sportybet.settlement';
 import { CatalogService } from '../catalog/catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { decideLegPlayStatus, matchPhase } from './play-leg-status';
+import { decideLegPlayStatus, isDoneLeg, isDoneSlip, matchPhase } from './play-leg-status';
 
 type LegInput = {
   id: string;
@@ -25,16 +25,6 @@ type LegInput = {
   league?: string;
   marketName?: string;
   selectionName?: string;
-};
-
-export type CutLegDetail = {
-  homeTeam: string;
-  awayTeam: string;
-  league: string;
-  marketName: string;
-  selectionName: string;
-  score: string | null;
-  playNote: string | null;
 };
 
 function matchLabel(leg: LegInput) {
@@ -103,8 +93,7 @@ export class PlayCheckService {
     }
 
     const now = Date.now();
-    let openLegs = 0, liveLegs = 0, playedLegs = 0, cutLegs = 0;
-    const cuts: CutLegDetail[] = [];
+    let openLegs = 0, liveLegs = 0, doneLegs = 0;
 
     for (const leg of selections) {
       const kickoff = leg.kickoffAt?.getTime() ?? null;
@@ -149,19 +138,7 @@ export class PlayCheckService {
 
       if (playStatus === 'UPCOMING') openLegs++;
       else if (playStatus === 'LIVE') liveLegs++;
-      else if (playStatus === 'PLAYED') playedLegs++;
-      else if (playStatus === 'CUT') {
-        cutLegs++;
-        cuts.push({
-          homeTeam: leg.homeTeam ?? 'Home',
-          awayTeam: leg.awayTeam ?? 'Away',
-          league: leg.league ?? '',
-          marketName: leg.marketName ?? 'Market',
-          selectionName: leg.selectionName ?? 'Selection',
-          score,
-          playNote,
-        });
-      }
+      else if (isDoneLeg(playStatus)) doneLegs++;
 
       await this.prisma.slipSelection.update({
         where: { id: leg.id },
@@ -169,18 +146,13 @@ export class PlayCheckService {
       });
     }
 
-    // One cut leg kills the whole ticket.
+    // Live beats open beats done. A ticket is done only when every leg is done.
     let playStatus: SlipPlayStatus = 'UNKNOWN';
     if (!selections.length) playStatus = 'UNKNOWN';
-    else if (cutLegs > 0) playStatus = 'CUT';
     else if (liveLegs > 0) playStatus = 'LIVE';
     else if (openLegs > 0) playStatus = 'OPEN';
-    else if (playedLegs > 0) playStatus = 'ALL_PLAYED';
+    else if (doneLegs === selections.length) playStatus = 'ALL_PLAYED';
     else playStatus = 'UNKNOWN';
-
-    const cutSummary = cuts.length
-      ? cuts.map(c => `${c.homeTeam} vs ${c.awayTeam}${c.score ? ` (${c.score})` : ''} · ${c.marketName}: ${c.selectionName}`).join(' · ')
-      : null;
 
     const checkedAt = new Date();
     await this.prisma.generatedSlip.update({
@@ -190,9 +162,9 @@ export class PlayCheckService {
         playCheckedAt: checkedAt,
         openLegs,
         liveLegs,
-        playedLegs,
-        cutLegs,
-        cutSummary,
+        playedLegs: doneLegs,
+        cutLegs: 0,
+        cutSummary: null,
       },
     });
 
@@ -202,27 +174,42 @@ export class PlayCheckService {
       playStatus,
       openLegs,
       liveLegs,
-      playedLegs,
-      cutLegs,
-      cutSummary,
-      cuts,
+      playedLegs: doneLegs,
+      cutLegs: 0,
+      cutSummary: null as string | null,
+      cuts: [] as Array<{
+        homeTeam: string;
+        awayTeam: string;
+        league: string;
+        marketName: string;
+        selectionName: string;
+        score: string | null;
+        playNote: string | null;
+      }>,
       totalLegs: selections.length,
       playCheckedAt: checkedAt.toISOString(),
     };
   }
 
-  summarize(rows: Array<{ playStatus: SlipPlayStatus; cutLegs: number; openLegs: number; liveLegs: number; playedLegs: number }>) {
+  summarize(rows: Array<{ playStatus: SlipPlayStatus | string; cutLegs: number; openLegs: number; liveLegs: number; playedLegs: number }>) {
+    const done = rows.filter(r => isDoneSlip(r.playStatus)).length;
     return {
       tickets: rows.length,
       open: rows.filter(r => r.playStatus === 'OPEN').length,
       live: rows.filter(r => r.playStatus === 'LIVE').length,
-      cut: rows.filter(r => r.playStatus === 'CUT').length,
-      allPlayed: rows.filter(r => r.playStatus === 'ALL_PLAYED').length,
-      unknown: rows.filter(r => r.playStatus === 'UNKNOWN').length,
+      done,
+      /** @deprecated use done — kept for older clients */
+      cut: 0,
+      /** @deprecated use done */
+      allPlayed: done,
+      unknown: rows.filter(r => !r.playStatus || r.playStatus === 'UNKNOWN').length,
       legsOpen: rows.reduce((n, r) => n + r.openLegs, 0),
       legsLive: rows.reduce((n, r) => n + r.liveLegs, 0),
-      legsPlayed: rows.reduce((n, r) => n + r.playedLegs, 0),
-      legsCut: rows.reduce((n, r) => n + r.cutLegs, 0),
+      legsDone: rows.reduce((n, r) => n + r.playedLegs + (r.cutLegs || 0), 0),
+      /** @deprecated use legsDone */
+      legsPlayed: rows.reduce((n, r) => n + r.playedLegs + (r.cutLegs || 0), 0),
+      /** @deprecated */
+      legsCut: 0,
     };
   }
 }
