@@ -51,6 +51,8 @@ jobs:
             --exclude '__pycache__/' \
             --exclude '.DS_Store' \
             --exclude '.vscode/' \
+            --exclude 'backup/' \
+            --exclude 'Backup/' \
             ./ "${DEPLOY_SSH}:${DEST}/"
 
       - name: Build and restart Compose
