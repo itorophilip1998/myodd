@@ -20,7 +20,8 @@ export type LegPlayDecision = {
 };
 
 /**
- * Settlement-first leg status. Never treats post-kickoff bettability (`isActive`) as a loss.
+ * Settlement/phase-first leg status.
+ * Finished running → PLAYED (“done”). Never invents cut/loss as a separate status.
  */
 export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecision {
   const { phase, settlement, unavailablePrematch, score, matchLabel, pickLabel } = input;
@@ -34,13 +35,13 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
   }
   if (settlement === 'LOST') {
     return {
-      playStatus: 'CUT',
-      playNote: `Lost · ${matchLabel}${scoreSuffix} · ${pickLabel}`,
+      playStatus: 'PLAYED',
+      playNote: `Finished · ${matchLabel}${scoreSuffix} · ${pickLabel}`,
     };
   }
   if (settlement === 'VOID') {
     return {
-      playStatus: 'CUT',
+      playStatus: 'PLAYED',
       playNote: `Void · ${matchLabel}${scoreSuffix} · ${pickLabel}`,
     };
   }
@@ -48,8 +49,8 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
   if (phase === 'prematch') {
     if (unavailablePrematch) {
       return {
-        playStatus: 'CUT',
-        playNote: `Cut · ${matchLabel} · ${pickLabel} unavailable before kickoff`,
+        playStatus: 'PLAYED',
+        playNote: `Done · ${matchLabel} · ${pickLabel} unavailable before kickoff`,
       };
     }
     return { playStatus: 'UPCOMING', playNote: 'Not kicked off yet' };
@@ -63,10 +64,9 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
   }
 
   if (phase === 'finished') {
-    // Finished without explicit settlement — do not invent a loss from inactive markets.
     return {
-      playStatus: 'UNKNOWN',
-      playNote: `Finished${scoreSuffix} · settlement not confirmed for ${pickLabel}`,
+      playStatus: 'PLAYED',
+      playNote: `Finished${scoreSuffix} · ${pickLabel}`,
     };
   }
 
@@ -98,4 +98,14 @@ export function matchPhase(args: {
   if (kickoffMs != null && kickoffMs <= nowMs && kickoffMs > nowMs - 3 * 3600_000) return 'live';
   if (kickoffMs != null && kickoffMs <= nowMs - 3 * 3600_000) return 'finished';
   return 'unknown';
+}
+
+/** Legacy CUT rows count as done. */
+export function isDoneLeg(status: LegPlayStatus | string | null | undefined) {
+  return status === 'PLAYED' || status === 'CUT';
+}
+
+/** Legacy CUT / ALL_PLAYED rows count as done. */
+export function isDoneSlip(status: string | null | undefined) {
+  return status === 'ALL_PLAYED' || status === 'CUT';
 }

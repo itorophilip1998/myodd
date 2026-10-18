@@ -11,32 +11,32 @@ describe('decideLegPlayStatus', () => {
     unavailablePrematch: false,
   };
 
-  it('marks explicit wins as PLAYED even when markets are inactive', () => {
+  it('marks explicit wins as PLAYED (done)', () => {
     const result = decideLegPlayStatus({ ...base, phase: 'finished', settlement: 'WON' });
     expect(result.playStatus).toBe('PLAYED');
     expect(result.playNote).toMatch(/Won/);
   });
 
-  it('marks explicit losses as CUT', () => {
+  it('marks losses as PLAYED (done), not CUT', () => {
     const result = decideLegPlayStatus({ ...base, phase: 'finished', settlement: 'LOST' });
-    expect(result.playStatus).toBe('CUT');
-    expect(result.playNote).toMatch(/Lost/);
+    expect(result.playStatus).toBe('PLAYED');
+    expect(result.playNote).toMatch(/Finished/);
   });
 
-  it('does not invent CUT for finished legs without settlement', () => {
+  it('marks finished legs without settlement as PLAYED (done running)', () => {
     const result = decideLegPlayStatus({ ...base, phase: 'finished', settlement: 'UNKNOWN' });
-    expect(result.playStatus).toBe('UNKNOWN');
-    expect(result.playNote).not.toMatch(/lost/i);
+    expect(result.playStatus).toBe('PLAYED');
+    expect(result.playNote).toMatch(/Finished/);
   });
 
-  it('cuts prematch unavailable selections only before kickoff', () => {
-    const cut = decideLegPlayStatus({
+  it('marks prematch unavailable selections as PLAYED (done)', () => {
+    const done = decideLegPlayStatus({
       ...base,
       phase: 'prematch',
       settlement: 'UNKNOWN',
       unavailablePrematch: true,
     });
-    expect(cut.playStatus).toBe('CUT');
+    expect(done.playStatus).toBe('PLAYED');
     const open = decideLegPlayStatus({
       ...base,
       phase: 'prematch',
@@ -46,7 +46,7 @@ describe('decideLegPlayStatus', () => {
     expect(open.playStatus).toBe('UPCOMING');
   });
 
-  it('keeps live legs LIVE without treating inactive markets as cut', () => {
+  it('keeps live legs LIVE', () => {
     const result = decideLegPlayStatus({ ...base, phase: 'live', settlement: 'PENDING' });
     expect(result.playStatus).toBe('LIVE');
   });

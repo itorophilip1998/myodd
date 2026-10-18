@@ -94,7 +94,7 @@ export interface SlipSelectionDto {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
-  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'UNKNOWN' | 'CUT';
   score?: string | null;
   playNote?: string | null;
 }

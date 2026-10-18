@@ -6,13 +6,16 @@ import { api } from '@/lib/api';
 import { LogoLoader } from '@/components/LogoLoader';
 import { ProgressQuest } from '@/components/ProgressQuest';
 import { CodeWorkspace } from '@/components/CodeWorkspace';
-import { Suspense, useEffect } from 'react';
+import { useToast } from '@/components/ToastProvider';
+import { Suspense, useEffect, useRef } from 'react';
 
 function ResultInner() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
+  const toast = useToast();
   const jobId = search.get('job');
   const publicId = params.id;
+  const told = useRef<string | null>(null);
 
   const jobQuery = useQuery({
     queryKey: ['job', jobId],
@@ -41,6 +44,22 @@ function ResultInner() {
     }
   }, [jobQuery.data?.status, groupQuery.refetch]);
 
+  useEffect(() => {
+    const key = jobQuery.data?.status === 'FAILED' && jobQuery.data.error
+      ? `job:${jobId}:${jobQuery.data.error}`
+      : jobQuery.error
+        ? `jobq:${(jobQuery.error as Error).message}`
+        : groupQuery.error
+          ? `groupq:${(groupQuery.error as Error).message}`
+          : null;
+    if (!key || told.current === key) return;
+    told.current = key;
+    const message = jobQuery.data?.status === 'FAILED' && jobQuery.data.error
+      ? jobQuery.data.error
+      : ((jobQuery.error ?? groupQuery.error) as Error | undefined)?.message;
+    if (message) toast(message, { sticky: true });
+  }, [jobId, jobQuery.data?.status, jobQuery.data?.error, jobQuery.error, groupQuery.error, toast]);
+
   const group = groupQuery.error ? undefined : groupQuery.data;
   const job = jobQuery.data ?? group?.job;
   const loading = job && job.status !== 'COMPLETED' && job.status !== 'FAILED';
@@ -48,18 +67,15 @@ function ResultInner() {
 
   return (
     <main className="workspace result-workspace">
-      {job?.error && <p className="form-error" role="alert">{job.error}</p>}
-      {(jobQuery.error || groupQuery.error) && (
-        <p className="form-error" role="alert">{(jobQuery.error ?? groupQuery.error)?.message}</p>
-      )}
-
       {!group && !groupQuery.error && !jobQuery.error && (
         <ProgressQuest job={job ?? { status: 'PENDING', stage: 'QUEUED', progress: 0, total: 0, failedCount: 0 }} />
       )}
       {group && <CodeWorkspace key={group.publicId} group={{ ...group, job: job ?? group.job }} busy={!!loading} />}
 
-      {!loading && group && !hasResults && job?.status === 'COMPLETED' && (
-        <p className="empty-state">No slips were created. Try different settings.</p>
+      {!loading && group && !hasResults && (job?.status === 'COMPLETED' || job?.status === 'FAILED') && (
+        <p className="empty-state" title="Try a different mode, odds range, or match day">
+          No codes this time. Adjust and try again.
+        </p>
       )}
     </main>
   );
