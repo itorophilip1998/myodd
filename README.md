@@ -56,7 +56,7 @@ Buy/manage the domain at [Spaceship](https://www.spaceship.com/application/domai
 4. In Clerk, add `https://yourdomain.com` as an allowed origin / production instance.
 5. Redeploy (merge to `production` or re-run the workflow). With `DOMAIN` set, Compose enables Caddy on `:80`/`:443` (Let's Encrypt) and proxies `/` → web, `/api` → api.
 
-Until `DOMAIN` is set, the site stays on `http://2.31.56.193:3000`.
+Until `DOMAIN` is set, the site stays on host loopback `:3000` only (not public). With `DOMAIN` set, the only public entry is Caddy on `:80`/`:443`. Web, API, AI, Postgres, and Redis stay on the Docker network (host binds are loopback-only for admin/debug).
 
 ## Run everything locally
 

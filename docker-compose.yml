@@ -8,10 +8,15 @@ services:
       dockerfile: Dockerfile.node
       target: web
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        # Empty = browser same-origin /api. Do not bake a public :3001 URL.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
+    environment:
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
     restart: unless-stopped
+    # Host loopback only — not reachable from the internet. Containers use the Docker network.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -50,8 +55,9 @@ services:
       SPORTYBET_MIN_INTERVAL_MS: ${SPORTYBET_MIN_INTERVAL_MS:-250}
       SPORTYBET_MAX_CONCURRENCY: ${SPORTYBET_MAX_CONCURRENCY:-4}
       SPORTYBET_CACHE_TTL_MS: ${SPORTYBET_CACHE_TTL_MS:-90000}
+    # Host loopback only — public traffic enters via Caddy :443 → /api → api:3001 on the Docker network.
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       migrate:
         condition: service_completed_successfully
