@@ -30,6 +30,34 @@ Deploy syncs code to `/opt/myodd` and runs `docker compose up -d --build --wait`
 
 Promote work with: feature branch → PR into `development` → PR into `production`.
 
+### Custom domain (Spaceship → Hetzner)
+
+Buy/manage the domain at [Spaceship](https://www.spaceship.com/application/domain-list-application/). Do **not** point it at Spaceship web hosting — only use Spaceship DNS, and host the app on Hetzner.
+
+1. In Spaceship → **Advanced DNS** → your domain → **Custom records**:
+
+   | Host | Type | Value |
+   |------|------|-------|
+   | `@` | A | `2.31.56.193` |
+   | `www` | CNAME | `yourdomain.com` (or A → same IP) |
+
+2. Wait until `dig +short yourdomain.com` returns `2.31.56.193`.
+3. On the server, edit `/opt/myodd/.env` (manual — deploy never overwrites it):
+
+   ```bash
+   DOMAIN=yourdomain.com
+   ACME_EMAIL=you@yourdomain.com
+   CORS_ORIGIN=https://yourdomain.com
+   CLERK_AUTHORIZED_PARTIES=https://yourdomain.com
+   PUBLIC_WEB_URL=https://yourdomain.com
+   NEXT_PUBLIC_API_URL=
+   ```
+
+4. In Clerk, add `https://yourdomain.com` as an allowed origin / production instance.
+5. Redeploy (merge to `production` or re-run the workflow). With `DOMAIN` set, Compose enables Caddy on `:80`/`:443` (Let's Encrypt) and proxies `/` → web, `/api` → api.
+
+Until `DOMAIN` is set, the site stays on `http://2.31.56.193:3000`.
+
 ## Run everything locally
 
 ```bash

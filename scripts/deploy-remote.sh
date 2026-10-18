@@ -14,7 +14,15 @@ if [[ ! -f apps/web/.env.local ]]; then
   exit 1
 fi
 
-docker compose config --quiet
-docker compose up -d --build --wait --wait-timeout 300
-docker compose ps
+COMPOSE_ARGS=()
+if grep -qE '^[[:space:]]*DOMAIN=[^[:space:]#]+' .env; then
+  COMPOSE_ARGS+=(--profile https)
+  echo "DOMAIN set — enabling Caddy HTTPS edge (profile: https)"
+else
+  echo "DOMAIN unset — serving on :3000 only (set DOMAIN after Spaceship DNS points here)"
+fi
+
+docker compose "${COMPOSE_ARGS[@]}" config --quiet
+docker compose "${COMPOSE_ARGS[@]}" up -d --build --wait --wait-timeout 300
+docker compose "${COMPOSE_ARGS[@]}" ps
 echo "Deployed $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git rev-parse --short HEAD 2>/dev/null || echo 'rsync')"

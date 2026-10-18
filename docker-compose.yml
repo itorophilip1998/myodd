@@ -42,6 +42,7 @@ services:
       AI_SERVICE_URL: http://ai:8000
       AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-120000}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-${CORS_ORIGIN:-http://localhost:3000}}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       SPORTYBET_REGION: ${SPORTYBET_REGION:-ng}
       SPORTYBET_API_BASE_URL: ${SPORTYBET_API_BASE_URL:-https://www.sportybet.com}
@@ -165,8 +166,32 @@ services:
       timeout: 3s
       retries: 20
 
+  # Enabled when DOMAIN is set in .env (deploy-remote.sh adds --profile https).
+  # Point Spaceship DNS here first, then set DOMAIN / PUBLIC_WEB_URL / CORS_ORIGIN.
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env before enabling the https profile}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_backups:
   postgres_data:
   redis_data:
   ai_data:
+  caddy_data:
+  caddy_config:
