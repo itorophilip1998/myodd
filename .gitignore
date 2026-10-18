@@ -18,3 +18,8 @@ apps/ai/data/*
 !apps/ai/data/.gitkeep
 
 .clerk/
+
+# Local daily Postgres dumps (pulled from Hetzner). Never commit SQL.
+/backup/*
+!/backup/.gitkeep
+/Backup/
