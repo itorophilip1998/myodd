@@ -36,7 +36,7 @@ describe('account-scoped saved collections', () => {
   const draft = { id: 'd', publicId: 'DRAFT', isPublic: false, userSaved: false, ownerId: 'owner', deletedAt: null, createdAt: new Date(), title: 'Draft', description: null, expiresAt: null, originalBookingCode: null, generationReport: null, slips: [], jobs: [], owner: null };
   it('rejects another account reading a saved private collection before checking any codes', async () => {
     const displayStatus = vi.fn();
-    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved) } } as any, { displayStatus } as any);
+    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved) } } as any, { displayStatus } as any, {} as any);
     await expect(service.getByPublicId('PRIVATE', 'other')).rejects.toThrow('Collection not found');
     await expect(service.getByPublicId('PRIVATE')).rejects.toThrow('Collection not found');
     expect(displayStatus).not.toHaveBeenCalled();
@@ -46,13 +46,13 @@ describe('account-scoped saved collections', () => {
     const service = new GroupsService({
       slipGroup: { findUnique: vi.fn().mockResolvedValue(draft) },
       savedCollection: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as any, { displayStatus } as any);
+    } as any, { displayStatus } as any, {} as any);
     await expect(service.getByPublicId('DRAFT')).resolves.toMatchObject({ publicId: 'DRAFT', userSaved: false, saved: false });
     expect(displayStatus).toHaveBeenCalled();
   });
   it('only includes owned, explicitly saved collections in history', async () => {
     const findMany = vi.fn().mockResolvedValue([]);
-    await new GroupsService({ slipGroup: { findMany } } as any, {} as any).listRecent(1, 'owner');
+    await new GroupsService({ slipGroup: { findMany } } as any, {} as any, {} as any).listRecent(1, 'owner');
     expect(findMany.mock.calls[0][0].where).toEqual({
       deletedAt: null,
       userSaved: true,
@@ -62,7 +62,7 @@ describe('account-scoped saved collections', () => {
   });
   it('prevents someone else from making a private collection public', async () => {
     const update = vi.fn();
-    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved), update } } as any, {} as any);
+    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved), update } } as any, {} as any, {} as any);
     await expect(service.publish('PRIVATE', 'other')).rejects.toThrow('Collection not found');
     expect(update).not.toHaveBeenCalled();
     await expect(service.publish('PRIVATE', 'owner')).resolves.toMatchObject({ isPublic: true, userSaved: true });
@@ -97,7 +97,7 @@ describe('account-scoped saved collections', () => {
 describe('collection library permissions and reversible removal', () => {
   it('only lists public collections that were explicitly saved and contain slips', async () => {
     const findMany = vi.fn().mockResolvedValue([{ publicId: 'PUBLIC', title: 'Public group', createdAt: new Date(), ownerId: 'other', owner: null, savedBy: [], _count: { slips: 3 } }]);
-    const rows = await new GroupsService({ slipGroup: { findMany } } as any, {} as any).listPublic(1, 'viewer');
+    const rows = await new GroupsService({ slipGroup: { findMany } } as any, {} as any, {} as any).listPublic(1, 'viewer');
     expect(findMany.mock.calls[0][0].where).toMatchObject({ isPublic: true, userSaved: true, deletedAt: null, slips: { some: {} } });
     expect(rows[0]).toMatchObject({ saved: false, isPublic: true, isOwner: false, slipCount: 3 });
     expect(rows[0]).not.toHaveProperty('ownerId');

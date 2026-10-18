@@ -1,0 +1,23 @@
+---
+description: Enforce myOdd git branch naming — bug/[version]-[what-you-fixed]
+alwaysApply: true
+---
+
+# Branch naming
+
+When creating a git branch for a fix or patch release:
+
+1. **Pattern (required for bugs/fixes):** `bug/[version]-[what-you-fixed]`
+   - `[version]` = product version after the bump (matches `APP_VERSION` in `packages/shared/src/app-version.ts`)
+   - `[what-you-fixed]` = lowercase kebab-case, 2–6 words
+   - Example: `bug/0.2.1-play-verify-and-prediction-book`
+
+2. **Version bump:** Before or with the branch, increment the patch (unless the user specifies minor/major) in:
+   - `packages/shared/src/app-version.ts` (`APP_VERSION`)
+   - Root and workspace `package.json` `version` fields (`apps/web`, `apps/api`, `packages/shared`)
+
+3. **Do not** invent alternate fix prefixes (`fix/`, `hotfix/`, `patch/`) for product fixes — use `bug/`.
+
+4. **Docs:** Full rules live in `docs/features/branching.md`. Keep that file and this rule aligned when the pattern changes.
+
+5. **PR target:** Prefer PRs into `development`, not direct pushes to `development` / `production`.

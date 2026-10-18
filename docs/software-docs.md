@@ -49,7 +49,15 @@ Host Postgres is published at `127.0.0.1:5433`, Redis at `127.0.0.1:6379`.
 | `development` | Default. PR-only (direct push blocked). |
 | `production` | Live deploy trigger. |
 
-Flow: feature branch → PR → `development` → PR → `production` → Actions deploy.
+**Bug / fix branch name (required):**
+
+```
+bug/[version]-[what-you-fixed]
+```
+
+Example: `bug/0.2.1-play-verify-and-prediction-book`. Bump `APP_VERSION` (and workspace `package.json` versions) to match `[version]`. Full rules: [features/branching.md](./features/branching.md). Agents: `.cursor/rules/branch-naming.mdc`.
+
+Flow: `bug/…` or `feat/…` → PR → `development` → PR → `production` → Actions deploy.
 
 ## Deployment
 

@@ -9,9 +9,11 @@ Show which product version (and deploy commit) is running, so updates are visibl
 Bump these together when shipping user-visible changes:
 
 1. `packages/shared/src/app-version.ts` → `APP_VERSION`
-2. Root / workspace `package.json` `version` fields (kept in sync at `0.2.0+`)
+2. Root / workspace `package.json` `version` fields (kept in sync)
 
-`formatAppVersion(gitSha)` renders `v0.2.0` or `v0.2.0 · a1b2c3d`.
+For patch/fix work, name the branch `bug/[version]-[what-you-fixed]` using that same version — see [branching.md](./branching.md).
+
+`formatAppVersion(gitSha)` renders `v0.2.1` or `v0.2.1 · a1b2c3d`.
 
 ## Where it appears
 

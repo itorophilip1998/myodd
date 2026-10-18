@@ -8,3 +8,4 @@ export * from './match-day';
 export * from './format-odds';
 export * from './prediction-markets';
 export * from './app-version';
+export * from './settlement';

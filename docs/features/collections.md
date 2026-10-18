@@ -42,8 +42,13 @@ Access rules: `apps/api/src/groups/group-access.ts`.
 - Delete retracts public visibility but retains training/journal history.
 - Share uses app links (`/g/...`) plus SportyBet share URLs for individual codes.
 
+## Play / cut labels
+
+Verify runs settlement-aware play-check (see [play-verification.md](./play-verification.md)). **CUT** means lost/void (or removed before kickoff), not merely “inactive on the share ticket.”
+
 ## Related
 
 - [auth.md](./auth.md) — ownership
 - [generation.md](./generation.md) — creating collections
 - [learning.md](./learning.md) — feedback on collections
+- [play-verification.md](./play-verification.md) — accurate win/loss checks
