@@ -21,16 +21,16 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HOST: ${{ secrets.HETZNER_HOST }}
-          USER: ${{ secrets.HETZNER_USER }}
+          DEPLOY_USER: ${{ secrets.HETZNER_USER }}
         run: |
           test -n "$SSH_KEY" || { echo "Missing secret HETZNER_SSH_KEY"; exit 1; }
           test -n "$HOST" || { echo "Missing secret HETZNER_HOST"; exit 1; }
-          test -n "$USER" || { echo "Missing secret HETZNER_USER"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "Missing secret HETZNER_USER"; exit 1; }
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
-          echo "DEPLOY_SSH=$USER@$HOST" >> "$GITHUB_ENV"
+          echo "DEPLOY_SSH=$DEPLOY_USER@$HOST" >> "$GITHUB_ENV"
 
       - name: Sync code (preserve server env)
         env:
