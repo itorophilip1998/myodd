@@ -1,6 +1,7 @@
 import {
   MIN_SELECTION_ODDS,
-  inferSettlementFromStatus,
+  explicitSettlement,
+  hasSettlementConflict,
   type LiveFixture,
   type BookmakerBooking,
   type BookmakerFixture,
@@ -169,16 +170,8 @@ export function mapShareResponse(
   };
 }
 
-function pickSettlement(...candidates: unknown[]): SelectionSettlement {
-  for (const candidate of candidates) {
-    const value = inferSettlementFromStatus(candidate);
-    if (value !== 'UNKNOWN' && value !== 'PENDING') return value;
-  }
-  for (const candidate of candidates) {
-    const value = inferSettlementFromStatus(candidate);
-    if (value === 'PENDING') return value;
-  }
-  return 'UNKNOWN';
+function readSettlement(...values: unknown[]) {
+  return { settlement: explicitSettlement(...values), settlementConflict: hasSettlementConflict(...values) };
 }
 
 function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]): BookmakerSelection[] {
@@ -201,7 +194,7 @@ function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]):
         // Bettability only — finished events are inactive for betting, not necessarily lost.
         isActive: !!outcome && mapOutcome(outcome).isActive
           && String(market?.status ?? '0') === '0' && String(event.status ?? '0') === '0',
-        settlement: pickSettlement(
+        ...readSettlement(
           (selection as ShareOutcome).settleStatus,
           (selection as ShareOutcome).outcomeStatus,
           (selection as ShareOutcome).selectionStatus,
@@ -209,9 +202,6 @@ function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]):
           outcome?.settleStatus,
           outcome?.outcomeStatus,
           outcome?.result,
-          // Flat share rows sometimes put won/lost in `status`; ignore numeric event codes.
-          typeof (selection as ShareOutcome).status === 'string' ? (selection as ShareOutcome).status : undefined,
-          typeof outcome?.status === 'string' ? outcome.status : undefined,
         ),
       };
     });
@@ -234,7 +224,7 @@ function mapShareOutcome(o: ShareOutcome): BookmakerSelection {
       ? new Date(o.estimateStartTime).toISOString()
       : undefined,
     isActive: o.status !== 'suspended',
-    settlement: pickSettlement(o.settleStatus, o.outcomeStatus, o.selectionStatus, o.result, o.status),
+    ...readSettlement(o.settleStatus, o.outcomeStatus, o.selectionStatus, o.result),
   };
 }
 

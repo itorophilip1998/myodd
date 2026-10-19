@@ -1,48 +1,81 @@
-# Feature: Play verification (settlement)
+# Feature: Booking result tracking
 
-## Purpose
+The app tracks whether the saved selections in an unplaced standard accumulator
+would win or lose. A booking code is sufficient when its selections have already
+been saved and SportyBet exposes explicit settlement data. No bet is placed.
 
-Accurately label each ticket leg as upcoming, live, played (won), cut (lost/void), or unknown — without treating “no longer bettable” as a loss.
+## Separate completion from results
 
-## Problem this fixes
+`playStatus` describes match progress: upcoming/open, live, played/all played, or
+unknown. A completed match does not establish that its selection won.
 
-SportyBet share JSON sets `isActive: false` once a match starts or finishes. The old checker treated that as **CUT / lost**, so winning finished legs were often wrong.
+Tickets and selections have a separate `result`:
 
-## Semantics
-
-| Status | Meaning |
+| Result | Meaning |
 |--------|---------|
-| `UPCOMING` | Prematch and still on the ticket |
-| `LIVE` | Match in play |
-| `PLAYED` | Explicit **win** settlement |
-| `CUT` | Explicit **loss** or **void**, or removed **before** kickoff |
-| `UNKNOWN` | Finished (or unclear) without confirmed settlement — **not** treated as cut |
+| `WON` | Every selection is won or void, with at least one win |
+| `LOST` | At least one selection has an explicit loss |
+| `VOID` | Every selection is explicitly void |
+| `PENDING` | No loss or unknown evidence; at least one selection is pending |
+| `UNKNOWN` | No confirmed loss, but some results are missing or conflicting |
 
-Slip rollup: any cut leg → ticket `CUT`; else live → open → all played → unknown.
+An empty ticket is unknown. These rules apply to standard accumulators; partial
+wins/losses, dead heats, cashout, promotions and payout calculations are unsupported.
 
-## Data sources
+## Evidence and matching
 
-1. Fresh share booking JSON (`getBooking`) — structure + any settlement fields (`settleStatus`, `outcomeStatus`, `result`, string `status`).
-2. Event / live facts — match phase and score.
-3. Share-page HTML scrape (cached ~90s in Redis) when finished legs lack settlement in JSON.
+- Generation already checks the accepted booking against requested selections and
+  stores event, market, outcome, specifier/line, teams, labels, odds and kickoff.
+  The `BOOKING_SAVED` training event preserves the confirmation snapshot.
+- Checks fetch share booking JSON fresh, independent of catalog expiry. Available
+  and unavailable outcomes are matched by event + market + outcome + exact specifier.
+- Unresolved selections may use structured embedded JSON from the share page.
+  Checks bypass the page cache. Free-text badges and loose HTML regex matches
+  cannot establish results. Line-specific selections never fall back to an empty line.
+- Only explicit settlement labels in `settleStatus`, `outcomeStatus`,
+  `selectionStatus` or `result` are used. Numeric codes, generic `status`, ambiguous
+  prose and unsupported settlement labels remain unknown.
+- Conflicting final fields/duplicate rows produce unknown, including contradictions
+  between fetched JSON and page results. A clear later result can correct a prior result.
+- Each leg stores `resultSource`, `resultCheckedAt` and `resultEvidence`. Confirmed
+  evidence survives a missing feed without advancing its evidence timestamp.
+- Selection and ticket updates plus a `SETTLEMENT_CHECKED` audit event are committed
+  in one transaction. The audit includes the fetched booking and parsed page results.
+- Elapsed kickoff time, expired codes, removed selections and `isActive: false`
+  cannot establish wins/losses or prove that matches finished.
 
-Bettability (`isActive`) is **never** used alone as a post-kickoff loss signal.
+## API and UI
 
-## API
+`POST /api/codes/:code/check-play` and
+`POST /api/groups/:groupId/check-play` return and persist `result` alongside
+`playStatus`. Existing access rules apply: these operate on stored generated
+bookings. The verify endpoints also run the checker.
 
-- `POST /api/groups/:groupId/verify` and `POST /api/codes/:code/verify` run catalog availability **and** play-check, persist Prisma play fields, and return a play summary.
-- Group / code GET payloads include `playStatus`, `cutSummary`, and per-selection `playStatus` / `score` / `playNote`.
+Code/group GET responses expose ticket and leg results and per-leg source/check
+timestamps. Ticket cards, pick dialogs and code details show Win, Loss, Void,
+Pending or Awaiting confirmation. The Check result action refreshes the evidence.
 
-## Ownership
+`cutLegs` counts confirmed losses. `playedLegs` already includes those finished
+legs; summary completion totals must not add them a second time.
 
-| Layer | Path |
-|-------|------|
-| Decision tree | `apps/api/src/groups/play-leg-status.ts` |
-| Orchestration | `apps/api/src/groups/play-check.service.ts` |
-| Scrape | `apps/api/src/bookmaker/sportybet.settlement.ts` |
-| Mapper | `apps/api/src/bookmaker/sportybet.mapper.ts` |
-| UI | `CutCallout` (only real `CUT` legs) |
+## Automatic checks
 
-## Limits
+The BullMQ `ticket-settlement` queue schedules checks every five minutes, up to 25
+eligible tickets per batch, ordered by oldest check first. Tickets become eligible
+at kickoff (or immediately if kickoff is unknown). Deleted collections are excluded;
+catalog expiry does not prevent checks. Unresolved tickets stay eligible and final
+results are rechecked until seven days after the latest kickoff to capture corrections.
+Queue backlog/provider latency can delay updates beyond five minutes.
 
-If SportyBet hides settlement, we prefer **UNKNOWN** over a false CUT. Playwright is not used in production.
+## Deployment and limits
+
+Apply `202610191200_ticket_results` with the normal Prisma deployment workflow
+before starting the updated API, then regenerate Prisma Client/build the app.
+Existing records start with unknown results and acquire evidence on their next check.
+No legacy `PLAYED`/`CUT` row is automatically treated as a verified win/loss.
+
+This implementation does not add an independent historical results provider.
+If SportyBet omits settlement or stops exposing an old booking, missing results
+remain Awaiting confirmation. A final score alone is insufficient for markets
+such as first-half goals, cards, player statistics or Asian handicaps. Only a
+validated provider-specific mapping/evaluator should extend supported evidence.

@@ -1,4 +1,5 @@
 'use client';
+import { ResultBadge, RESULT_LABEL } from './ResultBadge';
 import { formatOdds, exactOdds } from '@myodd/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -52,9 +53,11 @@ const LEG_LABEL: Record<LegPlayStatus, string> = {
 
 function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
   const done = slips.filter(s => isDoneSlip(s.playStatus)).length;
-  const legsDone = slips.reduce((n, s) => n + (s.playedLegs ?? 0) + (s.cutLegs ?? 0), 0);
+  const legsDone = slips.reduce((n, s) => n + (s.playedLegs ?? 0) + (s.playStatus === 'CUT' ? (s.cutLegs ?? 0) : 0), 0);
   return {
     tickets: slips.length,
+    won: slips.filter(s => s.result === 'WON').length,
+    lost: slips.filter(s => s.result === 'LOST').length,
     open: slips.filter(s => s.playStatus === 'OPEN').length,
     live: slips.filter(s => s.playStatus === 'LIVE').length,
     done,
@@ -68,6 +71,9 @@ function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
 function playLine(summary: PlaySummary) {
   const done = summary.done ?? summary.allPlayed ?? 0;
   const bits = [
+    summary.won ? `${summary.won} won` : '',
+    summary.lost ? `${summary.lost} lost` : '',
+    summary.awaitingConfirmation ? `${summary.awaitingConfirmation} awaiting confirmation` : '',
     summary.live ? `${summary.live} live` : '',
     summary.open ? `${summary.open} open` : '',
     done ? `${done} done` : '',
@@ -178,7 +184,7 @@ function TicketMenu({
         </button>
         {canVerify && (
           <button type="button" role="menuitem" disabled={verifying} onClick={() => run(() => onVerify?.())}>
-            <span aria-hidden>✓</span>{verifying ? 'Checking…' : 'Verify played'}
+            <span aria-hidden>✓</span>{verifying ? 'Checking…' : 'Check results'}
           </button>
         )}
         {canEdit && (
@@ -317,6 +323,7 @@ function PicksModal({
             <h3>{slip.bookingCode}</h3>
             <div className="picks-modal-tags">
               {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
+              <ResultBadge result={slip.result} />
               {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
               <span className="code-badge">{STATUS_LABEL[slip.displayStatus ?? 'UNKNOWN']} · {slip.selectionCount} picks</span>
             </div>
@@ -333,6 +340,7 @@ function PicksModal({
             <li key={i} className={pick.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(pick.playStatus) ? 'is-played-leg' : ''}>
               <div className="picks-modal-row">
                 <strong>{pick.homeTeam} vs {pick.awayTeam}</strong>
+                <ResultBadge result={pick.result} checkedAt={pick.resultCheckedAt} source={pick.resultSource} />
                 {pick.playStatus && pick.playStatus !== 'UNKNOWN' && (
                   <span className={`play-chip play-${isDoneLeg(pick.playStatus) ? 'all_played' : pick.playStatus.toLowerCase()}`}>{LEG_LABEL[pick.playStatus]}</span>
                 )}
@@ -487,7 +495,7 @@ export function SlipGroups({
       ]);
       play(isDoneSlip(result.playStatus) ? 'done' : result.playStatus === 'LIVE' ? 'tick' : 'tick');
       const doneLegs = result.playedLegs || 0;
-      toast(`${code}: ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
+      toast(`${code}: ${RESULT_LABEL[result.result]} · ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
     } catch {
       play('error');
       toast('Could not check this ticket.', { sticky: true });
@@ -528,7 +536,7 @@ export function SlipGroups({
         {createdAt && <p className="codes-meta"><time dateTime={createdAt}>{formatLagosDateTime(createdAt)}</time></p>}
       </div>
       <div className="bulk-actions">
-        {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Verify played'}</button>}
+        {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Check results'}</button>}
         <button onClick={() => void copyAll()} disabled={!slips.length || checkingCopy} className="primary-button">{checkingCopy ? 'Checking…' : 'Copy all'}</button>
         {collection && (
           <CollectionMenu
@@ -585,6 +593,7 @@ export function SlipGroups({
           <div className="ticket-footer">
             <div className="ticket-tags">
               {ticketMode && <span className={`mode-tag mode-${ticketModeKey}`}>{ticketMode}</span>}
+              <ResultBadge result={slip.result} />
               {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
             </div>
             <TicketMenu

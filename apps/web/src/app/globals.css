@@ -1186,3 +1186,11 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
   .mode-option strong { font-size: 11px; }
   .app-nav-mobile-item { font-size: 10px; }
 }
+
+/* Settlement is distinct from match completion. */
+.result-won { color: #c6f28c; background: #c6f28c14; border-color: #c6f28c44; }
+.result-lost { color: #fca5a5; background: #ef444414; border-color: #ef444444; }
+.result-void { color: #cbd5e1; background: #cbd5e114; }
+.result-pending, .result-unknown { color: #e0cd9a; background: #d6b76d14; }
+
+.picks-modal-row { flex-wrap: wrap; }

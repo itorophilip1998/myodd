@@ -20,7 +20,7 @@ describe('decideLegPlayStatus', () => {
   it('marks losses as PLAYED (done), not CUT', () => {
     const result = decideLegPlayStatus({ ...base, phase: 'finished', settlement: 'LOST' });
     expect(result.playStatus).toBe('PLAYED');
-    expect(result.playNote).toMatch(/Finished/);
+    expect(result.playNote).toMatch(/Lost/);
   });
 
   it('marks finished legs without settlement as PLAYED (done running)', () => {
@@ -29,14 +29,14 @@ describe('decideLegPlayStatus', () => {
     expect(result.playNote).toMatch(/Finished/);
   });
 
-  it('marks prematch unavailable selections as PLAYED (done)', () => {
+  it('does not treat prematch unavailable selections as completed', () => {
     const done = decideLegPlayStatus({
       ...base,
       phase: 'prematch',
       settlement: 'UNKNOWN',
       unavailablePrematch: true,
     });
-    expect(done.playStatus).toBe('PLAYED');
+    expect(done.playStatus).toBe('UNKNOWN');
     const open = decideLegPlayStatus({
       ...base,
       phase: 'prematch',
