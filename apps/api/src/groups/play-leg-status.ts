@@ -21,7 +21,7 @@ export type LegPlayDecision = {
 
 /**
  * Settlement/phase-first leg status.
- * Finished running → PLAYED (“done”). Never invents cut/loss as a separate status.
+ * Confirmed completion → PLAYED. Settlement is stored separately from play state.
  */
 export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecision {
   const { phase, settlement, unavailablePrematch, score, matchLabel, pickLabel } = input;
@@ -36,7 +36,7 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
   if (settlement === 'LOST') {
     return {
       playStatus: 'PLAYED',
-      playNote: `Finished · ${matchLabel}${scoreSuffix} · ${pickLabel}`,
+      playNote: `Lost · ${matchLabel}${scoreSuffix} · ${pickLabel}`,
     };
   }
   if (settlement === 'VOID') {
@@ -49,8 +49,8 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
   if (phase === 'prematch') {
     if (unavailablePrematch) {
       return {
-        playStatus: 'PLAYED',
-        playNote: `Done · ${matchLabel} · ${pickLabel} unavailable before kickoff`,
+        playStatus: 'UNKNOWN',
+        playNote: `Awaiting confirmation · ${matchLabel} · ${pickLabel} unavailable before kickoff`,
       };
     }
     return { playStatus: 'UPCOMING', playNote: 'Not kicked off yet' };
@@ -77,13 +77,15 @@ export function decideLegPlayStatus(input: LegPlayDecisionInput): LegPlayDecisio
 }
 
 export function finishedStatus(matchStatus: string) {
-  const value = matchStatus.toLowerCase();
-  return /ended|finished|ft|aet|pen|closed|final|complete/.test(value) || value === '3' || value === '100';
+  const value = matchStatus.toLowerCase().trim();
+  return ['ended', 'finished', 'ft', 'aet', 'pen', 'closed', 'final', 'complete', 'completed',
+    'full time', 'full-time', 'after extra time', 'after penalties'].includes(value);
 }
 
 export function liveStatus(matchStatus: string) {
-  const value = matchStatus.toLowerCase();
-  return value === '1' || /live|inplay|in play|1st|2nd|ht|half/.test(value);
+  const value = matchStatus.toLowerCase().trim();
+  return ['live', 'inplay', 'in play', '1st', '2nd', 'ht', 'half', 'halftime', 'half time',
+    'first half', 'second half', '1st half', '2nd half'].includes(value);
 }
 
 export function matchPhase(args: {
@@ -95,8 +97,6 @@ export function matchPhase(args: {
   if (matchStatus && finishedStatus(matchStatus)) return 'finished';
   if (matchStatus && liveStatus(matchStatus)) return 'live';
   if (kickoffMs != null && kickoffMs > nowMs + 2 * 60_000) return 'prematch';
-  if (kickoffMs != null && kickoffMs <= nowMs && kickoffMs > nowMs - 3 * 3600_000) return 'live';
-  if (kickoffMs != null && kickoffMs <= nowMs - 3 * 3600_000) return 'finished';
   return 'unknown';
 }
 

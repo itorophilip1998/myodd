@@ -36,6 +36,14 @@ enum LegPlayStatus {
   UNKNOWN
 }
 
+enum SettlementResult {
+  WON
+  LOST
+  VOID
+  PENDING
+  UNKNOWN
+}
+
 model SlipGroup {
   deletedAt            DateTime?       @map("deleted_at")
   id                   String          @id @default(cuid())
@@ -75,6 +83,7 @@ model GeneratedSlip {
   rankOrder      Int              @default(0) @map("rank_order")
   slipScore      Float            @default(0) @map("slip_score")
   playStatus     SlipPlayStatus   @default(UNKNOWN) @map("play_status")
+  result         SettlementResult @default(UNKNOWN)
   playCheckedAt  DateTime?        @map("play_checked_at")
   openLegs       Int              @default(0) @map("open_legs")
   liveLegs       Int              @default(0) @map("live_legs")
@@ -112,6 +121,10 @@ model SlipSelection {
   modelVersion          String        @default("odds-v1") @map("model_version")
   kickoffAt             DateTime?     @map("kickoff_at")
   playStatus            LegPlayStatus @default(UNKNOWN) @map("play_status")
+  result                SettlementResult @default(UNKNOWN)
+  resultSource          String?       @map("result_source")
+  resultCheckedAt       DateTime?     @map("result_checked_at")
+  resultEvidence        Json?         @map("result_evidence")
   score                 String?
   playNote              String?       @map("play_note")
 

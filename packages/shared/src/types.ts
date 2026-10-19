@@ -19,6 +19,7 @@ export interface BookmakerSelection {
   isActive?: boolean;
   /** Explicit settlement when SportyBet exposes it on the share ticket. */
   settlement?: SelectionSettlement;
+  settlementConflict?: boolean;
 }
 
 export interface BookmakerBooking {

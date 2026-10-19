@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  inferSettlementFromStatus,
+  explicitSettlement,
+  hasSettlementConflict,
   settlementKey,
   type SelectionSettlement,
 } from '@myodd/shared';
@@ -11,7 +12,6 @@ export type LegSettlementMap = Map<string, SelectionSettlement>;
 
 type ParsedShareSettlement = {
   byLeg: Record<string, SelectionSettlement>;
-  ticket?: SelectionSettlement;
 };
 
 /**
@@ -28,10 +28,10 @@ export class SportyBetSettlementService {
     private readonly redis: RedisService,
   ) {}
 
-  async fetchShareSettlement(code: string): Promise<LegSettlementMap> {
+  async fetchShareSettlement(code: string, options: { fresh?: boolean } = {}): Promise<LegSettlementMap> {
     const normalized = code.trim().toUpperCase();
-    const cacheKey = `sporty:settlement:${this.client.regionCode}:${normalized}`;
-    const cached = await this.redis.getJson<ParsedShareSettlement>(cacheKey);
+    const cacheKey = `sporty:settlement:v2:${this.client.regionCode}:${normalized}`;
+    const cached = options.fresh ? null : await this.redis.getJson<ParsedShareSettlement>(cacheKey);
     if (cached?.byLeg) {
       return new Map(Object.entries(cached.byLeg));
     }
@@ -70,7 +70,6 @@ export class SportyBetSettlementService {
 
 export function parseSharePageSettlement(html: string): ParsedShareSettlement {
   const byLeg: Record<string, SelectionSettlement> = {};
-  let ticket: SelectionSettlement | undefined;
 
   const scripts = [
     ...html.matchAll(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/gi),
@@ -87,24 +86,7 @@ export function parseSharePageSettlement(html: string): ParsedShareSettlement {
     }
   }
 
-  const badgeRe =
-    /"eventId"\s*:\s*"([^"]+)"[\s\S]{0,400}?"marketId"\s*:\s*"?([^",}]+)"?[\s\S]{0,400}?"outcomeId"\s*:\s*"?([^",}]+)"?[\s\S]{0,240}?"(?:status|settleStatus|outcomeStatus|selectionStatus|result)"\s*:\s*"([^"]+)"/gi;
-  for (const m of html.matchAll(badgeRe)) {
-    const settlement = inferSettlementFromStatus(m[4]);
-    if (settlement === 'UNKNOWN' || settlement === 'PENDING') continue;
-    const key = settlementKey({
-      eventId: m[1],
-      marketId: String(m[2]),
-      outcomeId: String(m[3]),
-      specifier: '',
-    });
-    byLeg[key] = settlement;
-  }
-
-  const ticketMatch = html.match(/\b(?:ticket|bet)\s*(?:status)?[^a-z]{0,20}(won|lost|void|pending|open|running)\b/i);
-  if (ticketMatch) ticket = inferSettlementFromStatus(ticketMatch[1]);
-
-  return { byLeg, ticket };
+  return { byLeg };
 }
 
 function walkJsonForSettlements(node: unknown, byLeg: Record<string, SelectionSettlement>, depth = 0) {
@@ -119,16 +101,15 @@ function walkJsonForSettlements(node: unknown, byLeg: Record<string, SelectionSe
   const marketId = obj.marketId ?? obj.market_id;
   const outcomeId = obj.outcomeId ?? obj.outcome_id;
   if (eventId != null && marketId != null && outcomeId != null) {
-    const rawStatus = obj.settleStatus ?? obj.outcomeStatus ?? obj.selectionStatus ?? obj.result
-      ?? (typeof obj.status === 'string' ? obj.status : undefined);
-    const settlement = inferSettlementFromStatus(rawStatus);
-    if (settlement !== 'UNKNOWN') {
-      byLeg[settlementKey({
-        eventId: String(eventId),
-        marketId: String(marketId),
-        outcomeId: String(outcomeId),
+    const settlement = explicitSettlement(obj.settleStatus, obj.outcomeStatus, obj.selectionStatus, obj.result);
+    if (settlement !== 'UNKNOWN' || hasSettlementConflict(obj.settleStatus, obj.outcomeStatus, obj.selectionStatus, obj.result)) {
+      const key = settlementKey({
+        eventId: String(eventId), marketId: String(marketId), outcomeId: String(outcomeId),
         specifier: String(obj.specifier ?? ''),
-      })] = settlement;
+      });
+      // Duplicate conflicting rows are ambiguous, including across scripts.
+      if (key in byLeg && byLeg[key] !== settlement) byLeg[key] = 'UNKNOWN';
+      else byLeg[key] = settlement;
     }
   }
   for (const value of Object.values(obj)) walkJsonForSettlements(value, byLeg, depth + 1);
