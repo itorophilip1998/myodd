@@ -1,8 +1,8 @@
-"""Compact odds display tokens (ks/ms) and prompt parsing helpers."""
+"""Compact odds display tokens (k/m) and prompt parsing helpers."""
 import math
 import re
 
-_SUFFIXES = ('', 'ks', 'ms', 'b', 't', 'q')
+_SUFFIXES = ('', 'k', 'm', 'b', 't', 'q')
 _PARSE_MULT = {
     '': 1.0,
     'k': 1e3,
