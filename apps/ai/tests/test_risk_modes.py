@@ -56,7 +56,10 @@ class RiskModeTests(unittest.TestCase):
         config = parse_rules('Create 3 codes between 2ks and 5ks using Lagoslife Mode')
         self.assertEqual((config.minimumOdds, config.maximumOdds), (2000, 5000))
         from app.odds_format import format_odds, parse_odds_token
-        self.assertEqual(format_odds(184775.21), '185ks')
+        self.assertEqual(format_odds(184775.21), '185k')
+        self.assertEqual(format_odds(1e6), '1m')
+        self.assertEqual(format_odds(999500), '1m')
+        self.assertEqual(parse_odds_token('1.5m'), 1.5e6)
         self.assertEqual(parse_odds_token('1.5ms'), 1.5e6)
 
     def test_named_modes_enforce_safe_per_game_odds(self):
