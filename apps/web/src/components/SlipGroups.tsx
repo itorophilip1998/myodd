@@ -216,17 +216,14 @@ function TicketMenu({
 function ShareSheet({
   slip,
   groupUrl,
-  collectionMode,
   onClose,
 }: {
   slip: GeneratedSlip;
   groupUrl: string;
-  collectionMode?: string | null;
   onClose: () => void;
 }) {
   const toast = useToast();
-  const mode = slip.riskMode ?? collectionMode ?? null;
-  const text = formatTicketCopy(slip, mode);
+  const text = formatTicketCopy(slip);
   const loadUrl = sportyLoadUrl(slip.bookingCode, slip.shareUrl);
 
   useEffect(() => {
@@ -276,7 +273,6 @@ function PicksModal({
   modeLabel,
   modeKey,
   playLabel,
-  collectionMode,
   onClose,
   onShare,
 }: {
@@ -284,7 +280,6 @@ function PicksModal({
   modeLabel: string | null;
   modeKey: string;
   playLabel: string | null;
-  collectionMode?: string | null;
   onClose: () => void;
   onShare: () => void;
 }) {
@@ -353,7 +348,7 @@ function PicksModal({
           <VerifiedBookmakerLink code={slip.bookingCode} url={slip.shareUrl} />
           <button type="button" className="outline-button" onClick={async () => {
             try {
-              await copyText(formatTicketCopy(slip, collectionMode));
+              await copyText(formatTicketCopy(slip));
               toast('Ticket copied');
             } catch {
               toast('Could not copy ticket');
@@ -496,7 +491,7 @@ export function SlipGroups({
 
   async function copyOne(slip: GeneratedSlip) {
     try {
-      await copyText(formatTicketCopy(slip, riskMode));
+      await copyText(formatTicketCopy(slip));
       toast('Copied');
     } catch {
       toast('Could not copy this ticket', { sticky: true });
@@ -617,7 +612,6 @@ export function SlipGroups({
         modeLabel={picksModeLabel}
         modeKey={picksModeKey}
         playLabel={picksPlayLabel}
-        collectionMode={riskMode}
         onClose={() => setPicksFor(null)}
         onShare={() => { setPicksFor(null); setShareFor(picksFor); }}
       />
@@ -626,7 +620,6 @@ export function SlipGroups({
       <ShareSheet
         slip={shareFor}
         groupUrl={groupUrl}
-        collectionMode={riskMode}
         onClose={() => setShareFor(null)}
       />
     )}

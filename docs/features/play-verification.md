@@ -94,8 +94,27 @@ before starting the updated API, then regenerate Prisma Client/build the app.
 Existing records start with unknown results and acquire evidence on their next check.
 No legacy `PLAYED`/`CUT` row is automatically treated as a verified win/loss.
 
-This implementation does not add an independent historical results provider.
-If SportyBet omits settlement or stops exposing an old booking, missing results
-remain Awaiting confirmation. A final score alone is insufficient for markets
+An optional independent **match-progress** fallback uses API-Football/API-Sports.
+Set `API_FOOTBALL_KEY` as a server-only secret, then restart/redeploy the API.
+Create an account at https://dashboard.api-football.com/register and choose access
+covering the matches and seasons you need. No provider account is created by this
+integration. Without a key, the fallback makes no requests and SportyBet checking
+continues as before. Never expose this key through `NEXT_PUBLIC_*` variables.
+
+When SportyBet cannot establish a match phase, the fallback queries fixtures for
+the stored kickoff's UTC date. It requires a unique match with the same home and
+away team names (case, accents and punctuation normalized) and kickoff within one
+minute. Team words, youth/reserve/women markers and home/away order are preserved;
+ambiguous matches and name variations remain unconfirmed. FT/AET/PEN establish
+completion; live phases establish in-play status; postponement, cancellation and
+abandonment never imply completion or a void bet. Displayed notes identify the
+source, and the audit records the provider fixture ID, phase, score and timestamp.
+Date requests are coalesced and cached for 60 seconds; failed lookups also have a
+60-second cooldown. Provider access, coverage and quotas can limit availability.
+Provider reference: https://www.api-football.com/documentation-v3 .
+
+This fallback confirms match progress only. If SportyBet omits settlement or stops
+exposing an old booking, missing selection results remain unconfirmed even if the
+matches are confirmed finished. A final score alone is insufficient for markets
 such as first-half goals, cards, player statistics or Asian handicaps. Only a
 validated provider-specific mapping/evaluator should extend supported evidence.

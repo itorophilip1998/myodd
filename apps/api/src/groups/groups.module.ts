@@ -6,11 +6,12 @@ import { Module } from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import { GroupsController } from './groups.controller';
 import { PlayCheckService } from './play-check.service';
+import { FootballResultsService } from './football-results.service';
 
 @Module({
   imports: [CatalogModule, BookmakerModule, BullModule.registerQueue({ name: SETTLEMENT_QUEUE })],
   controllers: [GroupsController],
-  providers: [GroupsService, PlayCheckService, SettlementSchedule, SettlementProcessor],
+  providers: [GroupsService, PlayCheckService, FootballResultsService, SettlementSchedule, SettlementProcessor],
   exports: [GroupsService, PlayCheckService],
 })
 export class GroupsModule {}
