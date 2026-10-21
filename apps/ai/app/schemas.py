@@ -27,11 +27,11 @@ class MarketRule(BaseModel):
 
 
 class Config(BaseModel):
-    numberOfSlips: int = Field(default=10, ge=1, le=10)
+    numberOfSlips: int = Field(default=10, ge=1, le=50)
     minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)
     maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)
-    maximumSelections: int = Field(default=20, ge=1, le=30)
-    minimumSelections: int = Field(default=2, ge=1, le=30)
+    maximumSelections: int = Field(default=50, ge=1, le=50)
+    minimumSelections: int = Field(default=1, ge=1, le=50)
     markets: list[Market] = Field(default_factory=list)
     marketQueries: list[str] = Field(default_factory=list)
     marketRules: list[MarketRule] = Field(default_factory=list)
@@ -67,8 +67,8 @@ class Config(BaseModel):
 
 class LearnedDefaults(BaseModel):
     riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
-    ticketCount: int | None = Field(default=None, ge=1, le=10)
-    gamesPerTicket: int | None = Field(default=None, ge=1, le=30)
+    ticketCount: int | None = Field(default=None, ge=1, le=50)
+    gamesPerTicket: int | None = Field(default=None, ge=1, le=50)
 
 
 class Instruction(BaseModel):
@@ -141,4 +141,4 @@ class GenerateInput(BaseModel):
 
 
 class SplitInput(GenerateInput):
-    parts: int = Field(ge=1, le=100)
+    parts: int = Field(ge=1, le=50)

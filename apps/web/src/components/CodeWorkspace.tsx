@@ -9,7 +9,7 @@ import { JobNoticeToast } from './JobNoticeToast';
 import { useToast } from './ToastProvider';
 import { BackButton } from './BackButton';
 
-export function CodeWorkspace({ group, busy = false }: { group: SlipGroup; busy?: boolean }) {
+export function CodeWorkspace({ group, busy = false, promptToSave = false }: { group: SlipGroup; busy?: boolean; promptToSave?: boolean }) {
   const toast = useToast();
   const buildingToast = useRef(false);
   const [editing, setEditing] = useState(false);
@@ -62,6 +62,7 @@ export function CodeWorkspace({ group, busy = false }: { group: SlipGroup; busy?
             userSaved={group.userSaved}
             isOwner={group.isOwner}
             isPublic={group.isPublic}
+            autoPrompt={promptToSave && !busy && !building}
           />
         )}
       </div>

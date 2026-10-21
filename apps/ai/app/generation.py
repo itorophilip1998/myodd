@@ -85,7 +85,25 @@ def event_choices(pool, config):
     return events
 
 
-def search(pool, config, original, allow_nearest=False):
+def varied_candidates(candidates, config, rng, limit, ceiling):
+    """Spread tickets across randomized targets; rank quality within each target."""
+    remaining = list(candidates)
+    count = min(limit, len(remaining))
+    if not count:
+        return []
+    low, high = math.log(config.minimumOdds), math.log(max(config.minimumOdds, ceiling))
+    targets = [low + (index + rng.random()) / count * (high - low) for index in range(count)]
+    rng.shuffle(targets)
+    picked = []
+    for target in targets:
+        candidate = max(remaining, key=lambda c: (c['_preferred'],
+            -abs(math.log(c['totalOdds']) - target), c['_original'], c['_rank']))
+        picked.append(candidate)
+        remaining.remove(candidate)
+    return picked
+
+
+def search(pool, config, original, allow_nearest=False, rng=None):
     events = event_choices(pool, config)
     if len(events) < config.minimumSelections:
         return [], None
@@ -97,7 +115,7 @@ def search(pool, config, original, allow_nearest=False):
         if any(not events[event] for event in original_ids) or len(original_keys) != len(original_ids):
             return [], None
     original_fingerprint = fingerprint(original) if original else None
-    rng = random.Random(42)
+    rng = rng or random.Random()
     maximum = min(config.maximumSelections, len(events))
     minimum = max(config.minimumSelections, len(original_ids)) if config.preserveOriginalSelections else config.minimumSelections
     if minimum > maximum:
@@ -110,7 +128,6 @@ def search(pool, config, original, allow_nearest=False):
     min_event_odds = sorted(min(s.odds for s in options) for options in events.values())
     lower_bound = math.prod(min_event_odds[:config.minimumSelections])
     ceiling = config.maximumOdds if config.maximumOdds is not None else max(config.minimumOdds, min(upper_bound, 1e300))
-    target_log = (math.log(config.minimumOdds) + math.log(ceiling)) / 2
     # Investor / VERY_LOW maximizes estimated joint probability within the hard odds band.
     exponent, appetite, penalty = {
         'VERY_LOW': (4.5, 0, .85), 'LOWER': (2, 0, .15), 'MODERATE': (1, .4, 0),
@@ -123,8 +140,9 @@ def search(pool, config, original, allow_nearest=False):
         return [], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
     attempts = min(12000, max(900, config.numberOfSlips * 100))
     for attempt in range(attempts):
-        # Rotate lengths; later passes target the requested total rather than relying on luck.
-        legs = minimum + attempt % (maximum - minimum + 1)
+        # Vary lengths and targets while keeping explicitly fixed counts/ranges intact.
+        legs = rng.randint(minimum, maximum)
+        target_log = rng.uniform(math.log(config.minimumOdds), math.log(max(config.minimumOdds, ceiling)))
         chosen = (sorted(original_ids) + rng.sample([event for event in event_ids if event not in original_ids], legs - len(original_ids))
                   if config.preserveOriginalSelections else rng.sample(event_ids, legs))
         if original_ids and attempt % 3 != 0:
@@ -171,7 +189,7 @@ def search(pool, config, original, allow_nearest=False):
         if math.isfinite(odds) and config.minimumOdds <= round(odds, 2) and (config.maximumOdds is None or round(odds, 2) <= config.maximumOdds):
             results[key] = candidate
             if len(results) > max(100, config.numberOfSlips * 12):
-                retained = sorted(results.values(), key=lambda c: (c['_preferred'], c['_original'], c['_rank']), reverse=True)[:max(50, config.numberOfSlips * 6)]
+                retained = varied_candidates(results.values(), config, rng, max(50, config.numberOfSlips * 6), ceiling)
                 results = {c['fingerprint']: c for c in retained}
         elif allow_nearest:
             candidate['_distance'] = max(math.log(config.minimumOdds / odds), math.log(odds / config.maximumOdds) if config.maximumOdds is not None else 0, 0)
@@ -179,9 +197,10 @@ def search(pool, config, original, allow_nearest=False):
                 nearest[key] = candidate
                 if len(nearest) > config.numberOfSlips * 4:
                     del nearest[max(nearest, key=lambda k: nearest[k]['_distance'])]
-    ranked = sorted(results.values(), key=lambda c: (c['_preferred'], c['_original'], c['_rank']), reverse=True)
+    ranked = varied_candidates(results.values(), config, rng, config.numberOfSlips, ceiling)
     if allow_nearest and len(ranked) < config.numberOfSlips:
         ranked += sorted(nearest.values(), key=lambda c: (c['_distance'], -c['_rank']))[:config.numberOfSlips - len(ranked)]
+    ranked.sort(key=lambda c: (c['_preferred'], c['_original'], c['_rank']), reverse=True)
     return ranked[:config.numberOfSlips], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
 
 

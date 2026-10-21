@@ -65,6 +65,16 @@ export function SettingsForm() {
             </select>
           </label>
           <label>
+            Default games per ticket
+            <select value={settings.defaultGames ?? ''} onChange={e => {
+              update({ defaultGames: e.target.value ? Number(e.target.value) : null });
+              play('click');
+            }}>
+              <option value="">Random (1–50)</option>
+              {TICKET_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label>
             Default split parts
             <select
               value={settings.defaultSplitParts ?? ''}
