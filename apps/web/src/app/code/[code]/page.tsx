@@ -60,8 +60,8 @@ export default function CodePage() {
         result.playedLegs ? `${result.playedLegs} done` : '',
       ].filter(Boolean);
       toast(`${params.code}: ${bits.join(' · ')}`, { sticky: true });
-    } catch {
-      toast('Could not check this ticket.', { sticky: true });
+    } catch (e) {
+      toast((e as Error).message || 'Could not check this ticket.', { sticky: true });
     } finally {
       setChecking(false);
     }

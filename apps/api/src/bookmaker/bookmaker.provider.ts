@@ -7,6 +7,7 @@ import type {
 } from '@myodd/shared';
 
 export interface FixturesQuery {
+  fresh?: boolean;
   eventIds?: string[];
   timelineHours?: number;
   pageSize?: number;

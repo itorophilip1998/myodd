@@ -15,6 +15,8 @@ export interface BookmakerSelection {
   awayTeam?: string;
   league?: string;
   kickoffAt?: string;
+  /** Explicit event phase from the booking response, independent of bettability. */
+  matchStatus?: string;
   /** Still open for betting (pre-match / not suspended). Not the same as won/lost. */
   isActive?: boolean;
   /** Explicit settlement when SportyBet exposes it on the share ticket. */
@@ -39,6 +41,7 @@ export interface BookmakerFixture {
   categoryName: string;
   kickoffAt: string;
   matchStatus: string;
+  score?: string | null;
   markets: BookmakerMarket[];
 }
 

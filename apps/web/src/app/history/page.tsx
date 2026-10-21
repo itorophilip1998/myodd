@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { api, accountApi, type CollectionSummary } from '@/lib/api';
+import { api, accountApi, type CollectionSummary, type CodeCheckLookup } from '@/lib/api';
+import { formatPlaySummary } from '@/lib/play-summary';
 import { CollectionMenu } from '@/components/CollectionMenu';
 import { LogoLoader } from '@/components/LogoLoader';
 import { useAccountSession, SignInPrompt } from '@/components/AccountSession';
@@ -23,7 +24,7 @@ function playBadge(group: CollectionSummary) {
   if (live > 0) return { label: `${live} live`, className: 'play-live' };
   if (open > 0) return { label: `${open} open`, className: 'play-open' };
   if (done > 0) return { label: done === total ? 'Done' : `${done} done`, className: 'play-all_played' };
-  if (group.playResult === 'UNKNOWN' || !group.playCheckedAt) return { label: 'Unchecked', className: 'play-unknown' };
+  if (group.playCheckedAt) return { label: 'Not confirmed', className: 'play-unknown' };
   return { label: 'Unchecked', className: 'play-unknown' };
 }
 
@@ -47,6 +48,10 @@ export default function HistoryPage() {
   const [selecting, setSelecting] = useState(false);
   const [pending, setPending] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [lookup, setLookup] = useState('');
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupResult, setLookupResult] = useState<CodeCheckLookup | null>(null);
+  const [lookupError, setLookupError] = useState('');
   const toast = useToast();
   const play = useUiSound();
   const client = useQueryClient();
@@ -76,7 +81,7 @@ export default function HistoryPage() {
     });
   }, [query.error, query, toast]);
 
-  const groups = (query.data?.pages.flat() ?? []).filter(g => `${g.title} ${g.originalBookingCode ?? ''} ${modeTag(g.riskMode) ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+  const groups = (query.data?.pages.flat() ?? []).filter(g => `${g.title} ${g.publicId} ${g.originalBookingCode ?? ''} ${modeTag(g.riskMode) ?? ''}`.toLowerCase().includes(search.toLowerCase()));
   const selectable = mine ? groups.filter(g => g.isOwner).slice(0, 100) : [];
   const allSelected = selectable.length > 0 && selectable.every(g => selected.has(g.publicId));
   const verifyTargets = selected.size ? [...selected] : groups.filter(g => g.isOwner).map(g => g.publicId);
@@ -93,6 +98,26 @@ export default function HistoryPage() {
   async function refresh() {
     await client.invalidateQueries({ queryKey: ['history'] });
     await client.invalidateQueries({ queryKey: ['group'] });
+    await client.invalidateQueries({ queryKey: ['code'] });
+  }
+
+  async function checkLookup() {
+    if (!lookup.trim() || lookupBusy) return;
+    setLookupBusy(true);
+    setLookupError('');
+    setLookupResult(null);
+    play('submit');
+    try {
+      const result = await api.lookupAndCheck(lookup.trim());
+      setLookupResult(result);
+      await refresh();
+      play('done');
+    } catch (e) {
+      setLookupError((e as Error).message);
+      play('error');
+    } finally {
+      setLookupBusy(false);
+    }
   }
 
   async function restore(ids: string[]) {
@@ -126,13 +151,14 @@ export default function HistoryPage() {
     if (!ids.length) { toast('No collections to verify.'); return; }
     setVerifying('bulk');
     play('submit');
-    let done = 0, other = 0, failed = 0;
+    let done = 0, other = 0, unknown = 0, failed = 0;
     try {
       for (const id of ids) {
         try {
           const result = await api.checkPlayGroup(id);
           const doneCount = result.summary.done ?? result.summary.allPlayed ?? 0;
           if (doneCount > 0 && doneCount === result.summary.tickets) done++;
+          else if (result.summary.unknown > 0) unknown++;
           else other++;
         } catch {
           failed++;
@@ -140,7 +166,7 @@ export default function HistoryPage() {
       }
       await refresh();
       play(failed > 0 ? 'error' : 'done');
-      toast(`Verified ${ids.length - failed} · ${done} done${other ? ` · ${other} open/live` : ''}${failed ? ` · ${failed} failed` : ''}`);
+      toast(`Checked ${ids.length - failed} · ${done} done${other ? ` · ${other} open/live` : ''}${unknown ? ` · ${unknown} not confirmed` : ''}${failed ? ` · ${failed} failed` : ''}`);
     } finally {
       setVerifying(null);
     }
@@ -152,14 +178,8 @@ export default function HistoryPage() {
     try {
       const result = await api.checkPlayGroup(id);
       await refresh();
-      const doneCount = result.summary.done ?? result.summary.allPlayed ?? 0;
-      const bits = [
-        result.summary.live ? `${result.summary.live} live` : '',
-        result.summary.open ? `${result.summary.open} open` : '',
-        doneCount ? `${doneCount} done` : '',
-      ].filter(Boolean);
       play('done');
-      toast(bits.join(' · ') || 'Checked');
+      toast(formatPlaySummary(result.summary));
     } catch (e) {
       play('error');
       toast((e as Error).message);
@@ -178,6 +198,28 @@ export default function HistoryPage() {
         </div>
         <Link href="/" className="outline-button">＋ Create codes</Link>
       </header>
+
+      <section className="library-code-check" aria-labelledby="code-check-title">
+        <form onSubmit={e => { e.preventDefault(); void checkLookup(); }}>
+          <label htmlFor="code-check" id="code-check-title">Check a code</label>
+          <div className="library-code-check-input">
+            <input id="code-check" type="search" placeholder="Booking code or saved ID" maxLength={128} required
+              value={lookup} disabled={lookupBusy} onChange={e => { setLookup(e.target.value); setLookupError(''); setLookupResult(null); }}
+              aria-describedby="code-check-help" autoCapitalize="off" autoComplete="off" spellCheck={false} />
+            <button className="outline-button" type="submit" disabled={lookupBusy || !!verifying || !lookup.trim()}>
+              {lookupBusy ? 'Checking…' : 'Verify code'}
+            </button>
+          </div>
+        </form>
+        <p id="code-check-help">Enter a booking code, ticket ID, or collection ID. You can also use the original booking code to find a saved collection.</p>
+        <div aria-live="polite" aria-atomic="true">
+          {lookupError && <p className="library-code-check-error" role="alert">{lookupError}</p>}
+          {lookupResult && <p className="library-code-check-result">
+            <strong>{lookupResult.identifier}</strong> · {formatPlaySummary(lookupResult.summary)}{' '}
+            <Link href={lookupResult.href}>View {lookupResult.kind === 'code' ? 'ticket' : 'collection'} →</Link>
+          </p>}
+        </div>
+      </section>
 
       <div className="library-navigation">
         <div className="history-tabs" role="group" aria-label="Collection source">
@@ -204,12 +246,12 @@ export default function HistoryPage() {
           {mine && session.signedIn && <>
             <button
               className="outline-button"
-              disabled={pending || !!verifying || !verifyTargets.length}
+              disabled={pending || lookupBusy || !!verifying || !verifyTargets.length}
               onClick={() => void verifyCollections(verifyTargets)}
             >
               {verifying === 'bulk' ? 'Verifying…' : selected.size ? `Verify selected (${selected.size})` : 'Verify played'}
             </button>
-            <button className="outline-button" disabled={pending || !!verifying} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}>
+            <button className="outline-button" disabled={pending || lookupBusy || !!verifying} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}>
               {selecting ? 'Done' : 'Select'}
             </button>
           </>}
@@ -272,7 +314,7 @@ export default function HistoryPage() {
                       <button
                         type="button"
                         className="library-verify-btn"
-                        disabled={!!verifying}
+                        disabled={lookupBusy || !!verifying}
                         onClick={() => void verifyOne(group.publicId)}
                       >
                         {verifying === group.publicId ? '…' : 'Verify'}
