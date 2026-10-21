@@ -60,21 +60,25 @@ export class PlayCheckService {
       where: { id: { in: slipIds } },
       include: { selections: true },
     });
-    const live = await this.bookmaker.getLiveFixtures().catch(() => [] as LiveFixture[]);
+    const eventIds = [...new Set(slips.flatMap(s => s.selections.map(leg => leg.sportyEventId)).filter(Boolean))];
+    const [live, fixtures] = await Promise.all([
+      this.bookmaker.getLiveFixtures().catch(() => [] as LiveFixture[]),
+      eventIds.length ? this.bookmaker.getFixtures({ eventIds, fresh: true }).catch(() => [] as BookmakerFixture[]) : Promise.resolve([]),
+    ]);
     const results = [];
     for (const slip of slips) {
-      results.push(await this.checkOne(slip.id, slip.bookingCode, slip.selections, live));
+      results.push(await this.checkOne(slip.id, slip.bookingCode, slip.selections, live, fixtures));
     }
     return results;
   }
 
-  async checkOne(slipId: string, bookingCode: string, selections: LegInput[], liveFixtures?: LiveFixture[]) {
+  async checkOne(slipId: string, bookingCode: string, selections: LegInput[], liveFixtures?: LiveFixture[], checkedFixtures?: BookmakerFixture[]) {
     // Settlement must work after catalog expiry and must never use its stale snapshot.
     const booking = await this.bookmaker.getBooking(bookingCode, { fresh: true }).catch(() => null);
     const validBooking = booking?.code.toUpperCase() === bookingCode.toUpperCase() ? booking : null;
     const eventIds = [...new Set(selections.map(s => s.sportyEventId).filter(Boolean))];
     const [fixtures, live] = await Promise.all([
-      eventIds.length ? this.bookmaker.getFixtures({ eventIds }).catch(() => [] as BookmakerFixture[]) : Promise.resolve([] as BookmakerFixture[]),
+      checkedFixtures ?? (eventIds.length ? this.bookmaker.getFixtures({ eventIds, fresh: true }).catch(() => [] as BookmakerFixture[]) : Promise.resolve([] as BookmakerFixture[])),
       liveFixtures ? Promise.resolve(liveFixtures) : this.bookmaker.getLiveFixtures().catch(() => [] as LiveFixture[]),
     ]);
     const byEvent = new Map<string, BookmakerFixture | LiveFixture>();
@@ -112,11 +116,15 @@ export class PlayCheckService {
         && s.marketId === leg.marketId
         && s.outcomeId === leg.outcomeId
         && (s.specifier ?? '') === (leg.specifier ?? '')) ?? false;
-      const phase = matchPhase({
+      const fixturePhase = matchPhase({
         kickoffMs: kickoff,
         nowMs: now,
         matchStatus: fixture && 'liveStatus' in fixture ? 'live' : fixture?.matchStatus,
       });
+      // Share responses can still describe a finished match after the event feed expires.
+      const bookingPhase = matchPhase({ kickoffMs: null, nowMs: now, matchStatus: bookSel?.matchStatus });
+      const phase = fixturePhase === 'finished' || bookingPhase === 'finished' ? 'finished'
+        : fixturePhase === 'live' || bookingPhase === 'live' ? 'live' : fixturePhase;
       const key = settlementKey({
         eventId: leg.sportyEventId,
         marketId: leg.marketId,

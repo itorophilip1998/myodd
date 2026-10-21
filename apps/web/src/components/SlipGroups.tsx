@@ -8,6 +8,7 @@ import type { GeneratedSlip, GenerationReport, LegPlayStatus, PlaySummary, SlipP
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatLagosDateTime } from '@/lib/datetime';
+import { formatPlaySummary } from '@/lib/play-summary';
 import { modeTag } from '@/lib/mode-label';
 import { loadTicketOnSportyBet, sportyLoadUrl } from '@/lib/sportybet';
 import { formatTicketCopy, formatTicketsCopy } from '@/lib/ticket-copy';
@@ -69,16 +70,7 @@ function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
 }
 
 function playLine(summary: PlaySummary) {
-  const done = summary.done ?? summary.allPlayed ?? 0;
-  const bits = [
-    summary.won ? `${summary.won} won` : '',
-    summary.lost ? `${summary.lost} lost` : '',
-    summary.awaitingConfirmation ? `${summary.awaitingConfirmation} awaiting confirmation` : '',
-    summary.live ? `${summary.live} live` : '',
-    summary.open ? `${summary.open} open` : '',
-    done ? `${done} done` : '',
-  ].filter(Boolean);
-  return bits.join(' · ') || 'No play check yet';
+  return formatPlaySummary(summary);
 }
 
 function TicketMenu({

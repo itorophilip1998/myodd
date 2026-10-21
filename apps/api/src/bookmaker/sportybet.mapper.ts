@@ -56,6 +56,7 @@ interface UpcomingEventsData {
 }
 
 interface ShareOutcome {
+  matchStatus?: string | number;
   eventId?: string;
   marketId?: string;
   outcomeId?: string;
@@ -120,6 +121,7 @@ export function mapEvent(event: RawEvent, league?: string, category?: string): B
     categoryName: category ?? event.sport?.category?.name ?? '',
     kickoffAt: new Date(event.estimateStartTime).toISOString(),
     matchStatus: String(event.matchStatus ?? ''),
+    score: /^\d+:\d+$/.test(event.setScore ?? '') ? event.setScore!.replace(':', ' : ') : null,
     markets: (event.markets ?? []).map(mapMarket),
   };
 }
@@ -220,6 +222,7 @@ function mapShareOutcome(o: ShareOutcome): BookmakerSelection {
     homeTeam: o.homeTeamName,
     awayTeam: o.awayTeamName,
     league: o.tournamentName,
+    matchStatus: o.matchStatus == null ? undefined : String(o.matchStatus),
     kickoffAt: o.estimateStartTime
       ? new Date(o.estimateStartTime).toISOString()
       : undefined,

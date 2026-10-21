@@ -124,6 +124,30 @@ describe('saved booking checks', () => {
     expect(result.playStatus).toBe('ALL_PLAYED');
     expect(result.result).toBe('UNKNOWN');
   });
+  it('checks event phases fresh and preserves an explicitly finished phase from the booking after feed expiry', async () => {
+    const booking = mapShareResponse({ shareCode: 'ABC123', unavailableOutcomes: [{
+      eventId: leg.sportyEventId, matchStatus: 'Finished', estimateStartTime: leg.kickoffAt.getTime(),
+      markets: [{ id: leg.marketId, desc: 'Total', specifier: leg.specifier,
+        outcomes: [{ id: leg.outcomeId, desc: 'Over', odds: 1.5 }] }],
+    }] }, 'ng');
+    const { service, bookmaker } = setup([]);
+    bookmaker.getBooking.mockResolvedValue(booking);
+    const result = await service.checkOne('slip', 'ABC123', [leg]);
+    expect(bookmaker.getFixtures).toHaveBeenCalledWith({ eventIds: ['event'], fresh: true });
+    expect(result.playStatus).toBe('ALL_PLAYED');
+    expect(result.result).toBe('UNKNOWN');
+  });
+  it('fetches shared event fixtures once when checking several saved tickets', async () => {
+    const { service, prisma, bookmaker } = setup([], new Map(), [{ eventId: 'event', matchStatus: 'Finished' }]);
+    (prisma.generatedSlip as any).findMany = vi.fn().mockResolvedValue([
+      { id: 'first', bookingCode: 'ABC123', selections: [leg] },
+      { id: 'second', bookingCode: 'ABC123', selections: [{ ...leg, id: 'leg2' }] },
+    ]);
+    const results = await service.checkSlips(['first', 'second']);
+    expect(results.map(r => r.playStatus)).toEqual(['ALL_PLAYED', 'ALL_PLAYED']);
+    expect(bookmaker.getFixtures).toHaveBeenCalledTimes(1);
+    expect(bookmaker.getLiveFixtures).toHaveBeenCalledTimes(1);
+  });
   it('preserves prior confirmed evidence during an outage without refreshing its timestamp', async () => {
     const { service, bookmaker, prisma } = setup();
     bookmaker.getBooking.mockRejectedValue(new Error('Unavailable'));

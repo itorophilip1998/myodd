@@ -59,6 +59,14 @@ export class GroupsController {
     return this.groups.checkPlayGroup(groupId, req.account?.id);
   }
 
+  @Post('checks/lookup') @HttpCode(200)
+  async lookup(@Body() body: unknown, @Req() req: AuthRequest) {
+    const parsed = z.object({ identifier: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/) }).strict().safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Enter a valid booking code, ticket ID, or collection ID');
+    await this.rateLimit.consume('check-play-lookup', 10);
+    return this.groups.lookupAndCheck(parsed.data.identifier, req.account?.id);
+  }
+
   @Post('codes/:code/check-play') @HttpCode(200)
   async checkPlayCode(@Param('code') code: string, @Req() req: AuthRequest) {
     await this.rateLimit.consume('check-play-code', 30);

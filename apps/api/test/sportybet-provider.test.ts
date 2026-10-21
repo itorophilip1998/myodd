@@ -16,3 +16,12 @@ it('reads a newly created booking when share POST returns only its code', async 
   expect(client.get.mock.calls[0][0]).toBe('/api/ng/orders/share/NEW123');
   expect(booking.selections[0].odds).toBe(1.5);
 });
+
+it('bypasses cached event data for an explicit result check', async () => {
+  const client = { regionCode: 'ng', get: vi.fn().mockResolvedValue({
+    eventId: 'event', estimateStartTime: Date.UTC(2026, 0, 1), matchStatus: 'Finished', setScore: '2:1',
+  }) };
+  const [fixture] = await new SportyBetProvider(client as any).getFixtures({ eventIds: ['event'], fresh: true });
+  expect(client.get.mock.calls[0][1]).toEqual({ cacheKey: undefined });
+  expect(fixture).toMatchObject({ matchStatus: 'Finished', score: '2 : 1' });
+});

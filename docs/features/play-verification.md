@@ -29,6 +29,10 @@ wins/losses, dead heats, cashout, promotions and payout calculations are unsuppo
   The `BOOKING_SAVED` training event preserves the confirmation snapshot.
 - Checks fetch share booking JSON fresh, independent of catalog expiry. Available
   and unavailable outcomes are matched by event + market + outcome + exact specifier.
+- Explicit checks also bypass the event cache. A collection check fetches each
+  distinct event once and shares that response across its tickets. Explicit match
+  phases from a booking remain usable when the standalone event feed is missing;
+  a finished phase establishes completion only, not a win or loss.
 - Unresolved selections may use structured embedded JSON from the share page.
   Checks bypass the page cache. Free-text badges and loose HTML regex matches
   cannot establish results. Line-specific selections never fall back to an empty line.
@@ -51,9 +55,25 @@ wins/losses, dead heats, cashout, promotions and payout calculations are unsuppo
 `playStatus`. Existing access rules apply: these operate on stored generated
 bookings. The verify endpoints also run the checker.
 
+Saved codes includes a separate **Check a code** form, independent of the filter
+for loaded collections. `POST /api/checks/lookup` accepts an `identifier`: a ticket
+ID, booking code, collection public/internal ID, or original booking code. It
+checks the matching saved ticket or collection and returns a summary and details
+link. Booking codes are case insensitive; database/public IDs retain their case.
+Original booking codes resolve to the latest accessible saved collection when no
+generated ticket matches. Private collections require their owner's session;
+anonymous lookups search saved public collections only. Unknown identifiers and
+inaccessible records return the same not-found response.
+
+Direct code reads and checks filter inaccessible duplicate booking codes before
+selecting the latest matching record. Summaries distinguish unconfirmed checks
+from open/live tickets, and a checked collection with unknown play status displays
+**Not confirmed** instead of **Unchecked**.
+
 Code/group GET responses expose ticket and leg results and per-leg source/check
-timestamps. Ticket cards, pick dialogs and code details show Win, Loss, Void,
-Pending or Awaiting confirmation. The Check result action refreshes the evidence.
+timestamps. Ticket cards show Win, Loss, Void or Pending when available; unknown
+result badges remain in pick dialogs and code details. The Check result action
+refreshes the evidence.
 
 `cutLegs` counts confirmed losses. `playedLegs` already includes those finished
 legs; summary completion totals must not add them a second time.

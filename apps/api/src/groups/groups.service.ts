@@ -4,12 +4,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CatalogService } from '../catalog/catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { canAccessGroup } from './group-access';
 import { PlayCheckService } from './play-check.service';
 
 const MODE_KEYS = new Set(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']);
+
+function accessibleGroups(userId?: string): Prisma.SlipGroupWhereInput {
+  return { deletedAt: null, OR: [
+    { isPublic: true, userSaved: true },
+    { userSaved: false },
+    ...(userId ? [{ ownerId: userId }] : []),
+  ] };
+}
 
 function resolveRiskMode(generationReport: unknown, description?: string | null): ModeKey | null {
   const report = generationReport as { effectiveConfig?: { riskMode?: string | null } } | null;
@@ -217,7 +226,9 @@ export class GroupsService {
 
   async checkPlayCode(code: string, userId?: string) {
     const slip = await this.prisma.generatedSlip.findFirst({
-      where: { bookingCode: code.toUpperCase(), group: { deletedAt: null } },
+      where: { bookingCode: code.trim().toUpperCase(), group: {
+        AND: [accessibleGroups(userId), { OR: [{ userSaved: true }, ...(userId ? [{ ownerId: userId }] : [])] }],
+      } },
       include: { group: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -227,6 +238,42 @@ export class GroupsService {
     }
     const [result] = await this.playCheck.checkSlips([slip.id]);
     return { ...result, summary: this.playCheck.summarize([result]) };
+  }
+
+  async lookupAndCheck(identifier: string, userId?: string) {
+    const value = identifier.trim();
+    const scope: Prisma.SlipGroupWhereInput = {
+      deletedAt: null,
+      userSaved: true,
+      OR: [{ isPublic: true }, ...(userId ? [{ ownerId: userId }] : [])],
+    };
+    // Collection IDs keep their case; SportyBet booking codes are case insensitive.
+    let group = await this.prisma.slipGroup.findFirst({
+      where: { AND: [scope, { OR: [{ publicId: value }, { id: value }] }] },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!group) {
+      const slip = await this.prisma.generatedSlip.findFirst({
+        where: { group: scope, OR: [{ id: value }, { bookingCode: value.toUpperCase() }] },
+        include: { group: true }, orderBy: { createdAt: 'desc' },
+      });
+      if (slip && canAccessGroup(slip.group, userId)) {
+        const [result] = await this.playCheck.checkSlips([slip.id]);
+        if (!result) throw new NotFoundException('Ticket no longer available');
+        return { kind: 'code' as const, identifier: slip.bookingCode,
+          href: `/code/${encodeURIComponent(slip.bookingCode)}`, summary: this.playCheck.summarize([result]) };
+      }
+      group = await this.prisma.slipGroup.findFirst({
+        where: { AND: [scope, { originalBookingCode: value.toUpperCase() }] },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    if (!group || !canAccessGroup(group, userId)) {
+      throw new NotFoundException('No saved ticket or collection found. Check the code or ID, and sign in to find your private codes.');
+    }
+    const result = await this.checkPlayGroup(group.publicId, userId);
+    return { kind: 'group' as const, identifier: group.publicId,
+      href: `/g/${encodeURIComponent(group.publicId)}`, summary: result.summary };
   }
 
   async verifyGroup(publicId: string, userId?: string) {
@@ -242,7 +289,7 @@ export class GroupsService {
   }
   async verifyCode(code: string, userId?: string) {
     const slip = await this.prisma.generatedSlip.findFirst({
-      where: { bookingCode: code.toUpperCase(), group: { deletedAt: null } },
+      where: { bookingCode: code.trim().toUpperCase(), group: accessibleGroups(userId) },
       include: { group: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -306,7 +353,7 @@ export class GroupsService {
 
   async getSlipByCode(code: string, userId?: string) {
     const slip = await this.prisma.generatedSlip.findFirst({
-      where: { bookingCode: code.toUpperCase(), group: { deletedAt: null } },
+      where: { bookingCode: code.trim().toUpperCase(), group: accessibleGroups(userId) },
       include: { selections: true, group: true },
       orderBy: { createdAt: 'desc' },
     });
