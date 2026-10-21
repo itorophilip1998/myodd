@@ -106,7 +106,7 @@ export default function TermsPage() {
 
       <h2>10. Privacy</h2>
       <p>
-        How we handle personal data is described in our <a href="/privacy">Privacy Policy</a>, which forms part of
+        How we handle personal data is described in our <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, which forms part of
         these Terms.
       </p>
 

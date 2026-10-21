@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       <p>
         This Privacy Policy explains how myOdd (“we”, “us”) collects, uses, and shares information when you use
         our website and related services (the “Service”). By using myOdd, you acknowledge this Policy. For product
-        rules and modes, see our <a href="/terms">Terms of Service</a>.
+        rules and modes, see our <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>.
       </p>
 
       <h2>1. Who we are</h2>
