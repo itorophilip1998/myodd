@@ -2,9 +2,9 @@
  * Single source of truth for the product version shown in the UI and health checks.
  * Bump this (and root package.json) when you ship user-visible changes.
  */
-export const APP_VERSION = '0.2.11';
+export const APP_VERSION = '0.2.12';
 
-/** Format e.g. `v0.2.11` or `v0.2.11 · a1b2c3d` when a real deploy git sha is provided. */
+/** Format e.g. `v0.2.12` or `v0.2.12 · a1b2c3d` when a real deploy git sha is provided. */
 export function formatAppVersion(gitSha?: string | null) {
   const raw = gitSha?.trim() ?? '';
   // Ignore env placeholders so UI shows the product version, not “local” / “production”.

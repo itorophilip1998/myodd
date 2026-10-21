@@ -385,7 +385,7 @@ export function SlipGroups({
   const toast = useToast();
   const play = useUiSound();
   const query = useQueryClient();
-  const [checkingCopy, setCheckingCopy] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [checkingPlay, setCheckingPlay] = useState(false);
   const [checkingTicket, setCheckingTicket] = useState<string | null>(null);
   const [loadingTicket, setLoadingTicket] = useState<string | null>(null);
@@ -416,17 +416,13 @@ export function SlipGroups({
   }
 
   async function copyAll() {
-    setCheckingCopy(true);
+    setCopying(true);
     try {
-      const checked = await api.verifyGroup(groupPublicId);
-      const valid = new Set(checked.codes.map(code => code.toUpperCase()));
-      const active = slips.filter(slip => valid.has(slip.bookingCode.toUpperCase()));
-      if (!active.length) { toast('No active codes right now.', { sticky: true }); return; }
-      await copyText(formatTicketsCopy(active, riskMode));
-      toast(`Copied ${active.length} tickets${checked.unavailable ? ` · ${checked.unavailable} skipped` : ''}`);
+      await copyText(formatTicketsCopy(slips, riskMode));
+      toast(`Copied ${slips.length} ticket${slips.length === 1 ? '' : 's'}`);
     } catch {
-      toast('Could not verify codes right now.', { sticky: true });
-    } finally { setCheckingCopy(false); }
+      toast('Could not copy this collection.', { sticky: true });
+    } finally { setCopying(false); }
   }
 
   function shareAll() {
@@ -524,7 +520,7 @@ export function SlipGroups({
       </div>
       <div className="bulk-actions">
         {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Check results'}</button>}
-        <button onClick={() => void copyAll()} disabled={!slips.length || checkingCopy} className="primary-button">{checkingCopy ? 'Checking…' : 'Copy all'}</button>
+        <button onClick={() => void copyAll()} disabled={!slips.length || copying} className="primary-button">{copying ? 'Copying…' : 'Copy all'}</button>
         {collection && (
           <CollectionMenu
             collection={collection}
