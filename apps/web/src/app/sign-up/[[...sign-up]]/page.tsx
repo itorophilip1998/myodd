@@ -12,9 +12,9 @@ export default function AuthPage() {
         <SignUp path="/sign-up" routing="path" />
         <p className="auth-legal">
           By creating an account, you agree to our{' '}
-          <Link href="/terms">Terms of Service</Link>
+          <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</Link>
           {' '}and{' '}
-          <Link href="/privacy">Privacy Policy</Link>.
+          <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.
         </p>
       </div>
     </main>

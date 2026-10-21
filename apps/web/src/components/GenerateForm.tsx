@@ -384,6 +384,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
             </button>
             <Link
               href={`/terms#${item.termsHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mode-info"
               aria-label={`About ${item.name}`}
               title={`Learn about ${item.name}`}
