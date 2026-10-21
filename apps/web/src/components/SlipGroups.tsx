@@ -593,7 +593,7 @@ export function SlipGroups({
           <div className="ticket-footer">
             <div className="ticket-tags">
               {ticketMode && <span className={`mode-tag mode-${ticketModeKey}`}>{ticketMode}</span>}
-              <ResultBadge result={slip.result} />
+              {slip.result && slip.result !== 'UNKNOWN' && <ResultBadge result={slip.result} />}
               {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
             </div>
             <TicketMenu
