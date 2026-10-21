@@ -1,4 +1,5 @@
 'use client';
+import { ResultBadge, RESULT_LABEL } from './ResultBadge';
 import { formatOdds, exactOdds } from '@myodd/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,6 +8,7 @@ import type { GeneratedSlip, GenerationReport, LegPlayStatus, PlaySummary, SlipP
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatLagosDateTime } from '@/lib/datetime';
+import { formatPlaySummary } from '@/lib/play-summary';
 import { modeTag } from '@/lib/mode-label';
 import { loadTicketOnSportyBet, sportyLoadUrl } from '@/lib/sportybet';
 import { formatTicketCopy, formatTicketsCopy } from '@/lib/ticket-copy';
@@ -52,9 +54,11 @@ const LEG_LABEL: Record<LegPlayStatus, string> = {
 
 function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
   const done = slips.filter(s => isDoneSlip(s.playStatus)).length;
-  const legsDone = slips.reduce((n, s) => n + (s.playedLegs ?? 0) + (s.cutLegs ?? 0), 0);
+  const legsDone = slips.reduce((n, s) => n + (s.playedLegs ?? 0) + (s.playStatus === 'CUT' ? (s.cutLegs ?? 0) : 0), 0);
   return {
     tickets: slips.length,
+    won: slips.filter(s => s.result === 'WON').length,
+    lost: slips.filter(s => s.result === 'LOST').length,
     open: slips.filter(s => s.playStatus === 'OPEN').length,
     live: slips.filter(s => s.playStatus === 'LIVE').length,
     done,
@@ -66,13 +70,7 @@ function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
 }
 
 function playLine(summary: PlaySummary) {
-  const done = summary.done ?? summary.allPlayed ?? 0;
-  const bits = [
-    summary.live ? `${summary.live} live` : '',
-    summary.open ? `${summary.open} open` : '',
-    done ? `${done} done` : '',
-  ].filter(Boolean);
-  return bits.join(' · ') || 'No play check yet';
+  return formatPlaySummary(summary);
 }
 
 function TicketMenu({
@@ -178,7 +176,7 @@ function TicketMenu({
         </button>
         {canVerify && (
           <button type="button" role="menuitem" disabled={verifying} onClick={() => run(() => onVerify?.())}>
-            <span aria-hidden>✓</span>{verifying ? 'Checking…' : 'Verify played'}
+            <span aria-hidden>✓</span>{verifying ? 'Checking…' : 'Check results'}
           </button>
         )}
         {canEdit && (
@@ -218,17 +216,14 @@ function TicketMenu({
 function ShareSheet({
   slip,
   groupUrl,
-  collectionMode,
   onClose,
 }: {
   slip: GeneratedSlip;
   groupUrl: string;
-  collectionMode?: string | null;
   onClose: () => void;
 }) {
   const toast = useToast();
-  const mode = slip.riskMode ?? collectionMode ?? null;
-  const text = formatTicketCopy(slip, mode);
+  const text = formatTicketCopy(slip);
   const loadUrl = sportyLoadUrl(slip.bookingCode, slip.shareUrl);
 
   useEffect(() => {
@@ -278,7 +273,6 @@ function PicksModal({
   modeLabel,
   modeKey,
   playLabel,
-  collectionMode,
   onClose,
   onShare,
 }: {
@@ -286,7 +280,6 @@ function PicksModal({
   modeLabel: string | null;
   modeKey: string;
   playLabel: string | null;
-  collectionMode?: string | null;
   onClose: () => void;
   onShare: () => void;
 }) {
@@ -317,6 +310,7 @@ function PicksModal({
             <h3>{slip.bookingCode}</h3>
             <div className="picks-modal-tags">
               {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
+              <ResultBadge result={slip.result} />
               {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
               <span className="code-badge">{STATUS_LABEL[slip.displayStatus ?? 'UNKNOWN']} · {slip.selectionCount} picks</span>
             </div>
@@ -333,6 +327,7 @@ function PicksModal({
             <li key={i} className={pick.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(pick.playStatus) ? 'is-played-leg' : ''}>
               <div className="picks-modal-row">
                 <strong>{pick.homeTeam} vs {pick.awayTeam}</strong>
+                <ResultBadge result={pick.result} checkedAt={pick.resultCheckedAt} source={pick.resultSource} />
                 {pick.playStatus && pick.playStatus !== 'UNKNOWN' && (
                   <span className={`play-chip play-${isDoneLeg(pick.playStatus) ? 'all_played' : pick.playStatus.toLowerCase()}`}>{LEG_LABEL[pick.playStatus]}</span>
                 )}
@@ -353,7 +348,7 @@ function PicksModal({
           <VerifiedBookmakerLink code={slip.bookingCode} url={slip.shareUrl} />
           <button type="button" className="outline-button" onClick={async () => {
             try {
-              await copyText(formatTicketCopy(slip, collectionMode));
+              await copyText(formatTicketCopy(slip));
               toast('Ticket copied');
             } catch {
               toast('Could not copy ticket');
@@ -390,7 +385,7 @@ export function SlipGroups({
   const toast = useToast();
   const play = useUiSound();
   const query = useQueryClient();
-  const [checkingCopy, setCheckingCopy] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [checkingPlay, setCheckingPlay] = useState(false);
   const [checkingTicket, setCheckingTicket] = useState<string | null>(null);
   const [loadingTicket, setLoadingTicket] = useState<string | null>(null);
@@ -421,17 +416,13 @@ export function SlipGroups({
   }
 
   async function copyAll() {
-    setCheckingCopy(true);
+    setCopying(true);
     try {
-      const checked = await api.verifyGroup(groupPublicId);
-      const valid = new Set(checked.codes.map(code => code.toUpperCase()));
-      const active = slips.filter(slip => valid.has(slip.bookingCode.toUpperCase()));
-      if (!active.length) { toast('No active codes right now.', { sticky: true }); return; }
-      await copyText(formatTicketsCopy(active, riskMode));
-      toast(`Copied ${active.length} tickets${checked.unavailable ? ` · ${checked.unavailable} skipped` : ''}`);
+      await copyText(formatTicketsCopy(slips, riskMode));
+      toast(`Copied ${slips.length} ticket${slips.length === 1 ? '' : 's'}`);
     } catch {
-      toast('Could not verify codes right now.', { sticky: true });
-    } finally { setCheckingCopy(false); }
+      toast('Could not copy this collection.', { sticky: true });
+    } finally { setCopying(false); }
   }
 
   function shareAll() {
@@ -487,7 +478,7 @@ export function SlipGroups({
       ]);
       play(isDoneSlip(result.playStatus) ? 'done' : result.playStatus === 'LIVE' ? 'tick' : 'tick');
       const doneLegs = result.playedLegs || 0;
-      toast(`${code}: ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
+      toast(`${code}: ${RESULT_LABEL[result.result]} · ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
     } catch {
       play('error');
       toast('Could not check this ticket.', { sticky: true });
@@ -496,7 +487,7 @@ export function SlipGroups({
 
   async function copyOne(slip: GeneratedSlip) {
     try {
-      await copyText(formatTicketCopy(slip, riskMode));
+      await copyText(formatTicketCopy(slip));
       toast('Copied');
     } catch {
       toast('Could not copy this ticket', { sticky: true });
@@ -528,8 +519,8 @@ export function SlipGroups({
         {createdAt && <p className="codes-meta"><time dateTime={createdAt}>{formatLagosDateTime(createdAt)}</time></p>}
       </div>
       <div className="bulk-actions">
-        {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Verify played'}</button>}
-        <button onClick={() => void copyAll()} disabled={!slips.length || checkingCopy} className="primary-button">{checkingCopy ? 'Checking…' : 'Copy all'}</button>
+        {allowPlayCheck && <button onClick={() => void checkAllPlayed()} disabled={!slips.length || checkingPlay} className="outline-button">{checkingPlay ? 'Checking…' : 'Check results'}</button>}
+        <button onClick={() => void copyAll()} disabled={!slips.length || copying} className="primary-button">{copying ? 'Copying…' : 'Copy all'}</button>
         {collection && (
           <CollectionMenu
             collection={collection}
@@ -585,6 +576,7 @@ export function SlipGroups({
           <div className="ticket-footer">
             <div className="ticket-tags">
               {ticketMode && <span className={`mode-tag mode-${ticketModeKey}`}>{ticketMode}</span>}
+              {slip.result && slip.result !== 'UNKNOWN' && <ResultBadge result={slip.result} />}
               {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
             </div>
             <TicketMenu
@@ -616,7 +608,6 @@ export function SlipGroups({
         modeLabel={picksModeLabel}
         modeKey={picksModeKey}
         playLabel={picksPlayLabel}
-        collectionMode={riskMode}
         onClose={() => setPicksFor(null)}
         onShare={() => { setPicksFor(null); setShareFor(picksFor); }}
       />
@@ -625,7 +616,6 @@ export function SlipGroups({
       <ShareSheet
         slip={shareFor}
         groupUrl={groupUrl}
-        collectionMode={riskMode}
         onClose={() => setShareFor(null)}
       />
     )}

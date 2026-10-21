@@ -1,3 +1,4 @@
+import type { SelectionSettlement } from '@myodd/shared';
 // Empty = same origin (Next proxies /api → backend). Needed for public tunnels.
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
@@ -35,6 +36,11 @@ export type RiskMode = 'INVESTOR' | 'GAMBLER' | 'JAPA' | 'LAGOS_LIFE';
 export type SlipPlayStatus = 'OPEN' | 'LIVE' | 'ALL_PLAYED' | 'UNKNOWN' | 'CUT';
 export type LegPlayStatus = 'UPCOMING' | 'LIVE' | 'PLAYED' | 'UNKNOWN' | 'CUT';
 export interface PlaySummary {
+  won?: number;
+  lost?: number;
+  void?: number;
+  pending?: number;
+  awaitingConfirmation?: number;
   tickets: number;
   open: number;
   live: number;
@@ -75,6 +81,13 @@ export interface CollectionSummary {
   allPlayed?: number;
 }
 
+export interface CodeCheckLookup {
+  kind: 'code' | 'group';
+  identifier: string;
+  href: string;
+  summary: PlaySummary;
+}
+
 export interface GenerateResponse {
   jobId: string;
   groupId: string;
@@ -107,7 +120,10 @@ export interface SlipSelection {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
+  result?: SelectionSettlement;
   playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'CUT' | 'UNKNOWN';
+  resultSource?: string | null;
+  resultCheckedAt?: string | null;
   score?: string | null;
   playNote?: string | null;
 }
@@ -123,6 +139,7 @@ export interface GeneratedSlip {
   selectionCount: number;
   rankOrder?: number;
   slipScore?: number;
+  result?: SelectionSettlement;
   playStatus?: 'OPEN' | 'LIVE' | 'CUT' | 'ALL_PLAYED' | 'UNKNOWN';
   playCheckedAt?: string | null;
   openLegs?: number;
@@ -225,10 +242,13 @@ export const api = {
   verifyCode(code: string) { return request<{ codes: string[]; unavailable: number }>(`/codes/${encodeURIComponent(code)}/verify`, { method: 'POST' }); },
   verifyGroup(id: string) { return request<{ codes: string[]; unavailable: number }>(`/groups/${encodeURIComponent(id)}/verify`, { method: 'POST' }); },
   checkPlayGroup(id: string) {
-    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
+    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
   },
   checkPlayCode(code: string) {
-    return request<{ slipId: string; bookingCode: string; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
+    return request<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
+  },
+  lookupAndCheck(identifier: string) {
+    return request<CodeCheckLookup>('/checks/lookup', { method: 'POST', body: JSON.stringify({ identifier }) });
   },
   getJob(jobId: string) {
     return request<JobProgress>(`/jobs/${jobId}`);

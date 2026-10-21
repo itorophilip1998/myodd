@@ -1,4 +1,5 @@
 'use client';
+import { ResultBadge, RESULT_LABEL } from '@/components/ResultBadge';
 import { formatOdds, exactOdds } from '@myodd/shared';
 
 import { useParams } from 'next/navigation';
@@ -43,6 +44,7 @@ export default function CodePage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['code', params.code],
     queryFn: () => api.getCode(params.code),
+    refetchInterval: 60_000,
   });
 
   async function checkPlayed() {
@@ -52,13 +54,14 @@ export default function CodePage() {
       await queryClient.invalidateQueries({ queryKey: ['code', params.code] });
       if (data?.groupPublicId) await queryClient.invalidateQueries({ queryKey: ['group', data.groupPublicId] });
       const bits = [
+        RESULT_LABEL[result.result],
         PLAY_LABEL[result.playStatus],
         result.liveLegs ? `${result.liveLegs} live` : '',
         result.playedLegs ? `${result.playedLegs} done` : '',
       ].filter(Boolean);
       toast(`${params.code}: ${bits.join(' · ')}`, { sticky: true });
-    } catch {
-      toast('Could not check this ticket.', { sticky: true });
+    } catch (e) {
+      toast((e as Error).message || 'Could not check this ticket.', { sticky: true });
     } finally {
       setChecking(false);
     }
@@ -104,6 +107,7 @@ export default function CodePage() {
           Odds <span title={exactOdds(data.totalOdds)}>{formatOdds(data.totalOdds)}</span> · {data.selectionCount} selections
         </p>
         <div className="ticket-meta">
+          <ResultBadge result={data.result} />
           {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
           {data.createdAt && <time dateTime={data.createdAt}>{formatLagosDateTime(data.createdAt)}</time>}
           {data.playStatus && data.playStatus !== 'UNKNOWN' && (
@@ -115,7 +119,7 @@ export default function CodePage() {
         <div className="code-detail-actions">
           {canVerify && (
             <button type="button" className="outline-button" disabled={checking} onClick={() => void checkPlayed()}>
-              {checking ? 'Checking…' : 'Verify played'}
+              {checking ? 'Checking…' : 'Check result'}
             </button>
           )}
           <ShareButtons
@@ -128,15 +132,17 @@ export default function CodePage() {
           />
         </div>
         {!canVerify && (
-          <p className="code-detail-hint">Save this collection from Saved codes to verify whether it played.</p>
+          <p className="code-detail-hint">Save this collection from Saved codes to check its results.</p>
         )}
         {expired && <p className="code-detail-hint">Archived code. Generate a fresh collection to use upcoming matches.</p>}
       </header>
+      <p className="code-detail-hint">Tracks the saved selections without placing a bet. Completed matches may still be awaiting a confirmed result.</p>
       <ul className="code-leg-list">
         {data.selections.map((s, i) => (
           <li key={i} className={s.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(s.playStatus) ? 'is-played-leg' : undefined}>
             <div className="code-leg-top">
               <p className="code-leg-league">{s.league}</p>
+              <ResultBadge result={s.result} checkedAt={s.resultCheckedAt} source={s.resultSource} />
               {s.playStatus && s.playStatus !== 'UNKNOWN' && (
                 <span className={`play-chip play-${isDoneLeg(s.playStatus) ? 'all_played' : s.playStatus.toLowerCase()}`}>{LEG_LABEL[s.playStatus]}</span>
               )}

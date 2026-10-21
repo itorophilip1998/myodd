@@ -203,12 +203,12 @@ export class SlipsService implements OnModuleInit {
       const explicitOdds = /\b(?:between|around|odds(?:\s+(?:of|above|below|over|under|from|at))?)\s+\d|\d(?:\.\d+)?\s*(?:to|-|and)\s*\d(?:\.\d+)?\s*odds|\d(?:\.\d+)?\s*odds/i.test(input.instruction);
       config = { ...config, numberOfSlips: input.splitInto, fixtureMode: 'original_only', preserveOriginalSelections: false,
         minimumSelections: /\bmin(?:imum)?\s+\d+\s*(?:selections?|legs?|picks?)/i.test(input.instruction) ? config.minimumSelections : 1,
-        maximumSelections: /\bmax(?:imum)?\s+\d+\s*(?:selections?|legs?|picks?)/i.test(input.instruction) ? config.maximumSelections : 30,
+        maximumSelections: /\bmax(?:imum)?\s+\d+\s*(?:selections?|legs?|picks?)/i.test(input.instruction) ? config.maximumSelections : 50,
         minimumOdds: explicitOdds || config.riskMode ? config.minimumOdds : 1.1, maximumOdds: explicitOdds || config.riskMode ? config.maximumOdds : null,
       };
     }
     if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
-    if (!input.splitInto) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
+    if (!input.splitInto) config.numberOfSlips = Math.min(50, Math.max(1, config.numberOfSlips));
     if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
     // Prediction book: keep the exact pinned outcomes; do not let mode odds bands reject them.
     if (input.pinnedSelections?.length && !input.splitInto) {

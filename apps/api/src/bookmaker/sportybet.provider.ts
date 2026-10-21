@@ -45,7 +45,7 @@ export class SportyBetProvider implements BookmakerProvider {
       const results = await Promise.allSettled(ids.map(async eventId => {
         const data = await this.client.get<Parameters<typeof mapEvent>[0]>(
           `/api/${region}/factsCenter/event?eventId=${encodeURIComponent(eventId)}`,
-          { cacheKey: `sporty:event:${region}:${eventId}` },
+          { cacheKey: query.fresh ? undefined : `sporty:event:${region}:${eventId}` },
         );
         return mapEvent(data);
       }));

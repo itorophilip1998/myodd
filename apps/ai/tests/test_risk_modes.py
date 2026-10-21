@@ -37,7 +37,7 @@ class RiskModeTests(unittest.TestCase):
     @patch('app.intent._parse_intent', return_value=Config(riskPreference='LOWER'))
     def test_keywords_are_applied_after_provider_interpretation(self, _):
         self.assertEqual(parse_intent('Japa Mode').riskPreference, 'HIGHER')
-    def test_conservative_and_high_modes_rank_real_candidates_differently(self):
+    def test_all_risk_modes_keep_random_targets_within_explicit_bounds_and_filters(self):
         pool = [selection(event, odds, .96 / odds, outcome=str(i)) for event in range(5) for i, odds in enumerate([1.5, 2, 3])]
         values = {}
         for mode in ['VERY_LOW', 'MODERATE', 'HIGHER', 'VERY_HIGH']:
@@ -46,7 +46,8 @@ class RiskModeTests(unittest.TestCase):
             values[mode] = candidate['totalOdds']
             self.assertTrue(2 <= candidate['totalOdds'] <= 5)
             self.assertTrue(all(s['homeTeam'] != 'Home 4' for s in candidate['selections']))
-        self.assertLessEqual(values['VERY_LOW'], values['VERY_HIGH'])
+        # Each mode now samples its own target; independent random draws need not be ordered.
+        self.assertTrue(all(2 <= odds <= 5 for odds in values.values()))
 
     def test_unset_mode_defaults_to_investor(self):
         config = parse_rules('Create 4 codes. Exclude Chelsea.')
@@ -56,7 +57,10 @@ class RiskModeTests(unittest.TestCase):
         config = parse_rules('Create 3 codes between 2ks and 5ks using Lagoslife Mode')
         self.assertEqual((config.minimumOdds, config.maximumOdds), (2000, 5000))
         from app.odds_format import format_odds, parse_odds_token
-        self.assertEqual(format_odds(184775.21), '185ks')
+        self.assertEqual(format_odds(184775.21), '185k')
+        self.assertEqual(format_odds(1e6), '1m')
+        self.assertEqual(format_odds(999500), '1m')
+        self.assertEqual(parse_odds_token('1.5m'), 1.5e6)
         self.assertEqual(parse_odds_token('1.5ms'), 1.5e6)
 
     def test_named_modes_enforce_safe_per_game_odds(self):

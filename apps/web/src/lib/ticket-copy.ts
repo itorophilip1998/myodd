@@ -18,12 +18,11 @@ export function ticketCopyTitle(mode?: string | null): string {
   return 'myOdd ticket';
 }
 
-/** One ticket: title, then booking code. */
+/** One ticket: only the booking code. Titles belong to collection copies. */
 export function formatTicketCopy(
   slip: { bookingCode: string; riskMode?: string | null },
-  fallbackMode?: string | null,
 ): string {
-  return `${ticketCopyTitle(slip.riskMode ?? fallbackMode)}\n${slip.bookingCode}`;
+  return slip.bookingCode;
 }
 
 /**

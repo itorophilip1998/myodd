@@ -124,7 +124,7 @@ class LlmOrchestratorTests(unittest.TestCase):
     def test_rate_limit_can_use_a_faithful_numeric_request_fallback(self, post):
         post.return_value = httpx.Response(429)
         result = parse_intent('Create 50 lower variance slips between 3 and 5 odds. Prefer double chance.')
-        self.assertEqual(result.numberOfSlips, 10)
+        self.assertEqual(result.numberOfSlips, 50)
         self.assertEqual((result.minimumOdds, result.maximumOdds), (3, 5))
         self.assertEqual(result.riskMode, 'INVESTOR')
         self.assertTrue(any('local parser' in message for message in result.unhandledRequests))
