@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, SlipPlayStatus } from '@prisma/client';
 import {
   settlementKey,
@@ -13,7 +13,8 @@ import {
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { SportyBetSettlementService } from '../bookmaker/sportybet.settlement';
 import { PrismaService } from '../prisma/prisma.service';
-import { decideLegPlayStatus, isDoneLeg, isDoneSlip, matchPhase } from './play-leg-status';
+import { decideLegPlayStatus, isDoneLeg, isDoneSlip, matchPhase, type LegMatchPhase } from './play-leg-status';
+import { FootballResultsService, type MatchEvidence } from './football-results.service';
 
 type LegInput = {
   id: string;
@@ -53,6 +54,7 @@ export class PlayCheckService {
     private readonly prisma: PrismaService,
     private readonly settlement: SportyBetSettlementService,
     @Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider,
+    @Optional() private readonly footballResults?: FootballResultsService,
   ) {}
 
   async checkSlips(slipIds: string[]) {
@@ -104,6 +106,7 @@ export class PlayCheckService {
     const results: SelectionSettlement[] = [];
     const updates: Prisma.PrismaPromise<unknown>[] = [];
     const checkedAt = new Date();
+    const matchEvidence: Array<{ selectionId: string; evidence: MatchEvidence }> = [];
     const cuts: Array<{ homeTeam: string; awayTeam: string; league: string; marketName: string;
       selectionName: string; score: string | null; playNote: string | null }> = [];
 
@@ -123,8 +126,13 @@ export class PlayCheckService {
       });
       // Share responses can still describe a finished match after the event feed expires.
       const bookingPhase = matchPhase({ kickoffMs: null, nowMs: now, matchStatus: bookSel?.matchStatus });
-      const phase = fixturePhase === 'finished' || bookingPhase === 'finished' ? 'finished'
+      let phase: LegMatchPhase = fixturePhase === 'finished' || bookingPhase === 'finished' ? 'finished'
         : fixturePhase === 'live' || bookingPhase === 'live' ? 'live' : fixturePhase;
+      const independent = phase === 'unknown' ? await this.footballResults?.lookup(leg) : null;
+      if (independent) {
+        phase = independent.phase;
+        matchEvidence.push({ selectionId: leg.id, evidence: independent });
+      }
       const key = settlementKey({
         eventId: leg.sportyEventId,
         marketId: leg.marketId,
@@ -157,10 +165,10 @@ export class PlayCheckService {
         settlement = 'PENDING';
       }
       results.push(settlement);
-      const evidence = { selectionKey: key, result: settlement, source,
+      const evidence = { selectionKey: key, result: settlement, source, matchEvidence: independent ?? null,
         observedAt: checkedAt.toISOString(), conflict };
 
-      const score = fixture && 'score' in fixture ? (fixture.score ?? null) : null;
+      const score = independent?.score ?? fixture?.score ?? null;
       const decision = decideLegPlayStatus({
         phase,
         settlement,
@@ -169,7 +177,8 @@ export class PlayCheckService {
         matchLabel: matchLabel(leg),
         pickLabel: pickLabel(leg),
       });
-      const { playStatus, playNote } = decision;
+      const playStatus = decision.playStatus;
+      const playNote = `${decision.playNote}${independent ? ' · Match status: API-Football' : ''}`;
       if (settlement === 'LOST') cuts.push({
         homeTeam: leg.homeTeam ?? '', awayTeam: leg.awayTeam ?? '', league: leg.league ?? '',
         marketName: leg.marketName ?? '', selectionName: leg.selectionName ?? '', score, playNote,
@@ -213,7 +222,7 @@ export class PlayCheckService {
     updates.push(this.prisma.trainingEvent.create({ data: {
       kind: 'SETTLEMENT_CHECKED', payload: JSON.parse(JSON.stringify({
         slipId, bookingCode, checkedAt, result, results,
-        booking: validBooking, pageResults: Object.fromEntries(scraped),
+        booking: validBooking, pageResults: Object.fromEntries(scraped), matchEvidence,
       })),
     } }));
     // Readers never see partially updated ticket/selection results.

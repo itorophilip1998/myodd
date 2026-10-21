@@ -10,7 +10,7 @@ const leg = { id: 'leg', sportyEventId: 'event', marketId: '18', outcomeId: 'ove
   specifier: 'total=2.5', kickoffAt: new Date('2020-01-01'), homeTeam: 'A', awayTeam: 'B' };
 const selection = { eventId: leg.sportyEventId, marketId: leg.marketId, outcomeId: leg.outcomeId,
   specifier: leg.specifier, settlement: 'WON' };
-function setup(selections: any[] = [selection], page = new Map(), fixtures: any[] = []) {
+function setup(selections: any[] = [selection], page = new Map(), fixtures: any[] = [], footballResults?: any) {
   const prisma = {
     slipSelection: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     generatedSlip: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
@@ -21,7 +21,7 @@ function setup(selections: any[] = [selection], page = new Map(), fixtures: any[
     getFixtures: vi.fn().mockResolvedValue(fixtures), getLiveFixtures: vi.fn().mockResolvedValue([]) };
   const catalog = { validate: vi.fn() };
   const scraper = { fetchShareSettlement: vi.fn().mockResolvedValue(page) };
-  const service = new PlayCheckService(prisma as any, scraper as any, bookmaker as any);
+  const service = new PlayCheckService(prisma as any, scraper as any, bookmaker as any, footballResults);
   return { service, prisma, bookmaker, catalog, scraper };
 }
 function html(rows: unknown[]) {
@@ -79,6 +79,20 @@ describe('accumulator result', () => {
 });
 
 describe('saved booking checks', () => {
+  it('uses independent completion evidence during a SportyBet outage without guessing a win', async () => {
+    const evidence = { provider: 'API_FOOTBALL', fixtureId: 123, status: 'FT', phase: 'finished',
+      score: '2 : 1', checkedAt: new Date().toISOString() };
+    const lookup = vi.fn().mockResolvedValue(evidence);
+    const { service, bookmaker, prisma } = setup([], new Map(), [], { lookup });
+    bookmaker.getBooking.mockRejectedValue(new Error('HTTP 403'));
+    const result = await service.checkOne('slip', 'ABC123', [leg]);
+    expect(result.playStatus).toBe('ALL_PLAYED');
+    expect(result.result).toBe('UNKNOWN');
+    expect(prisma.slipSelection.update.mock.calls[0][0].data).toMatchObject({
+      score: '2 : 1', resultEvidence: { matchEvidence: evidence },
+    });
+    expect(prisma.trainingEvent.create.mock.calls[0][0].data.payload.matchEvidence).toEqual([{ selectionId: 'leg', evidence }]);
+  });
   it('stores a confirmed win, source, evidence and audit atomically using a fresh booking', async () => {
     const { service, prisma, bookmaker, catalog } = setup();
     expect((await service.checkOne('slip', 'ABC123', [leg])).result).toBe('WON');
