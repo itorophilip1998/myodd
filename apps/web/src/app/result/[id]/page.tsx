@@ -70,7 +70,7 @@ function ResultInner() {
       {!group && !groupQuery.error && !jobQuery.error && (
         <ProgressQuest job={job ?? { status: 'PENDING', stage: 'QUEUED', progress: 0, total: 0, failedCount: 0 }} />
       )}
-      {group && <CodeWorkspace key={group.publicId} group={{ ...group, job: job ?? group.job }} busy={!!loading} />}
+      {group && <CodeWorkspace key={group.publicId} group={{ ...group, job: job ?? group.job }} busy={!!loading} promptToSave={!!jobId} />}
 
       {!loading && group && !hasResults && (job?.status === 'COMPLETED' || job?.status === 'FAILED') && (
         <p className="empty-state" title="Try a different mode, odds range, or match day">

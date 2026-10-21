@@ -23,14 +23,14 @@ def parse_rules(instruction: str) -> Config:
 
     data = {}
     count = re.search(r'(?:create|generate|give me)\s+(\d+)\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
-    data['numberOfSlips'] = min(10, max(1, int(count[1]) if count else 10))
+    data['numberOfSlips'] = min(50, max(1, int(count[1]) if count else 10))
     low, high = extract_odds_bounds(instruction)
     if low is not None:
         data['minimumOdds'] = low
     if high is not None:
         data['maximumOdds'] = high
-    data['maximumSelections'] = number(r'max(?:imum)?\s+(\d+)\s*(?:selections?|legs?)', 20)
-    data['minimumSelections'] = number(r'min(?:imum)?\s+(\d+)\s*(?:selections?|legs?)', 2)
+    data['maximumSelections'] = number(r'max(?:imum)?\s+(\d+)\s*(?:games?|matches?|selections?|legs?)', 50)
+    data['minimumSelections'] = number(r'min(?:imum)?\s+(\d+)\s*(?:games?|matches?|selections?|legs?)', 1)
     data['riskPreference'] = 'HIGHER' if re.search(r'aggressive|high(?:er)?[- ]?(?:risk|variance|odds)|risky', text) else 'LOWER' if re.search(r'safer|conservative|low(?:er)?[- ]?(?:risk|variance)', text) else 'MODERATE'
     exact = extract_games_per_ticket(instruction)
     if exact is not None:
@@ -155,10 +155,13 @@ def parse_intent(instruction: str, available_markets: list[dict] | None = None, 
     memory = learned_defaults or {}
     text = instruction.casefold()
     if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
-        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))
+        config.numberOfSlips = min(50, max(1, int(memory['ticketCount'])))
     games = extract_games_per_ticket(instruction)
     if games is not None:
         config.minimumSelections = config.maximumSelections = games
+    elif re.search(r'games per ticket:\s*random', text):
+        if not re.search(r'\b(?:min(?:imum)?|max(?:imum)?)\s+\d+\s*(?:games?|matches?|legs?|selections?)', text):
+            config.minimumSelections, config.maximumSelections = 1, 50
     elif memory.get('gamesPerTicket') and not re.search(r'\d+\s+(?:games?|matches?|picks?|legs?|selections?)', text):
         config.minimumSelections = config.maximumSelections = memory['gamesPerTicket']
     low, high = extract_odds_bounds(instruction)

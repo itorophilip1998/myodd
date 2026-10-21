@@ -6,8 +6,8 @@ export type UiSettings = {
   defaultMode: 'INVESTOR' | 'GAMBLER' | 'JAPA' | 'LAGOS_LIFE' | null;
   defaultOperation: 'generate' | 'split';
   defaultTickets: number | null;
-  /** Kept for storage compat; games/ticket are chosen programmatically (1–50). */
-  defaultGames: null;
+  /** Null chooses a variable count, up to 50 games per ticket. */
+  defaultGames: number | null;
   defaultSplitParts: number | null;
   defaultScope: 'prompt' | 'original_only' | 'upcoming';
   defaultStrict: boolean;
@@ -17,7 +17,7 @@ export type UiSettings = {
 
 export const UI_SETTINGS_KEY = 'myodd-ui-settings-v1';
 export const MAX_GAMES_PER_TICKET = 50;
-export const MAX_TICKETS = 10;
+export const MAX_TICKETS = 50;
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
   soundsEnabled: true,
@@ -27,7 +27,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   /** Always Investor (recommended); kept for storage compat, not user-selectable. */
   defaultMode: 'INVESTOR',
   defaultOperation: 'generate',
-  defaultTickets: 5,
+  defaultTickets: 10,
   defaultGames: null as null,
   defaultSplitParts: 5,
   defaultScope: 'prompt',
@@ -53,7 +53,9 @@ export function readUiSettings(): UiSettings {
   try {
     const raw = localStorage.getItem(UI_SETTINGS_KEY);
     if (!raw) return DEFAULT_UI_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<UiSettings>;
+    const parsed = JSON.parse(raw) as Partial<UiSettings> & { defaultsVersion?: number };
+    // Older releases automatically stored five as the default on first load.
+    const tickets = parsed.defaultsVersion !== 2 && parsed.defaultTickets === 5 ? 10 : parsed.defaultTickets;
     return {
       soundsEnabled: parsed.soundsEnabled !== false,
       soundVolume: clampVolume(Number(parsed.soundVolume ?? DEFAULT_UI_SETTINGS.soundVolume)),
@@ -61,8 +63,8 @@ export function readUiSettings(): UiSettings {
       toastSounds: parsed.toastSounds !== false,
       defaultMode: 'INVESTOR',
       defaultOperation: parsed.defaultOperation === 'split' ? 'split' : 'generate',
-      defaultTickets: clampTickets(parsed.defaultTickets),
-      defaultGames: null,
+      defaultTickets: clampTickets(tickets === undefined ? DEFAULT_UI_SETTINGS.defaultTickets : tickets),
+      defaultGames: clampTickets(parsed.defaultGames),
       defaultSplitParts: clampTickets(parsed.defaultSplitParts ?? DEFAULT_UI_SETTINGS.defaultSplitParts),
       defaultScope: parsed.defaultScope === 'original_only' || parsed.defaultScope === 'upcoming' || parsed.defaultScope === 'prompt'
         ? parsed.defaultScope
@@ -79,7 +81,7 @@ export function readUiSettings(): UiSettings {
 export function writeUiSettings(next: UiSettings) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(next));
+    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify({ ...next, defaultsVersion: 2 }));
   } catch {
     /* ignore quota / private mode */
   }

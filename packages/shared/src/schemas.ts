@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { RiskPreference, SupportedMarket } from './enums';
 
 export const generationConfigSchema = z.object({
-  numberOfSlips: z.number().int().min(1).max(10).default(10),
+  numberOfSlips: z.number().int().min(1).max(50).default(10),
   minimumOdds: z.number().finite().min(1.1).default(2.5),
   maximumOdds: z.number().finite().min(1.1).nullable().default(5),
-  maximumSelections: z.number().int().min(1).max(30).default(20),
-  minimumSelections: z.number().int().min(1).max(30).default(2),
+  maximumSelections: z.number().int().min(1).max(50).default(50),
+  minimumSelections: z.number().int().min(1).max(50).default(1),
   markets: z.array(z.nativeEnum(SupportedMarket)).default([]),
   marketQueries: z.array(z.string()).default([]),
   marketRules: z.array(z.object({
@@ -68,28 +68,28 @@ export const pinnedSelectionSchema = z.object({
 export const generateFromCodeSchema = z.object({
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
-  ticketCount: z.number().int().min(1).max(10).optional(),
-  gamesPerTicket: z.number().int().min(1).max(30).optional(),
-  splitInto: z.number().int().min(1).max(10).optional(),
+  ticketCount: z.number().int().min(1).max(50).optional(),
+  gamesPerTicket: z.number().int().min(1).max(50).optional(),
+  splitInto: z.number().int().min(1).max(50).optional(),
   bookingCode: z.string().min(3).max(32).trim().optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
-  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(30).optional(),
+  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(50).optional(),
 });
 
 export const generateFromPromptSchema = z.object({
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
-  ticketCount: z.number().int().min(1).max(10).optional(),
-  gamesPerTicket: z.number().int().min(1).max(30).optional(),
-  splitInto: z.number().int().min(1).max(10).optional(),
+  ticketCount: z.number().int().min(1).max(50).optional(),
+  gamesPerTicket: z.number().int().min(1).max(50).optional(),
+  splitInto: z.number().int().min(1).max(50).optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
-  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(30).optional(),
+  pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(50).optional(),
 });
 
 export type AnalyzeSlipInput = z.infer<typeof analyzeSlipSchema>;

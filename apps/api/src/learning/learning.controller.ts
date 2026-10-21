@@ -42,7 +42,7 @@ export class LearningController {
         const games = Number(config.minimumSelections);
         const preferences = {
           riskMode: typeof config.riskMode === 'string' ? config.riskMode : null,
-          ticketCount: Math.min(10, Math.max(1, Number.isFinite(slips) ? slips : 10)),
+          ticketCount: Math.min(50, Math.max(1, Number.isFinite(slips) ? slips : 10)),
           gamesPerTicket: Number.isFinite(games) && config.minimumSelections === config.maximumSelections ? games : null,
         } as Prisma.InputJsonValue;
         await tx.learningProfile.upsert({ where: { id: data.profileId }, create: { id: data.profileId, preferences },

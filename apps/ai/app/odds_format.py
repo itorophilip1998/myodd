@@ -110,7 +110,7 @@ def extract_games_per_ticket(instruction: str) -> int | None:
         match = re.search(pattern, text)
         if match:
             count = int(match[1])
-            if 1 <= count <= 30:
+            if 1 <= count <= 50:
                 return count
     return None
 

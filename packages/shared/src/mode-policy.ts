@@ -8,7 +8,8 @@ export const MAX_TICKET_ODDS = 10_000;
 export function previewOddsFromPrompt(instruction: string): { minimum: number; maximum: number | null } | null {
   const text = instruction.trim();
   if (!text) return null;
-  const between = text.match(/\b(?:between|from)\s+(\d+(?:\.\d+)?)\s*(?:and|to|-)\s*(\d+(?:\.\d+)?)\b/i);
+  const between = [...text.matchAll(/\b(?:between|from)\s+(\d+(?:\.\d+)?)\s*(?:and|to|[-–])\s*(\d+(?:\.\d+)?)\b/gi)].filter(m => !/^\s*(?:games?|tickets?|matches?|legs?|picks?)\b/i.test(text.slice((m.index ?? 0) + m[0].length))).at(-1)
+    ?? [...text.matchAll(/\b(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*odds\b/gi)].at(-1);
   if (between) {
     const minimum = Number(between[1]);
     const maximum = Number(between[2]);

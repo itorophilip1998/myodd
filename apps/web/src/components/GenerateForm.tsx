@@ -13,6 +13,7 @@ import { useSettings, useUiSound } from '@/components/SettingsProvider';
 import { useToast } from '@/components/ToastProvider';
 import { generateGuardrailMessage } from '@/lib/generate-guardrails';
 import { MAX_TICKETS } from '@/lib/ui-settings';
+import { readGenerationControls } from '@/lib/generation-controls';
 import {
   clearPredictionBook,
   predictionBookPrompt,
@@ -24,7 +25,7 @@ import {
 const MODES = [
   { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: 'Ticket 2–5 · each game 1.10–1.50', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
   { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Ticket 5.01–20 · each game ≤1.80', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
-  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
+  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MODE_ODDS.JAPA.maximum} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
   { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: `Ticket 100.01–${MAX_TICKET_ODDS} · each game ≤2.00`, icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
 ];
 
@@ -54,10 +55,10 @@ function oddsPresets(key: ModeKey): Array<{ label: string; min: number; max: num
       ];
     case 'JAPA':
       return [
-        { label: `20–${MAX_TICKET_ODDS}`, min: 20.01, max: MAX_TICKET_ODDS },
+        { label: `20–${MODE_ODDS.JAPA.maximum}`, min: 20.01, max: MODE_ODDS.JAPA.maximum },
         { label: '20–30', min: 20.01, max: 30 },
         { label: '30–40', min: 30, max: 40 },
-        { label: '40–50', min: 40, max: MAX_TICKET_ODDS },
+        { label: '40–50', min: 40, max: 50 },
       ];
     case 'LAGOS_LIFE':
       return [
@@ -86,8 +87,9 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [preferSource, setPreferSource] = useState(false);
   useEffect(() => { if (sourceRevision) setPreferSource(true); }, [sourceRevision]);
   const [instruction, setInstruction] = useState(initialInstruction);
+  const initialControls = readGenerationControls(initialInstruction);
   // Always land on recommended Investor Mode; user can still switch for a single run.
-  const [mode, setMode] = useState('Investor Mode');
+  const [mode, setMode] = useState(() => MODES.find(m => m.key === (initialControls.mode ?? modeKeyFromLabel(initialMode)))?.name ?? 'Investor Mode');
   const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(() => {
     if (initialSplitInto) return 'split';
     return settings.defaultOperation === 'split' ? 'split' : 'generate';
@@ -106,24 +108,25 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
   const [bookOpen, setBookOpen] = useState(false);
   const bookApplied = useRef(false);
-  const [ticketCount, setTicketCount] = useState(() => settings.defaultTickets ? String(settings.defaultTickets) : '5');
+  const [ticketCount, setTicketCount] = useState(() => String(initialControls.tickets ?? settings.defaultTickets ?? 10));
+  const [gamesPerTicket, setGamesPerTicket] = useState(() => initialControls.games || settings.defaultGames ? String(initialControls.games ?? settings.defaultGames) : '');
   const [scope, setScope] = useState(settings.defaultScope);
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
   const presets = useMemo(() => oddsPresets(modeBand.key), [modeBand.key]);
-  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => settings.defaultOddsSource);
-  const [minOdds, setMinOdds] = useState(() => String(bandForMode('Investor Mode').minimum));
+  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : settings.defaultOddsSource);
+  const [minOdds, setMinOdds] = useState(() => String(bandForMode(mode).minimum));
   const [maxOdds, setMaxOdds] = useState(() => {
-    const max = bandForMode('Investor Mode').maximum;
+    const max = bandForMode(mode).maximum;
     return max == null ? '' : String(max);
   });
   useEffect(() => {
-    if (edited.current) return;
+    if (edited.current || initialInstruction) return;
     setOddsSource(settings.defaultOddsSource);
     setMinOdds(String(modeBand.minimum));
     setMaxOdds(modeBand.maximum == null ? '' : String(modeBand.maximum));
-  }, [modeBand, settings.defaultOddsSource]);
+  }, [modeBand, settings.defaultOddsSource, initialInstruction]);
   useEffect(() => {
     const sync = () => setPredictionBook(readPredictionBook());
     sync();
@@ -160,10 +163,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     if (settings.defaultSplitParts) setSplitCount(String(settings.defaultSplitParts));
     else if (settings.defaultSplitParts === null) setSplitCount('');
     setScope(settings.defaultScope);
+    setGamesPerTicket(settings.defaultGames ? String(settings.defaultGames) : '');
     setStrict(settings.defaultStrict);
     setNearest(settings.defaultNearest);
     setOddsSource(settings.defaultOddsSource);
-  }, [initialInstruction, initialSplitInto, settings.defaultOperation, settings.defaultTickets, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, settings.defaultOddsSource]);
+  }, [initialInstruction, initialSplitInto, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, settings.defaultOddsSource]);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
     void api.preferences().then(({ preferences }) => {
@@ -180,7 +184,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const speech = useSpeechDictation(text => {
     touch();
     setPreferSource(false);
-    setInstruction(current => appendPrompt(current, text));
+    applyInstruction(appendPrompt(instruction, text));
     toast('Voice added');
   });
   useEffect(() => {
@@ -199,6 +203,26 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   }, [wantsSplit, effectiveSplit, ticketCount, oddsSource, minOdds, maxOdds]);
 
   function touch() { edited.current = true; }
+
+  function chooseMode(name: string) {
+    touch();
+    setMode(name);
+    const band = bandForMode(name);
+    setMinOdds(String(band.minimum));
+    setMaxOdds(band.maximum == null ? '' : String(band.maximum));
+    setOddsSource('manual');
+  }
+
+  function applyInstruction(next: string) {
+    const before = readGenerationControls(instruction);
+    const after = readGenerationControls(next);
+    touch();
+    setInstruction(next);
+    if (after.tickets !== before.tickets && after.tickets !== null) setTicketCount(String(after.tickets));
+    if (after.games !== before.games && after.games !== null) setGamesPerTicket(String(after.games));
+    if (after.mode && after.mode !== before.mode) chooseMode(MODES.find(m => m.key === after.mode)!.name);
+    if (after.odds && JSON.stringify(after.odds) !== JSON.stringify(before.odds)) setOddsSource('prompt');
+  }
 
   function resolvedOdds() {
     if (oddsSource === 'prompt') return null;
@@ -232,8 +256,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       ? matchWindow.label
       : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
     const overrideNote = optionsOdds || ticketCount ? ' · Options win when set' : '';
-    return `Applied: ${mode} · ${ticketsBit} · games auto 1–50 · ${oddsBit} · ${dayBit}${overrideNote}`;
-  }, [wantsSplit, effectiveSplit, mode, ticketCount, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
+    return `Applied: ${mode} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
+  }, [wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
 
   function applyPreset(min: number, max: number | null) {
     touch();
@@ -249,7 +273,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const { text, truncated } = await extractPromptFromFile(file);
       touch();
       setPreferSource(false);
-      setInstruction(text);
+      applyInstruction(text);
       play('import');
       play('prompt');
       toast(truncated ? `Imported ${file.name} (trimmed to ${MAX_PROMPT} characters).` : `Imported ${file.name}.`);
@@ -274,10 +298,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       wantsSplit,
       instruction,
       ticketCount: uiTickets,
+      gamesPerTicket: gamesPerTicket ? Number(gamesPerTicket) : undefined,
       splitParts: wantsSplit ? Number(effectiveSplit) : undefined,
       rawMinOdds: rawMin,
       rawMaxOdds: rawMax,
       oddsSource,
+      mode: modeBand.key,
     });
     if (guard) {
       play('error');
@@ -301,7 +327,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
       uiTickets ? `Generate ${uiTickets} tickets.` : '',
-      'Vary games per ticket between 1 and 50 unless an exact count is stated in the prompt.',
+      gamesPerTicket ? `Exactly ${gamesPerTicket} games per ticket.` : 'Games per ticket: Random (1–50). Ignore saved game counts.',
       scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
@@ -318,7 +344,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const result = await api.generate({
         bookingCode: effectiveCode || undefined,
         ticketCount: uiTickets ?? (hasBook ? 1 : undefined),
-        gamesPerTicket: hasBook ? predictionBook.length : undefined,
+        gamesPerTicket: hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
         operation: wantsSplit ? 'split' : 'generate',
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
@@ -368,7 +394,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
             <button
               type="button"
               aria-pressed={mode === item.name}
-              onClick={() => { touch(); setMode(item.name); }}
+              onClick={() => chooseMode(item.name)}
               className={`mode-option ${item.tone}${mode === item.name ? ' selected' : ''}`}
             >
               <span className="mode-icon" aria-hidden>{item.icon}</span>
@@ -452,7 +478,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       <textarea
         id={promptId}
         value={instruction}
-        onChange={e => { touch(); setInstruction(e.target.value); setPreferSource(false); }}
+        onChange={e => { applyInstruction(e.target.value); setPreferSource(false); }}
         onKeyDown={shortcut}
         maxLength={MAX_PROMPT}
         rows={2}
@@ -493,7 +519,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               </label>
               {wantsSplit ? (
                 <label>Parts
-                  <input type="number" aria-label="Number of parts" min={1} max={10} step={1} value={splitEnabled ? splitCount : parsedChat.splitInto ?? ''} onChange={e => { touch(); setOperation('split'); setSplitCount(e.target.value); }} />
+                  <input type="number" aria-label="Number of parts" min={1} max={MAX_TICKETS} step={1} value={splitEnabled ? splitCount : parsedChat.splitInto ?? ''} onChange={e => { touch(); setOperation('split'); setSplitCount(e.target.value); }} />
                 </label>
               ) : (
                 <label>Tickets
@@ -503,6 +529,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
                   </select>
                 </label>
               )}
+              {!wantsSplit && <label>Games per ticket
+                <select aria-label="Games per ticket" value={gamesPerTicket} onChange={e => { touch(); setGamesPerTicket(e.target.value); }}>
+                  <option value="">Random (1–50)</option>
+                  {TICKET_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>}
               <label>Matches
                 <select value={scope} onChange={e => { touch(); setScope(e.target.value as 'prompt' | 'original_only' | 'upcoming'); }}>
                   <option value="prompt">Prompt</option>

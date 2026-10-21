@@ -1,11 +1,13 @@
-import { MAX_TICKET_ODDS, previewOddsFromPrompt } from '@myodd/shared';
-import { MAX_GAMES_PER_TICKET, MAX_TICKETS } from '@/lib/ui-settings';
+import { MAX_TICKET_ODDS, MODE_ODDS, previewOddsFromPrompt, type ModeKey } from '@myodd/shared';
+import { MAX_GAMES_PER_TICKET, MAX_TICKETS } from './ui-settings';
 
 /** Pre-flight checks that should toast and abort before a generate job starts. */
 export function generateGuardrailMessage(input: {
   wantsSplit: boolean;
   instruction: string;
   ticketCount?: number;
+  gamesPerTicket?: number;
+  mode?: ModeKey;
   splitParts?: number;
   /** Raw (pre-clamp) manual odds from options. */
   rawMinOdds?: number | null;
@@ -23,6 +25,10 @@ export function generateGuardrailMessage(input: {
 
   if (ticketCount != null && (!Number.isInteger(ticketCount) || ticketCount < 1 || ticketCount > MAX_TICKETS)) {
     return `Choose 1–${MAX_TICKETS} tickets.`;
+  }
+
+  if (input.gamesPerTicket != null && (!Number.isInteger(input.gamesPerTicket) || input.gamesPerTicket < 1 || input.gamesPerTicket > MAX_GAMES_PER_TICKET)) {
+    return `Choose 1–${MAX_GAMES_PER_TICKET} games per ticket, or Random.`;
   }
 
   if (oddsSource === 'manual') {
@@ -50,6 +56,11 @@ export function generateGuardrailMessage(input: {
   const gamesAsk = instruction.match(
     /\b(?:exactly\s+)?(\d{1,3})\s*(?:games?|legs?|picks?|selections?)\s*(?:per\s+ticket)?\b|\bmake\s+it\s+(\d{1,3})\s+games?\b/i,
   );
+  const requested = oddsSource === 'manual' && rawMinOdds != null ? { minimum: rawMinOdds, maximum: rawMaxOdds } : previewOddsFromPrompt(instruction);
+  const band = input.mode ? MODE_ODDS[input.mode] : null;
+  if (requested && band && (requested.minimum < band.minimum || (band.maximum != null && requested.maximum != null && requested.maximum > band.maximum))) {
+    return 'This odds range is outside the selected mode. Change the mode or the range before generating.';
+  }
   if (gamesAsk) {
     const n = Number(gamesAsk[1] || gamesAsk[2]);
     if (Number.isFinite(n) && n > MAX_GAMES_PER_TICKET) {
