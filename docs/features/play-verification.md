@@ -36,15 +36,17 @@ wins/losses, dead heats, cashout, promotions and payout calculations are unsuppo
 - Unresolved selections may use structured embedded JSON from the share page.
   Checks bypass the page cache. Free-text badges and loose HTML regex matches
   cannot establish results. Line-specific selections never fall back to an empty line.
-- Only explicit settlement labels in `settleStatus`, `outcomeStatus`,
-  `selectionStatus` or `result` are used. Numeric codes, generic `status`, ambiguous
-  prose and unsupported settlement labels remain unknown.
+- Bookmaker settlement uses explicit labels in `settleStatus`, `outcomeStatus`,
+  `selectionStatus` or `result`. Numeric codes, generic `status`, ambiguous
+  prose and unsupported settlement labels remain unknown. The independent BBC
+  fallback can calculate supported standard-market results as described below.
 - Conflicting final fields/duplicate rows produce unknown, including contradictions
   between fetched JSON and page results. A clear later result can correct a prior result.
 - Each leg stores `resultSource`, `resultCheckedAt` and `resultEvidence`. Confirmed
   evidence survives a missing feed without advancing its evidence timestamp.
 - Selection and ticket updates plus a `SETTLEMENT_CHECKED` audit event are committed
-  in one transaction. The audit includes the fetched booking and parsed page results.
+  in one transaction. The audit includes the fetched booking, parsed page results,
+  and any independent match evidence used.
 - Elapsed kickoff time, expired codes, removed selections and `isActive: false`
   cannot establish wins/losses or prove that matches finished.
 
@@ -94,12 +96,58 @@ before starting the updated API, then regenerate Prisma Client/build the app.
 Existing records start with unknown results and acquire evidence on their next check.
 No legacy `PLAYED`/`CUT` row is automatically treated as a verified win/loss.
 
+### Public BBC Sport scraper (enabled by default)
+
+The checker fetches the public BBC Sport football results page for the saved
+kickoff's **Europe/London calendar date**, for example
+https://www.bbc.co.uk/sport/football/scores-fixtures/2026-10-20 . It extracts the
+JSON string assigned to `window.__INITIAL_DATA__`, parses it without executing any
+JavaScript, and validates the football/date block and event shapes with Zod.
+Plain match prose and unrelated script objects are never used as evidence.
+No browser installation, API key, or paid results account is required.
+Set `BBC_RESULTS_ENABLED=false` on the API to disable it.
+
+Matching requires home and away names in the correct order, kickoff within one
+minute, and the saved league when present. Names normalize only case, accents and
+punctuation; team words and age/gender/reserve markers remain intact. Duplicate,
+ambiguous, wrong-league and different-kickoff candidates remain unconfirmed.
+Coverage and team-name differences can prevent a match from being found.
+
+Explicit `PostEvent` with FT/AET/PENS establishes completion. Calculated selection
+results require **both regulation-time scores** from `runningScores.fulltime`.
+The display score, extra-time score, penalties, or `scoreUnconfirmed` never stand
+in for the regulation score. These saved SportyBet market/outcome IDs are supported:
+
+| Market | Supported outcomes/lines |
+|--------|--------------------------|
+| 1, full-time result | 1 home, 2 draw, 3 away |
+| 10, double chance | 9 home/draw, 10 home/away, 11 draw/away |
+| 29, both teams to score | 74 yes, 76 no |
+| 18, total goals | 12 over, 13 under; exact `total=N.5` specifier only |
+
+Additional specifiers, whole/quarter-goal lines, first-half, corners, cards,
+handicaps and player markets remain unconfirmed. Neither cancellation nor
+abandonment implies a void bet. Contradictory current match phases prevent score
+calculation, and conflicting bookmaker evidence is never overridden. Prior
+confirmed bookmaker results retain priority; fresh BBC evidence may correct a
+previous BBC calculation.
+
+Derived results use `BBC_SPORT_SCORE`, with provider event ID, source URL, match
+status, regulation score and timestamp in the stored evidence/audit. The result
+badge tooltip identifies BBC score calculations. Date requests are coalesced and
+cached for 60 seconds, with the same cooldown after failures. Source blocks,
+timeouts, malformed pages and unsupported matches return unknown, never guessed
+wins or losses. Sofascore returned 403 during implementation, so this scraper
+uses the accessible BBC page instead.
+
+### Optional API-Football match-progress fallback
+
 An optional independent **match-progress** fallback uses API-Football/API-Sports.
 Set `API_FOOTBALL_KEY` as a server-only secret, then restart/redeploy the API.
 Create an account at https://dashboard.api-football.com/register and choose access
 covering the matches and seasons you need. No provider account is created by this
-integration. Without a key, the fallback makes no requests and SportyBet checking
-continues as before. Never expose this key through `NEXT_PUBLIC_*` variables.
+integration. Without a key, this optional fallback makes no requests; SportyBet
+and BBC checks still run. Never expose this key through `NEXT_PUBLIC_*` variables.
 
 When SportyBet cannot establish a match phase, the fallback queries fixtures for
 the stored kickoff's UTC date. It requires a unique match with the same home and
@@ -113,8 +161,9 @@ Date requests are coalesced and cached for 60 seconds; failed lookups also have 
 60-second cooldown. Provider access, coverage and quotas can limit availability.
 Provider reference: https://www.api-football.com/documentation-v3 .
 
-This fallback confirms match progress only. If SportyBet omits settlement or stops
-exposing an old booking, missing selection results remain unconfirmed even if the
-matches are confirmed finished. A final score alone is insufficient for markets
+This API-Football fallback confirms match progress only. If SportyBet omits
+settlement and the BBC score evaluator does not support or find the selection,
+its result remains unconfirmed even if the match is confirmed finished. A final
+score alone is insufficient for markets
 such as first-half goals, cards, player statistics or Asian handicaps. Only a
 validated provider-specific mapping/evaluator should extend supported evidence.

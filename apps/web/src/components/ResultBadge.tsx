@@ -9,7 +9,7 @@ export function ResultBadge({ result, checkedAt, source }: {
 }) {
   const value = result ?? 'UNKNOWN';
   return <span className={`play-chip result-${value.toLowerCase()}`}
-    title={[source ? 'SportyBet settlement' : '', checkedAt ? `Evidence checked: ${checkedAt}` : '',
+    title={[source === 'BBC_SPORT_SCORE' ? 'Calculated from BBC Sport full-time score' : source ? 'SportyBet settlement' : '', checkedAt ? `Evidence checked: ${checkedAt}` : '',
       'Tracks the saved booking selections without placing a bet.'].filter(Boolean).join(' · ')}>
     {RESULT_LABEL[value]}
   </span>;

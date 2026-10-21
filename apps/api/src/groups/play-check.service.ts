@@ -15,6 +15,8 @@ import { SportyBetSettlementService } from '../bookmaker/sportybet.settlement';
 import { PrismaService } from '../prisma/prisma.service';
 import { decideLegPlayStatus, isDoneLeg, isDoneSlip, matchPhase, type LegMatchPhase } from './play-leg-status';
 import { FootballResultsService, type MatchEvidence } from './football-results.service';
+import { BbcResultsService } from './bbc-results.service';
+import { settlementFromScore } from './score-settlement';
 
 type LegInput = {
   id: string;
@@ -55,6 +57,7 @@ export class PlayCheckService {
     private readonly settlement: SportyBetSettlementService,
     @Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider,
     @Optional() private readonly footballResults?: FootballResultsService,
+    @Optional() private readonly bbcResults?: BbcResultsService,
   ) {}
 
   async checkSlips(slipIds: string[]) {
@@ -114,6 +117,8 @@ export class PlayCheckService {
       const kickoff = leg.kickoffAt?.getTime() ?? null;
       const fixture = byEvent.get(leg.sportyEventId);
       const bookSel = findBookingSelection(validBooking, leg);
+      const key = settlementKey({ eventId: leg.sportyEventId, marketId: leg.marketId,
+        outcomeId: leg.outcomeId, specifier: leg.specifier ?? '' });
       const unavailable = validBooking?.unavailableOutcomes?.some(s =>
         s.eventId === leg.sportyEventId
         && s.marketId === leg.marketId
@@ -128,17 +133,16 @@ export class PlayCheckService {
       const bookingPhase = matchPhase({ kickoffMs: null, nowMs: now, matchStatus: bookSel?.matchStatus });
       let phase: LegMatchPhase = fixturePhase === 'finished' || bookingPhase === 'finished' ? 'finished'
         : fixturePhase === 'live' || bookingPhase === 'live' ? 'live' : fixturePhase;
-      const independent = phase === 'unknown' ? await this.footballResults?.lookup(leg) : null;
+      const explicitResult = explicitSettlement(bookSel?.settlement, scraped.get(key));
+      const needsIndependent = phase === 'unknown' || !['WON', 'LOST', 'VOID'].includes(explicitResult);
+      let independent = needsIndependent ? await this.bbcResults?.lookup(leg) : null;
+      if (!independent && phase === 'unknown') independent = await this.footballResults?.lookup(leg);
+      // Never settle from contradictory match phases returned by two current sources.
+      if (independent && phase !== 'unknown' && phase !== independent.phase) independent = null;
       if (independent) {
         phase = independent.phase;
         matchEvidence.push({ selectionId: leg.id, evidence: independent });
       }
-      const key = settlementKey({
-        eventId: leg.sportyEventId,
-        marketId: leg.marketId,
-        outcomeId: leg.outcomeId,
-        specifier: leg.specifier ?? '',
-      });
       let settlement: SelectionSettlement = bookSel?.settlement ?? 'UNKNOWN';
       let source: string | null = bookSel && settlement !== 'UNKNOWN' ? 'SPORTYBET_SHARE_JSON' : null;
       if (settlement === 'UNKNOWN' || settlement === 'PENDING') {
@@ -152,11 +156,19 @@ export class PlayCheckService {
       const pageResult = scraped.get(key);
       const sourceConflict = hasSettlementConflict(bookSel?.settlement, pageResult);
       if (bookSel?.settlementConflict || sourceConflict || pageResult === 'UNKNOWN') settlement = 'UNKNOWN';
-      const hasFreshResult = settlement === 'WON' || settlement === 'LOST' || settlement === 'VOID';
       const priorConfirmed = leg.resultEvidence != null && ['WON', 'LOST', 'VOID'].includes(leg.result ?? '');
       // Preserve confirmed evidence through outages. An explicit conflicting page row
       // is retained as UNKNOWN rather than restoring a previous result.
       const conflict = !!bookSel?.settlementConflict || sourceConflict || pageResult === 'UNKNOWN';
+      const priorBookmakerResult = priorConfirmed && leg.resultSource !== 'BBC_SPORT_SCORE';
+      if (independent && !conflict && !priorBookmakerResult && ['UNKNOWN', 'PENDING'].includes(settlement)) {
+        const calculated = settlementFromScore(leg, independent);
+        if (calculated !== 'UNKNOWN') {
+          settlement = calculated;
+          source = 'BBC_SPORT_SCORE';
+        }
+      }
+      const hasFreshResult = settlement === 'WON' || settlement === 'LOST' || settlement === 'VOID';
       const retained = !hasFreshResult && !conflict && priorConfirmed;
       if (retained) {
         settlement = leg.result!;
@@ -178,7 +190,7 @@ export class PlayCheckService {
         pickLabel: pickLabel(leg),
       });
       const playStatus = decision.playStatus;
-      const playNote = `${decision.playNote}${independent ? ' · Match status: API-Football' : ''}`;
+      const playNote = `${decision.playNote}${independent ? ` · Match status: ${independent.provider === 'BBC_SPORT' ? 'BBC Sport' : 'API-Football'}` : ''}`;
       if (settlement === 'LOST') cuts.push({
         homeTeam: leg.homeTeam ?? '', awayTeam: leg.awayTeam ?? '', league: leg.league ?? '',
         marketName: leg.marketName ?? '', selectionName: leg.selectionName ?? '', score, playNote,

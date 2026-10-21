@@ -10,7 +10,7 @@ const leg = { id: 'leg', sportyEventId: 'event', marketId: '18', outcomeId: 'ove
   specifier: 'total=2.5', kickoffAt: new Date('2020-01-01'), homeTeam: 'A', awayTeam: 'B' };
 const selection = { eventId: leg.sportyEventId, marketId: leg.marketId, outcomeId: leg.outcomeId,
   specifier: leg.specifier, settlement: 'WON' };
-function setup(selections: any[] = [selection], page = new Map(), fixtures: any[] = [], footballResults?: any) {
+function setup(selections: any[] = [selection], page = new Map(), fixtures: any[] = [], footballResults?: any, bbcResults?: any) {
   const prisma = {
     slipSelection: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     generatedSlip: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
@@ -21,7 +21,7 @@ function setup(selections: any[] = [selection], page = new Map(), fixtures: any[
     getFixtures: vi.fn().mockResolvedValue(fixtures), getLiveFixtures: vi.fn().mockResolvedValue([]) };
   const catalog = { validate: vi.fn() };
   const scraper = { fetchShareSettlement: vi.fn().mockResolvedValue(page) };
-  const service = new PlayCheckService(prisma as any, scraper as any, bookmaker as any, footballResults);
+  const service = new PlayCheckService(prisma as any, scraper as any, bookmaker as any, footballResults, bbcResults);
   return { service, prisma, bookmaker, catalog, scraper };
 }
 function html(rows: unknown[]) {
@@ -79,6 +79,39 @@ describe('accumulator result', () => {
 });
 
 describe('saved booking checks', () => {
+  it('calculates a stored standard selection from BBC’s regulation score when SportyBet is blocked', async () => {
+    const evidence = { provider: 'BBC_SPORT', fixtureId: 'bbc-match', phase: 'finished', status: 'PostEvent:FT',
+      score: '2 : 1', regularTimeScore: { home: 2, away: 1 }, checkedAt: new Date().toISOString() };
+    const { service, bookmaker, prisma } = setup([], new Map(), [], undefined, { lookup: async () => evidence });
+    bookmaker.getBooking.mockRejectedValue(new Error('HTTP 403'));
+    const result = await service.checkOne('slip', 'ABC123', [{ ...leg, outcomeId: '12' }]);
+    expect(result).toMatchObject({ result: 'WON', playStatus: 'ALL_PLAYED' });
+    expect(prisma.slipSelection.update.mock.calls[0][0].data).toMatchObject({ resultSource: 'BBC_SPORT_SCORE',
+      resultEvidence: { matchEvidence: evidence }, playNote: expect.stringContaining('BBC Sport') });
+  });
+  it('uses BBC scores even when match completion is already known but settlement is missing', async () => {
+    const lookup = vi.fn().mockResolvedValue({ provider: 'BBC_SPORT', phase: 'finished', regularTimeScore: { home: 0, away: 0 } });
+    const { service } = setup([], new Map(), [{ eventId: 'event', matchStatus: 'Finished' }], undefined, { lookup });
+    expect((await service.checkOne('slip', 'ABC123', [{ ...leg, outcomeId: '12' }])).result).toBe('LOST');
+    expect(lookup).toHaveBeenCalledOnce();
+  });
+  it('does not override conflicting bookmaker evidence with a scraped score', async () => {
+    const lookup = vi.fn().mockResolvedValue({ provider: 'BBC_SPORT', phase: 'finished', regularTimeScore: { home: 2, away: 1 } });
+    const { service } = setup([{ ...selection, outcomeId: '12', settlement: 'UNKNOWN', settlementConflict: true }], new Map(), [], undefined, { lookup });
+    expect((await service.checkOne('slip', 'ABC123', [{ ...leg, outcomeId: '12' }])).result).toBe('UNKNOWN');
+  });
+  it.each([['BBC_SPORT_SCORE', 'WON'], ['SPORTYBET_SHARE_JSON', 'LOST']])('handles a previous %s result with bookmaker priority', async (resultSource, expected) => {
+    const lookup = vi.fn().mockResolvedValue({ provider: 'BBC_SPORT', phase: 'finished', regularTimeScore: { home: 2, away: 1 } });
+    const { service } = setup([], new Map(), [], undefined, { lookup });
+    const result = await service.checkOne('slip', 'ABC123', [{ ...leg, outcomeId: '12', result: 'LOST', resultSource, resultEvidence: { result: 'LOST' } }]);
+    expect(result.result).toBe(expected);
+  });
+  it('does not settle from a finished scraped score while the bookmaker explicitly reports the match live', async () => {
+    const lookup = vi.fn().mockResolvedValue({ provider: 'BBC_SPORT', phase: 'finished', regularTimeScore: { home: 2, away: 1 } });
+    const { service } = setup([], new Map(), [{ eventId: 'event', matchStatus: 'live' }], undefined, { lookup });
+    const result = await service.checkOne('slip', 'ABC123', [{ ...leg, outcomeId: '12' }]);
+    expect(result).toMatchObject({ playStatus: 'LIVE', result: 'PENDING' });
+  });
   it('uses independent completion evidence during a SportyBet outage without guessing a win', async () => {
     const evidence = { provider: 'API_FOOTBALL', fixtureId: 123, status: 'FT', phase: 'finished',
       score: '2 : 1', checkedAt: new Date().toISOString() };

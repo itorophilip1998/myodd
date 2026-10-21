@@ -9,8 +9,10 @@ type ResultFixture = {
 };
 
 export type MatchEvidence = {
-  provider: 'API_FOOTBALL'; fixtureId: number; status: string;
+  provider: 'API_FOOTBALL' | 'BBC_SPORT'; fixtureId: number | string; status: string;
   phase: LegMatchPhase; score: string | null; checkedAt: string;
+  sourceUrl?: string;
+  regularTimeScore?: { home: number; away: number };
 };
 
 function teamName(value: string) {
