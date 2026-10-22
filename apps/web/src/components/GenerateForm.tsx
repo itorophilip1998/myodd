@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { useSettings, useUiSound } from '@/components/SettingsProvider';
 import { useToast } from '@/components/ToastProvider';
 import { generateGuardrailMessage } from '@/lib/generate-guardrails';
-import { MAX_TICKETS } from '@/lib/ui-settings';
+import { MAX_TICKETS, MAX_GAMES_PER_TICKET } from '@/lib/ui-settings';
 import { readGenerationControls } from '@/lib/generation-controls';
 import {
   clearPredictionBook,
@@ -32,6 +32,7 @@ const MODES = [
 ];
 
 const TICKET_CHOICES = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
+const GAME_CHOICES = Array.from({ length: MAX_GAMES_PER_TICKET }, (_, i) => i + 1);
 const MAX_PROMPT = 4000;
 
 function bandForMode(modeName: string) {
@@ -152,6 +153,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [submittedAt, setSubmittedAt] = useState<string>();
 
   const speech = useSpeechDictation(text => {
@@ -175,7 +177,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     return bits.join(' · ') || 'defaults';
   }, [wantsSplit, effectiveSplit, ticketCount, oddsSource, minOdds, maxOdds]);
 
-  function touch() { edited.current = true; }
+  function touch() { edited.current = true; setSubmitError(''); }
 
   function chooseMode(name: string) {
     touch();
@@ -275,7 +277,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       oddsSource,
       mode: mode ? modeBand.key : undefined,
     });
-    if (guard) {
+    if (guard) { setSubmitError(guard);
       play('error');
       toast(guard, { sticky: true });
       setOptionsOpen(true);
@@ -352,7 +354,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         setPredictionBook([]);
       }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { track('generate_failed'); play('error'); toast((err as Error).message, { sticky: true }); setLoading(false); }
+    } catch (err) { const message = (err as Error).message.includes('You can generate up to 10 tickets') ? 'You can generate up to 10 tickets at a time.' : 'Your request could not be started. Please try again.'; track('generate_failed'); play('error'); setSubmitError(message); toast(message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
@@ -395,6 +397,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     </fieldset>
 
     {mode && initialControls.mode && initialControls.mode !== modeBand.key && <p role="status">Your selected mode takes precedence over the prompt mode.</p>}
+    {submitError && <p role="alert" className="generation-outcome">{submitError}</p>}
     <div className="composer chat-input-box">
       {predictionBook.length > 0 && (
         <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
@@ -504,7 +507,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               {!wantsSplit && <label>Games per ticket
                 <select aria-label="Games per ticket" value={gamesPerTicket} onChange={e => { touch(); setGamesPerTicket(e.target.value); }}>
                   <option value="">Random (1–50)</option>
-                  {TICKET_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
+                  {GAME_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>}
             </div>

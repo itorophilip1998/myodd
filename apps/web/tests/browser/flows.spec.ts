@@ -190,3 +190,116 @@ for (const width of [320, 1280]) {
     await expect(page.getByRole('heading', { name: 'How mode settings are applied' })).toBeVisible();
   });
 }
+
+test('Create rejects more than ten tickets and retains fifty-game controls', async ({ page }) => {
+  await mockApi(page); let submitted = false;
+  await page.route('**/api/slips/generate-from-prompt', route => { submitted = true; return route.abort(); });
+  await page.goto('/'); await page.getByRole('button', { name: /^Options/ }).click();
+  await expect(page.getByLabel('Total tickets').locator('option')).toHaveCount(11);
+  await expect(page.getByLabel('Games per ticket', { exact: true }).locator('option')).toHaveCount(51);
+  await page.getByRole('button', { name: 'Close options' }).click();
+  for (const prompt of ['Create 11 tickets', 'Create eleven tickets', 'Split ABC123 into 11 parts']) {
+    await page.locator('textarea').fill(prompt); await page.locator('textarea').press('ControlOrMeta+Enter');
+    await expect(page.getByText('You can generate up to 10 tickets at a time.').last()).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(prompt); expect(submitted).toBe(false);
+    await page.getByRole('button', { name: 'Dismiss notification' }).last().click();
+  }
+});
+
+test('generation shows progress before one concise terminal empty result', async ({ page }) => {
+  await mockApi(page);
+  const raw = '0 of 50 original matches have eligible pre-match markets; unavailable matches were skipped. Found 0 of 10 requested unique combinations within the search budget.';
+  let running = true;
+  const currentJob = () => ({ ...job, status: running ? 'RUNNING' : 'FAILED', stage: running ? 'GENERATING' : 'FAILED', stageDetail: raw, error: raw, outcome: { ...outcome, status: 'empty', generated: 0, failed: 10, errors: [{ code: 'SHORTAGE', message: raw, retryable: false }] } });
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: currentJob() }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: currentJob(), generationReport: { notices: [raw] } } }));
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByText(/search budget|original matches have eligible/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Unable to create codes' })).toHaveCount(0);
+  await expect(page.locator('.progress-quest')).toBeVisible();
+  running = false;
+  await expect(page.getByText('No eligible matches were available for this request. Try another match day or adjust your options.')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('link', { name: 'Adjust request', exact: true })).toHaveCount(1);
+  await expect(page.getByText(/search budget|original matches have eligible|0 of 10/)).toHaveCount(0);
+});
+
+test('toasts expire, pause on hover and focus, and keep Undo usable', async ({ page }) => {
+  await page.clock.install(); await page.goto('http://127.0.0.1:3101/toasts-fixture');
+  await page.getByRole('button', { name: 'Ordinary toast', exact: true }).click();
+  await page.clock.runFor(4900); await expect(page.locator('.toast-item')).toHaveCount(1);
+  await page.clock.runFor(101); await expect(page.locator('.toast-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'First toast', exact: true }).click();
+  await page.clock.runFor(3000); await page.locator('.toast-item').hover();
+  await page.clock.runFor(10000); await expect(page.locator('.toast-item')).toHaveCount(1);
+  await page.mouse.move(0, 0); await page.getByRole('button', { name: 'Dismiss notification' }).focus();
+  await page.clock.runFor(10000); await expect(page.locator('.toast-item')).toHaveCount(1);
+  await page.getByRole('button', { name: 'First toast', exact: true }).focus();
+  await page.clock.runFor(5100); await expect(page.locator('.toast-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Action toast', exact: true }).click();
+  await page.clock.runFor(6000); await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('Undo completed')).toBeVisible(); await expect(page.locator('.toast-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Action toast', exact: true }).click();
+  await page.clock.runFor(8100); await expect(page.locator('.toast-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'First toast', exact: true }).click(); await page.getByRole('button', { name: 'Second toast', exact: true }).click();
+  await page.getByRole('button', { name: 'Dismiss all' }).click(); await page.clock.runFor(20000); await expect(page.locator('.toast-item')).toHaveCount(0);
+});
+
+test('collection checking is in menus and bulk actions use only selected IDs', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fixture-account', 'test-owner'));
+  const collections = Array.from({ length: 12 }, (_, i) => ({ ...group, publicId: `collection-${i}`, title: `Collection ${i}`, isOwner: i !== 11, slipCount: 10 }));
+  const checked: string[] = []; const removed: string[][] = []; const restored: string[] = [];
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/check-play')) { checked.push(path.split('/')[3]); return route.fulfill({ json: { summary: { tickets: 10, done: 0, open: 10, live: 0, unknown: 0 } } }); }
+    if (path.endsWith('/collections/remove')) { const ids = route.request().postDataJSON().publicIds; removed.push(ids); return route.fulfill({ json: { removed: ids } }); }
+    if (path.includes('/account/saves/')) { restored.push(path.split('/').at(-1)!); return route.fulfill({ json: { saved: true } }); }
+    return route.fulfill({ json: path.endsWith('/account/settings') ? { settings: null } : collections });
+  });
+  await page.goto('http://127.0.0.1:3101/history-fixture');
+  await expect(page.locator('.library-cards > li')).toHaveCount(12);
+  await expect(page.getByRole('button', { name: 'Verify played', exact: true })).toHaveCount(0);
+  await expect(page.locator('.library-verify-btn')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Actions for Collection 0', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Check results', exact: true }).click();
+  await expect.poll(() => checked).toEqual(['collection-0']); checked.length = 0;
+  await page.getByRole('button', { name: 'Select', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Check results/ })).toHaveCount(0);
+  await expect(page.getByLabel('Select Collection 11', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Select Collection 1', { exact: true }).check(); await page.getByLabel('Select Collection 3', { exact: true }).check();
+  await page.getByRole('button', { name: 'Check results (2)', exact: true }).click();
+  await expect.poll(() => checked).toEqual(['collection-1', 'collection-3']);
+  await expect(page.getByLabel('Select Collection 1', { exact: true })).toBeChecked();
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: 'Delete selected (2)', exact: true }).click();
+  expect(removed).toEqual([]);
+  await expect(page.getByLabel('Select Collection 1', { exact: true })).toBeChecked();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete selected (2)', exact: true }).click();
+  await expect.poll(() => removed).toEqual([['collection-1', 'collection-3']]);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(() => restored.sort()).toEqual(['collection-1', 'collection-3']);
+  for (const width of [320, 375, 767, 768, 1023, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const layout of ['Grid', 'Compact', 'List']) {
+      await page.getByRole('button', { name: new RegExp(layout, 'i') }).click();
+      const count = await page.locator('.library-cards').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+      expect(count).toBeLessThanOrEqual(layout === 'List' ? 1 : 4);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  }
+});
+
+test('ten existing tickets remain visible with at most five cards per row', async ({ page }, testInfo) => {
+  await mockApi(page);
+  const tickets = Array.from({ length: 10 }, (_, i) => ({ ...slip, id: `slip-${i}`, bookingCode: `TEST${100+i}` }));
+  const complete = { ...job, outcome: { ...outcome, status: 'success', generated: 10, failed: 0, errors: [] } };
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: complete }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: tickets, job: complete } }));
+  for (const width of [320, 375, 767, 768, 1023, 1280]) {
+    await page.setViewportSize({ width, height: 900 }); await page.goto('/result/test-group?job=test-job');
+    await expect(page.locator('.code-card')).toHaveCount(10);
+    expect(await page.locator('.code-grid').first().evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBeLessThanOrEqual(5);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width === 1280) await page.screenshot({ path: testInfo.outputPath('five-ticket-columns.png'), fullPage: true });
+  }
+});

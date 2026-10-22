@@ -54,7 +54,7 @@ export function ProgressQuest({ job }: { job: BuildJob | null; availability?: { 
     ? Math.max(0, Math.floor(((running ? now : new Date(job.updatedAt ?? job.createdAt).getTime()) - new Date(job.createdAt).getTime()) / 1000))
     : 0;
   const duration = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
-  const detail = job.stageDetail ?? DETAILS[stage] ?? 'Working on your request.';
+  const detail = DETAILS[stage] ?? 'Working on your request.';
   const progressLabel = stage === 'BOOKING' && job.total ? `${job.progress} / ${job.total} processed` : `Step ${Math.min(step + 1, 5)} of 5`;
 
   return (

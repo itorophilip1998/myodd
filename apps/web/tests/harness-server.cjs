@@ -10,9 +10,12 @@ const esbuild = require('esbuild');
     tsconfig: path.join(__dirname, '../tsconfig.json'),
     define: { 'process.env.NODE_ENV': '"development"', 'process.env.NEXT_PUBLIC_API_URL': '""', 'process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID': '""' },
     plugins: [{ name: 'fixture-session', setup(build) {
+      build.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'fixture-router', namespace: 'router' }));
+      build.onLoad({ filter: /.*/, namespace: 'router' }, () => ({ loader: 'js', contents: `export const useRouter = () => ({ push: url => { location.href = url; }, replace: url => { location.replace(url); } });` }));
       build.onResolve({ filter: /(?:^|\/)AccountSession$/ }, () => ({ path: 'fixture-session', namespace: 'fixture' }));
       build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ loader: 'js', resolveDir: path.join(__dirname, '..'), contents: `
         import { useState, useEffect } from 'react';
+        export function SignInPrompt() { return null; }
         export function useAccountSession() {
           const read = () => localStorage.getItem('fixture-account') || '';
           const [id, set] = useState(read);

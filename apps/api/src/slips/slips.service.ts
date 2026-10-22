@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -147,6 +147,8 @@ export class SlipsService implements OnModuleInit {
 
   async startGeneration(req: GenerateRequest) {
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
+    const requestedCount = requestedTicketCount(req.instruction);
+    if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
@@ -177,8 +179,8 @@ export class SlipsService implements OnModuleInit {
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
         expiresAt: codeExpiry(new Date()),
       } });
-      const count = req.splitInto ?? req.ticketCount ?? Number(req.instruction.match(/(?:generate|create|give me)\s+(\d+)\s+(?:tickets?|bookings?|codes?|slips?)/i)?.[1] ?? 10);
-      const job = await tx.generationJob.create({ data: { groupId: group.id, requestKey, requestId: req.requestId, payloadHash, requestedCount: Math.min(50, Math.max(1, count)) } });
+      const count = req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
+      const job = await tx.generationJob.create({ data: { groupId: group.id, requestKey, requestId: req.requestId, payloadHash, requestedCount: Math.min(10, Math.max(1, count)) } });
       await tx.trainingEvent.create({ data: { eventKey: `${job.id}:request`, groupId: group.id, jobId: job.id, profileId: req.profileId,
         kind: 'REQUEST_ACCEPTED', payload: { ...req, engineVersion: 'myodd-v5', acceptedAt: new Date().toISOString() } as Prisma.InputJsonValue } });
       return { group, job };
@@ -267,7 +269,7 @@ export class SlipsService implements OnModuleInit {
       };
     }
     if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
-    if (!input.splitInto) config.numberOfSlips = Math.min(50, Math.max(1, config.numberOfSlips));
+    if (!input.splitInto) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
     if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
     // Prediction book: keep the exact pinned outcomes; do not let mode odds bands reject them.
     if (input.pinnedSelections?.length && !input.splitInto) {

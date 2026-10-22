@@ -15,11 +15,15 @@ export function CollectionMenu({
   onDelete,
   onNotice,
   onShare,
+  onCheckResults,
+  checking = false,
 }: {
   collection: MenuCollection;
   onDelete?: () => Promise<void | boolean>;
   onNotice?: (message: string) => void;
   onShare?: () => void;
+  onCheckResults?: () => Promise<void>;
+  checking?: boolean;
 }) {
   const router = useRouter();
   const query = useQueryClient();
@@ -83,7 +87,8 @@ export function CollectionMenu({
   async function action(work: () => Promise<unknown>, message: string) {
     setPending(true);
     try {
-      await work();
+      const result = await work();
+      if (result === false) return;
       if (/deleted/i.test(message)) track('collection_deleted');
       if (/now public|published/i.test(message)) track('collection_published');
       await Promise.all(['history', 'group', 'public-collections'].map(key => query.invalidateQueries({ queryKey: [key] })));
@@ -130,6 +135,7 @@ export function CollectionMenu({
           </form>
         ) : (
           <>
+            {onCheckResults && <button type="button" role="menuitem" disabled={pending || checking} onClick={() => { setOpen(false); void onCheckResults(); }}><span aria-hidden>✓</span>Check results</button>}
             {onShare && (
               <button
                 type="button"
@@ -179,7 +185,7 @@ export function CollectionMenu({
                   disabled={pending}
                   onClick={() => void action(async () => {
                     if (onDelete) {
-                      if (await onDelete() === false) throw new Error('Could not delete this collection. Please retry.');
+                      if (await onDelete() === false) return false;
                     } else {
                       await accountApi.remove([collection.publicId]);
                       router.push('/history');

@@ -41,7 +41,7 @@ export class SlipsController {
     await this.rateLimit.consume('analyze', 30);
     const parsed = analyzeSlipSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException(parsed.error.flatten());
+      throw new BadRequestException(parsed.error.issues.some(issue => issue.message === 'You can generate up to 10 tickets at a time.') ? 'You can generate up to 10 tickets at a time.' : parsed.error.flatten());
     }
     return this.slips.analyze(parsed.data.bookingCode, !req.account);
   }
@@ -52,7 +52,7 @@ export class SlipsController {
     await this.rateLimit.consume('generate', 10);
     const parsed = generateFromCodeSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException(parsed.error.flatten());
+      throw new BadRequestException(parsed.error.issues.some(issue => issue.message === 'You can generate up to 10 tickets at a time.') ? 'You can generate up to 10 tickets at a time.' : parsed.error.flatten());
     }
     return this.slips.startGeneration({
       instruction: parsed.data.instruction,
@@ -82,7 +82,7 @@ export class SlipsController {
     await this.rateLimit.consume('generate', 10);
     const parsed = generateFromPromptSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException(parsed.error.flatten());
+      throw new BadRequestException(parsed.error.issues.some(issue => issue.message === 'You can generate up to 10 tickets at a time.') ? 'You can generate up to 10 tickets at a time.' : parsed.error.flatten());
     }
     return this.slips.startGeneration({
       instruction: parsed.data.instruction,

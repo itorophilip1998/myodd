@@ -92,7 +92,9 @@ export class AiClient {
   }
 
   async parse(instruction: string, fixtures: BookmakerFixture[] = [], learnedDefaults?: unknown): Promise<GenerationConfig> {
-    const body = { instruction, availableMarkets: this.catalog(instruction, fixtures), learnedDefaults: learnedDefaults ?? {} };
+    const defaults = learnedDefaults && typeof learnedDefaults === 'object' ? { ...learnedDefaults } as Record<string, unknown> : {};
+    if (typeof defaults.ticketCount === 'number') defaults.ticketCount = Math.min(10, defaults.ticketCount);
+    const body = { instruction, availableMarkets: this.catalog(instruction, fixtures), learnedDefaults: defaults };
     const key = `intent:${APP_VERSION}:${createHash('sha256').update(JSON.stringify(body)).digest('hex')}`;
     const existing = this.interpretations.get(key);
     if (existing) return structuredClone(await existing);

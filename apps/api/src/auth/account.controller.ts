@@ -1,7 +1,8 @@
+import { normalizeLearnedPreferences } from '../learning/preferences';
 import { createClerkClient } from '@clerk/backend';
 import { Controller, Get, Post, Delete, Param, Req, UseGuards, NotFoundException, Query, Body, BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
-import { collectionSaveSchema, uiSettingsSchema } from '@myodd/shared';
+import { collectionSaveSchema, uiSettingsSchema, normalizeUiSettings } from '@myodd/shared';
 import { Prisma } from '@prisma/client';
 import { Patch } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,7 +24,7 @@ export class AccountController {
   }
   @Get('preferences') async preferences(@Req() req: AuthRequest) {
     const row = await this.prisma.learningProfile.findUnique({ where: { id: req.account!.id } });
-    return { preferences: row?.preferences ?? null, revision: row?.revision ?? 0 };
+    return { preferences: normalizeLearnedPreferences(row?.preferences), revision: row?.revision ?? 0 };
   }
   @Get('legacy') async legacy(@Req() req: AuthRequest, @Query('page') input = '1') {
     const page = Math.max(1, Math.min(1000, Number.parseInt(input, 10) || 1));
@@ -34,7 +35,7 @@ export class AccountController {
   }
   @Get('settings') async settings(@Req() req: AuthRequest) {
     const user = await this.prisma.appUser.findUniqueOrThrow({ where: { id: req.account!.id }, select: { uiSettings: true } });
-    return { settings: user.uiSettings ? uiSettingsSchema.partial().strip().parse(user.uiSettings) : null };
+    return { settings: user.uiSettings ? normalizeUiSettings(user.uiSettings) : null };
   }
   @Patch('settings') async updateSettings(@Req() req: AuthRequest, @Body() body: unknown) {
     const patch = uiSettingsSchema.partial().safeParse(body);
@@ -43,7 +44,7 @@ export class AccountController {
       // Serialize concurrent device updates without dropping unrelated preferences.
       await tx.$queryRaw`SELECT id FROM app_users WHERE id = ${req.account!.id} FOR UPDATE`;
       const user = await tx.appUser.findUniqueOrThrow({ where: { id: req.account!.id } });
-      const settings = uiSettingsSchema.partial().strip().parse({ ...(user.uiSettings as object ?? {}), ...patch.data });
+      const settings = normalizeUiSettings({ ...(user.uiSettings as object ?? {}), ...patch.data });
       await tx.appUser.update({ where: { id: user.id }, data: { uiSettings: settings as Prisma.InputJsonValue } });
       return { settings };
     });

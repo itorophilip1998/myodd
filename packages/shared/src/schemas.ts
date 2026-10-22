@@ -3,7 +3,7 @@ import { MARKET_REGISTRY } from './market-registry';
 import { RiskPreference, SupportedMarket } from './enums';
 
 export const generationConfigSchema = z.object({
-  numberOfSlips: z.number().int().min(1).max(50).default(10),
+  numberOfSlips: z.number().int().min(1).max(10, "You can generate up to 10 tickets at a time.").default(10),
   minimumOdds: z.number().finite().min(1.1).default(2.5),
   maximumOdds: z.number().finite().min(1.1).nullable().default(5),
   maximumSelections: z.number().int().min(1).max(50).default(50),
@@ -72,9 +72,9 @@ export const generateFromCodeSchema = z.object({
   selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
-  ticketCount: z.number().int().min(1).max(50).optional(),
+  ticketCount: z.number().int().min(1).max(10, "You can generate up to 10 tickets at a time.").optional(),
   gamesPerTicket: z.number().int().min(1).max(50).optional(),
-  splitInto: z.number().int().min(1).max(50).optional(),
+  splitInto: z.number().int().min(1).max(10, "You can generate up to 10 tickets at a time.").optional(),
   bookingCode: z.string().min(3).max(32).trim().optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
@@ -90,9 +90,9 @@ export const generateFromPromptSchema = z.object({
   selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
-  ticketCount: z.number().int().min(1).max(50).optional(),
+  ticketCount: z.number().int().min(1).max(10, "You can generate up to 10 tickets at a time.").optional(),
   gamesPerTicket: z.number().int().min(1).max(50).optional(),
-  splitInto: z.number().int().min(1).max(50).optional(),
+  splitInto: z.number().int().min(1).max(10, "You can generate up to 10 tickets at a time.").optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
   matchDateEnd: matchDateField,

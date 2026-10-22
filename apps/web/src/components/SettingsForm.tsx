@@ -2,7 +2,7 @@
 
 import { useSettings } from './SettingsProvider';
 import type { SoundId } from '@/lib/sounds';
-import { MAX_TICKETS, type UiSettings } from '@/lib/ui-settings';
+import { MAX_TICKETS, MAX_GAMES_PER_TICKET, type UiSettings } from '@/lib/ui-settings';
 
 const PREVIEWS: Array<{ id: SoundId; label: string; note: string }> = [
   { id: 'mic-on', label: 'Mic open', note: 'When dictation starts' },
@@ -19,6 +19,7 @@ const PREVIEWS: Array<{ id: SoundId; label: string; note: string }> = [
 ];
 
 const TICKET_OPTIONS = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
+const GAME_OPTIONS = Array.from({ length: MAX_GAMES_PER_TICKET }, (_, i) => i + 1);
 const SPLIT_OPTIONS = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
 
 export function SettingsForm() {
@@ -71,7 +72,7 @@ export function SettingsForm() {
               play('click');
             }}>
               <option value="">Random (1–50)</option>
-              {TICKET_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+              {GAME_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
           <label>
