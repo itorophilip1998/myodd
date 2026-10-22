@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const uiSettingsSchema = z.object({
-  theme: z.enum(['system', 'light', 'dark']),
   soundsEnabled: z.boolean(), soundVolume: z.number().min(0).max(1),
   progressSounds: z.boolean(), toastSounds: z.boolean(),
   defaultMode: z.enum(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']).nullable(),

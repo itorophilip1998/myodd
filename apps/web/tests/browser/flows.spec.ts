@@ -1,3 +1,4 @@
+import { MAX_TICKET_ODDS } from '@myodd/shared';
 import { expect, test, type Page } from '@playwright/test';
 
 const slip = { id: 'test-slip', bookingCode: 'TEST123', shareUrl: '', totalOdds: 4, confidence: .6, riskLevel: 'LOWER', selectionCount: 1, expiresAt: null, displayStatus: 'ACTIVE', result: 'PENDING', playStatus: 'OPEN', selections: [{ homeTeam: 'Test Home', awayTeam: 'Test Away', league: 'Test League', marketName: 'Total goals', selectionName: 'Over 1.5', odds: 4, result: 'PENDING', playStatus: 'UPCOMING', kickoffAt: null }] };
@@ -13,19 +14,18 @@ async function mockApi(page: Page) {
     return route.fulfill({ json: value });
   });
 }
-test('prompt generation works in Auto with multiple typed controls and a visible partial result', async ({ page }) => {
+test('Create generates with standalone modes and opens the result page', async ({ page }) => {
   await mockApi(page);
   let payload: Record<string, unknown> = {};
   await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
-  await page.goto('/generate');
-  await page.locator('.mode-advanced summary').click();
-  await expect(page.getByRole('button', { name: 'Auto — follow my prompt' })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('.mode-advanced summary').click();
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /Investor Mode Recommended/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
   await page.locator('textarea').fill('Generate 5 tickets using over 1.5 targeting around 15 odds');
   await page.locator('textarea').press('ControlOrMeta+Enter');
   await expect(page).toHaveURL(/\/result\/test-group/);
   await expect(page.getByRole('heading', { name: 'Partial success' })).toBeVisible();
-  expect(payload.riskMode).toBeNull(); expect(payload.ticketCount).toBe(5); expect(payload.requestId).toMatch(/^[a-f0-9-]{36}$/);
+  expect(payload.riskMode).toBe('GAMBLER'); expect(payload.ticketCount).toBe(5); expect(payload.requestId).toMatch(/^[a-f0-9-]{36}$/);
 });
 test('copying a code does not open details, and each card has one result badge', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']); await mockApi(page);
@@ -58,19 +58,21 @@ test('failed initial results show an actionable error rather than a blank page',
   await expect(page.getByRole('heading', { name: 'Results could not refresh' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
 });
-test('theme overrides persist and System follows operating system changes', async ({ page }) => {
+test('settings have no theme controls and ignore old saved themes and OS appearance', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('myodd-ui-settings-v1', JSON.stringify({ theme: 'light' })));
   await page.emulateMedia({ colorScheme: 'light' }); await page.goto('/settings');
-  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('dark');
-  await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('system');
-  await page.emulateMedia({ colorScheme: 'light' }); await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await page.emulateMedia({ colorScheme: 'dark' }); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('combobox', { name: 'Theme', exact: true })).toHaveCount(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  const background = await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('body')).toHaveCSS('background-color', background);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('myodd-ui-settings-v1') || '{}').theme)).toBeUndefined();
 });
 test('market selection survives navigation', async ({ page }) => {
-  await mockApi(page); await page.goto('/generate'); await page.locator('.market-picker summary').click();
+  await mockApi(page); await page.goto('/generate'); await page.getByRole('button', { name: /^Options/ }).click(); await page.getByRole('button', { name: /^Markets/ }).click();
   await page.getByLabel('Over 1.5', { exact: true }).check();
   await page.goto('/settings'); await page.goto('/generate');
-  await page.locator('.market-picker summary').click(); await expect(page.getByLabel('Over 1.5', { exact: true })).toBeChecked();
+  await page.getByRole('button', { name: /^Options/ }).click(); await page.getByRole('button', { name: /^Markets/ }).click(); await expect(page.getByLabel('Over 1.5', { exact: true })).toBeChecked();
 });
 test('unified save uses one request with editable title and optional public visibility', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('fixture-account', 'test-owner'));
@@ -108,15 +110,83 @@ for (const width of [320, 375, 767, 768, 1023, 1280]) {
   test(`major screens fit a ${width}px viewport`, async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 900 }); await mockApi(page);
-    for (const theme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme: theme });
     for (const path of ['/', '/generate', '/history', '/settings', '/result/test-group?job=test-job', '/code/TEST123']) {
       await page.goto(path); await expect(page.locator('main')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       const overflowing = await page.locator('button:visible, input:visible, textarea:visible, select:visible').evaluateAll(nodes => nodes.filter(node => { const r = node.getBoundingClientRect(); return r.width > 0 && (r.left < -1 || r.right > innerWidth + 1); }).map(node => node.textContent?.slice(0, 50)));
       expect(overflowing).toEqual([]);
-      if (width === 375 && (path === '/generate' || path.startsWith('/result'))) await page.screenshot({ path: testInfo.outputPath(`${theme}-${path === '/generate' ? 'generate' : 'results'}.png`), fullPage: true });
+      if (width === 375 && (path === '/generate' || path.startsWith('/result'))) await page.screenshot({ path: testInfo.outputPath(`${path === '/generate' ? 'generate' : 'results'}.png`), fullPage: true });
     }
+  });
+}
+
+test('restored navigation, footer version, and compact options match each mode', async ({ page }) => {
+  await mockApi(page); await page.goto('/');
+  await expect(page.locator('.app-nav-desktop a')).toHaveText(['Create', 'Live', 'Predictions', 'Codes']);
+  await expect(page.locator('.site-footer > :last-child')).toHaveClass('footer-version');
+  for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100.01', String(MAX_TICKET_ODDS)]]) {
+    await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    await page.getByRole('button', { name: /^Options/ }).click();
+    const options = page.getByRole('dialog', { name: 'Generation options' });
+    await expect(options.getByText('Matches', { exact: true })).toHaveCount(0);
+    await expect(options.getByLabel('Min', { exact: true })).toHaveValue(min);
+    await expect(options.getByLabel('Max', { exact: true })).toHaveAttribute('max', max);
+    await expect(options.getByRole('region', { name: 'Markets', exact: true })).toBeVisible();
+    await expect(options.getByRole('group', { name: 'Odds presets' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Close options' }).click();
+  }
+});
+test('successful collections show codes without routine success and policy banners', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, job: { ...job, outcome: { ...outcome, status: 'success', requested: 1, generated: 1, failed: 0, errors: [] } } } }));
+  await page.goto('/g/test-group');
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Codes ready' })).toHaveCount(0);
+  await expect(page.locator('.collection-retention, .public-collection-heading')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open TEST123 details' })).toHaveCSS('text-decoration-line', 'none');
+});
+
+test('markets load only when expanded, with searchable grouped rows', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 375, height: 800 }); await mockApi(page);
+  let reads = 0;
+  await page.route('**/api/slips/markets', route => { reads++; return route.fulfill({ json: { version: 1, options: Array.from({ length: 18 }, (_, i) => ({ id: `test-${i}`, label: `Over ${i}.5`, category: i < 9 ? 'Total Goals' : 'First Half', available: i !== 2 })) } }); });
+  await page.goto('/'); await page.getByRole('button', { name: /^Options/ }).click();
+  await expect(page.getByRole('button', { name: /^Markets/ })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('searchbox', { name: 'Search markets' })).toHaveCount(0); expect(reads).toBe(0);
+  await page.getByRole('button', { name: /^Markets/ }).click();
+  await expect(page.getByRole('group', { name: 'Total Goals', exact: true })).toBeVisible();
+  await expect(page.locator('.market-options label').filter({ hasText: 'Over 2.5' }).getByRole('checkbox')).toBeDisabled();
+  const choices = page.getByRole('region', { name: 'Market choices' });
+  expect(await choices.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('expanded-markets.png') });
+  await page.getByRole('searchbox', { name: 'Search markets' }).fill('First Half');
+  await expect(page.getByRole('group', { name: 'Total Goals', exact: true })).toHaveCount(0);
+  await page.getByLabel('Over 9.5', { exact: true }).check();
+  await page.getByRole('button', { name: /^Markets/ }).click();
+  await expect(page.getByRole('searchbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Markets/ })).toContainText('1 selected');
+});
+for (const width of [320, 1280]) {
+  test(`mode information points to each card and links to its full explanation at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 }); await mockApi(page); await page.goto('/');
+    for (const [name, hash] of [['Investor Mode', 'mode-investor'], ['Gambler Mode', 'mode-gambler'], ['Japa Mode', 'mode-japa'], ['Lagoslife Mode', 'mode-lagos-life']]) {
+      const info = page.getByRole('button', { name: `About ${name}`, exact: true });
+      await info.click();
+      const tip = page.getByRole('dialog', { name: `About ${name}`, exact: true });
+      await expect(tip).toBeVisible(); await expect(tip).toBeFocused();
+      await expect(tip.getByRole('link', { name: /Learn more/ })).toHaveAttribute('href', `/terms#${hash}`);
+      await expect(info).toHaveAttribute('aria-expanded', 'true');
+      await expect.poll(async () => tip.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
+      await expect.poll(async () => {
+        const anchor = await info.boundingBox(); const bubble = await tip.boundingBox();
+        if (!anchor || !bubble) return false;
+        return Math.min(Math.abs(bubble.y - (anchor.y + anchor.height) - 10), Math.abs(anchor.y - (bubble.y + bubble.height) - 10)) < 3;
+      }).toBe(true);
+      if (name === 'Investor Mode') await page.screenshot({ path: testInfo.outputPath('mode-information.png') });
+      await page.keyboard.press('Escape'); await expect(tip).toHaveCount(0); await expect(info).toBeFocused();
     }
+    await page.goto('/terms#mode-japa');
+    await expect(page.locator('#mode-japa')).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'How mode settings are applied' })).toBeVisible();
   });
 }

@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { uiSettingsSchema } from '@myodd/shared';
+const storedSettingsSchema = uiSettingsSchema.partial().strip();
 import { accountApi } from '@/lib/api';
 import { readUiSettings, type UiSettings } from '@/lib/ui-settings';
 import { useSettings } from './SettingsProvider';
@@ -16,12 +18,12 @@ export function SettingsSync() {
     try {
       const previousAccount = localStorage.getItem('myodd-settings-account');
       if (!signedIn) {
-        if (previousAccount) { const guest = JSON.parse(localStorage.getItem(guestKey) ?? 'null'); if (guest) hydrate(guest); localStorage.removeItem('myodd-settings-account'); }
+        if (previousAccount) { const raw = JSON.parse(localStorage.getItem(guestKey) ?? 'null'); const guest = raw && storedSettingsSchema.parse(raw); if (guest) hydrate(guest); localStorage.removeItem('myodd-settings-account'); }
         return;
       }
       if (!previousAccount) localStorage.setItem(guestKey, JSON.stringify(local));
-      const accountLocal = JSON.parse(localStorage.getItem(`myodd-settings-account:${userId}`) ?? localStorage.getItem(guestKey) ?? 'null');
-      if (accountLocal) { local = accountLocal; hydrate(local); }
+      const raw = JSON.parse(localStorage.getItem(`myodd-settings-account:${userId}`) ?? localStorage.getItem(guestKey) ?? 'null'); const accountLocal = raw && storedSettingsSchema.parse(raw);
+      if (accountLocal) { local = { ...local, ...accountLocal }; hydrate(local); }
       localStorage.setItem('myodd-settings-account', userId!);
     } catch {}
     if (!signedIn) return;
@@ -29,7 +31,7 @@ export function SettingsSync() {
     let pending: Partial<UiSettings> = {};
     let timer: ReturnType<typeof setTimeout> | undefined;
     const key = `myodd-settings-pending:${userId}`;
-    try { pending = JSON.parse(localStorage.getItem(key) ?? '{}'); } catch {}
+    try { pending = storedSettingsSchema.parse(JSON.parse(localStorage.getItem(key) ?? '{}')); } catch {}
     function store() { try { localStorage.setItem(key, JSON.stringify(pending)); localStorage.setItem(`myodd-settings-account:${userId}`, JSON.stringify({ ...local, ...pending })); } catch {} }
     async function flush() {
       if (!ready || !active || sending || !Object.keys(pending).length) return;
@@ -43,7 +45,7 @@ export function SettingsSync() {
     window.addEventListener('myodd:settings-change', change);
     void accountApi.settings().then(({ settings }) => {
       if (!active) return;
-      const merged = { ...local, ...settings, ...pending };
+      const merged = { ...local, ...storedSettingsSchema.parse(settings ?? {}), ...pending };
       local = merged; store();
       hydrate(merged);
       if (!settings) pending = merged;

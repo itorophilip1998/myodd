@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('generation defaults and limits', () => {
   it('defaults to ten tickets with an unfixed one-to-fifty game count', () => {
-    expect(DEFAULT_UI_SETTINGS).toMatchObject({ defaultTickets: 10, defaultGames: null, defaultOddsSource: 'prompt' });
+    expect(DEFAULT_UI_SETTINGS).toMatchObject({ defaultTickets: 10, defaultGames: null, defaultMode: 'INVESTOR', defaultOddsSource: 'manual' });
     expect(MAX_TICKETS).toBe(50);
     expect(generationConfigSchema.parse({})).toMatchObject({ numberOfSlips: 10, minimumSelections: 1, maximumSelections: 50 });
   });

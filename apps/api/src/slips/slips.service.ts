@@ -442,7 +442,6 @@ export class SlipsService implements OnModuleInit {
         kind: booking ? 'BOOKING_SAVED' : 'BOOKING_FAILED', payload: JSON.parse(JSON.stringify({ taskId, config: input.config, requestedSelections: input.selections,
           confirmedBooking: booking ?? null, acceptedSelections: selections ?? null, recordedAt: new Date().toISOString() })) } });
       if (booking && selections) {
-        await tx.slipGroup.updateMany({ where: { id: input.groupId, ownerId: { not: null } }, data: { userSaved: true } });
         const now = new Date();
         const code = booking.code.toUpperCase();
         const existing = await tx.bookingCode.findUnique({ where: { code } });

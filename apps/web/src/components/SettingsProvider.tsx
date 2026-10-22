@@ -1,6 +1,5 @@
 'use client';
 
-import { track } from '@/lib/analytics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { playSound, unlockAudio, type SoundId } from '@/lib/sounds';
 import { DEFAULT_UI_SETTINGS, readUiSettings, writeUiSettings, type UiSettings } from '@/lib/ui-settings';
@@ -45,17 +44,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => { document.documentElement.dataset.theme = settings.theme === 'system' ? (media.matches ? 'dark' : 'light') : settings.theme; };
-    apply(); media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
-  }, [settings.theme, ready]);
   const hydrate = useCallback((patch: Partial<UiSettings>) => setSettings(prev => ({ ...prev, ...patch })), []);
 
   const update = useCallback((patch: Partial<UiSettings>) => {
-    if (patch.theme) track('theme_changed', { theme: patch.theme });
     setSettings(prev => ({ ...prev, ...patch }));
     window.dispatchEvent(new CustomEvent('myodd:settings-change', { detail: patch }));
   }, []);
