@@ -1,4 +1,5 @@
 'use client';
+import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -83,7 +84,9 @@ export function CollectionMenu({
     setPending(true);
     try {
       await work();
-      await Promise.all(['history', 'group'].map(key => query.invalidateQueries({ queryKey: [key] })));
+      if (/deleted/i.test(message)) track('collection_deleted');
+      if (/now public|published/i.test(message)) track('collection_published');
+      await Promise.all(['history', 'group', 'public-collections'].map(key => query.invalidateQueries({ queryKey: [key] })));
       if (onNotice) onNotice(message);
       else toast(message);
       setOpen(false);

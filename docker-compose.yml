@@ -12,7 +12,10 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
         NEXT_PUBLIC_APP_GIT_SHA: ${APP_GIT_SHA:-local}
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+        NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED: ${NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED:-false}
     environment:
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
     restart: unless-stopped
     # Host loopback only — not reachable from the internet. Containers use the Docker network.
@@ -40,6 +43,7 @@ services:
         APP_GIT_SHA: ${APP_GIT_SHA:-local}
     restart: unless-stopped
     environment:
+      COLLECTION_CLEANUP_ENABLED: ${COLLECTION_CLEANUP_ENABLED:-false}
       NODE_ENV: production
       API_PORT: 3001
       APP_GIT_SHA: ${APP_GIT_SHA:-local}
@@ -58,7 +62,7 @@ services:
       SPORTYBET_TIMEOUT_MS: ${SPORTYBET_TIMEOUT_MS:-15000}
       SPORTYBET_MIN_INTERVAL_MS: ${SPORTYBET_MIN_INTERVAL_MS:-250}
       SPORTYBET_MAX_CONCURRENCY: ${SPORTYBET_MAX_CONCURRENCY:-4}
-      SPORTYBET_CACHE_TTL_MS: ${SPORTYBET_CACHE_TTL_MS:-90000}
+      SPORTYBET_CACHE_TTL_MS: ${SPORTYBET_CACHE_TTL_MS:-30000}
     # Host loopback only — public traffic enters via Caddy :443 → /api → api:3001 on the Docker network.
     ports:
       - "127.0.0.1:3001:3001"

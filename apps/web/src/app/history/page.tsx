@@ -1,4 +1,5 @@
 'use client';
+import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -138,6 +139,7 @@ export default function HistoryPage() {
       setSelected(new Set());
       await refresh();
       const removed = result.removed;
+      if (removed.length) track('collection_deleted', { count: removed.length });
       toast(
         `${removed.length} collection${removed.length === 1 ? '' : 's'} removed.`,
         { label: 'Undo', onClick: () => { void restore(removed); } },
@@ -189,11 +191,11 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="workspace library-workspace">
+    <main className="workspace library-workspace"><p className="collection-retention">All collections are temporary: permanently deleted 24 hours after every match has a confirmed final result.</p>
       <header className="library-header">
         <div>
           <p className="eyebrow">YOUR CODE LIBRARY</p>
-          <h1>Saved codes<span className="heading-dot">.</span></h1>
+          <h1>Codes<span className="heading-dot">.</span></h1>
           <p>Browse public collections, verify played tickets, and keep your own close.</p>
         </div>
         <Link href="/" className="outline-button">＋ Create codes</Link>
@@ -306,7 +308,7 @@ export default function HistoryPage() {
                     <span aria-hidden>↗</span>
                   </div>
                 </Link>
-                <div className="library-creator">{group.creator ? <span>{group.creator.name}</span> : <span>Community collection</span>}</div>
+                <div className="library-creator">{group.creator ? <span>{group.isOwner ? 'You' : group.creator.name}</span> : <span>Community collection</span>}</div>
                 <div className="library-card-action">
                   <span>{group.isOwner ? 'Created by you' : 'Public collection'}</span>
                   <div className="library-card-tools">

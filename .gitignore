@@ -23,3 +23,8 @@ apps/ai/data/*
 /backup/*
 !/backup/.gitkeep
 /Backup/
+
+# Browser test artifacts
+playwright-report/
+test-results/
+.pnpm-store/

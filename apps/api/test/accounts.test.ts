@@ -42,10 +42,10 @@ describe('account-scoped saved collections', () => {
     await expect(service.getByPublicId('PRIVATE')).rejects.toThrow('Collection not found');
     expect(displayStatus).not.toHaveBeenCalled();
   });
-  it('keeps unsaved draft collections reachable by publicId without adding them to history', async () => {
+  it('keeps guest drafts reachable by publicId without adding them to history', async () => {
     const displayStatus = vi.fn().mockResolvedValue({ valid: new Set(), checking: 0, unavailable: 0, statuses: new Map() });
     const service = new GroupsService({
-      slipGroup: { findUnique: vi.fn().mockResolvedValue(draft) },
+      slipGroup: { findUnique: vi.fn().mockResolvedValue({ ...draft, ownerId: null }) },
       savedCollection: { findUnique: vi.fn().mockResolvedValue(null) },
     } as any, { displayStatus } as any, playCheck as any);
     await expect(service.getByPublicId('DRAFT')).resolves.toMatchObject({ publicId: 'DRAFT', userSaved: false, saved: false });
@@ -62,27 +62,27 @@ describe('account-scoped saved collections', () => {
     });
   });
   it('prevents someone else from making a private collection public', async () => {
-    const update = vi.fn();
-    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved), update } } as any, {} as any, playCheck as any);
+    const update = vi.fn().mockResolvedValue({ count: 1 });
+    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(privateSaved), updateMany: update } } as any, {} as any, playCheck as any);
     await expect(service.publish('PRIVATE', 'other')).rejects.toThrow('Collection not found');
     expect(update).not.toHaveBeenCalled();
     await expect(service.publish('PRIVATE', 'owner')).resolves.toMatchObject({ isPublic: true, userSaved: true });
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'g' },
+      where: { id: 'g', ownerId: 'owner', deletedAt: null },
       data: { isPublic: true, userSaved: true, ownerId: 'owner', deletedAt: null },
     });
   });
   it('makes save operations idempotent and marks the draft as user-saved', async () => {
     const upsert = vi.fn();
-    const update = vi.fn();
+    const update = vi.fn().mockResolvedValue({ count: 1 });
     const create = vi.fn();
     const controller = new AccountController(withTx({
-      slipGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'g', isPublic: false, userSaved: false, ownerId: null }), update },
+      slipGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'g', isPublic: false, userSaved: false, ownerId: null }), updateMany: update },
       savedCollection: { upsert },
       trainingEvent: { create },
     }) as any);
     await controller.save('DRAFT', { account: { id: 'verified' } } as any);
-    expect(update).toHaveBeenCalledWith({ where: { id: 'g' }, data: { userSaved: true, deletedAt: null, ownerId: 'verified' } });
+    expect(update).toHaveBeenCalledWith({ where: { id: 'g', OR: [{ ownerId: 'verified' }, { ownerId: null, deletedAt: null }] }, data: { userSaved: true, deletedAt: null, ownerId: 'verified' } });
     expect(upsert.mock.calls[0][0].create).toEqual({ userId: 'verified', groupId: 'g' });
     expect(upsert.mock.calls[0][0].where).toEqual({ userId_groupId: { userId: 'verified', groupId: 'g' } });
   });
@@ -123,15 +123,15 @@ describe('collection library permissions and reversible removal', () => {
   });
   it('restores a previously removed collection when saved again', async () => {
     const upsert = vi.fn();
-    const update = vi.fn();
+    const update = vi.fn().mockResolvedValue({ count: 1 });
     const create = vi.fn();
     const controller = new AccountController(withTx({
-      slipGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'g', ownerId: 'owner' }), update },
+      slipGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'g', ownerId: 'owner' }), updateMany: update },
       savedCollection: { upsert },
       trainingEvent: { create },
     }) as any);
     await controller.save('MINE', { account: { id: 'owner' } } as any);
     expect(upsert.mock.calls[0][0].update).toEqual({ hiddenAt: null });
-    expect(update).toHaveBeenCalledWith({ where: { id: 'g' }, data: { userSaved: true, deletedAt: null } });
+    expect(update).toHaveBeenCalledWith({ where: { id: 'g', OR: [{ ownerId: 'owner' }, { ownerId: null, deletedAt: null }] }, data: { userSaved: true, deletedAt: null } });
   });
 });

@@ -1,6 +1,6 @@
 """Named mode odds policies are enforced locally after every language-model interpretation."""
 import re
-from .odds_format import extract_odds_bounds, has_explicit_odds_request
+from .odds_format import extract_odds_bounds, has_explicit_odds_request, has_safer_slang
 from .schemas import Config
 
 class ModeConstraintError(ValueError):
@@ -46,4 +46,14 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
     """Recommend Investor Mode when the user did not name another mode."""
     if config.riskMode or any(re.search(pattern, instruction, re.I) for pattern, *_ in MODES):
         return config
+    if has_safer_slang(instruction):
+        return apply_named_mode(config, f'{instruction}\nInvestor Mode')
+    if has_explicit_odds_request(instruction):
+        low, high = extract_odds_bounds(instruction)
+        if low is not None and high is not None:
+            for _, mode, preference, band_low, band_high in MODES:
+                if low >= band_low and (band_high is None or high <= band_high):
+                    return config.model_copy(update={'riskMode': mode, 'riskPreference': preference, 'minimumOdds': low, 'maximumOdds': high})
+        return config.model_copy(update={'minimumOdds': low if low is not None else config.minimumOdds,
+                                         'maximumOdds': high if high is not None else config.maximumOdds})
     return apply_named_mode(config, f'{instruction}\nInvestor Mode')

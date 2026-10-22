@@ -95,10 +95,19 @@ def varied_candidates(candidates, config, rng, limit, ceiling):
     targets = [low + (index + rng.random()) / count * (high - low) for index in range(count)]
     rng.shuffle(targets)
     picked = []
+    used_keys, used_events = set(), set()
+    def keys(candidate):
+        return {(s['eventId'], s['marketId'], s['outcomeId'], s.get('specifier', '')) for s in candidate['selections']}
     for target in targets:
-        candidate = max(remaining, key=lambda c: (c['_preferred'],
+        compatible = [candidate for candidate in remaining if config.preserveOriginalSelections or not (keys(candidate) & used_keys)]
+        if not compatible:
+            break
+        candidate = max(compatible, key=lambda c: (
+            -len({s['eventId'] for s in c['selections']} & used_events), c['_preferred'],
             -abs(math.log(c['totalOdds']) - target), c['_original'], c['_rank']))
         picked.append(candidate)
+        used_keys.update(keys(candidate))
+        used_events.update(s['eventId'] for s in candidate['selections'])
         remaining.remove(candidate)
     return picked
 
@@ -244,7 +253,7 @@ def generate_report(pool: list[ScoredSelection], config: Config, original: list[
             break
     needs_expansion = (len(candidates) < config.numberOfSlips and config.fixtureMode == 'adaptive'
                        and bool(original) and not has_expansion and not expansion_attempted and not preserve_blocked)
-    if not needs_expansion and len(candidates) < config.numberOfSlips:
+    if not needs_expansion and not candidates:
         # Hard filtering already limits this pool to exact or locally verified related rules.
         fallback_stages = [original_pool] if original and config.fixtureMode != 'upcoming' else []
         if config.fixtureMode != 'original_only' or not original:

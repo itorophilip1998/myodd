@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MARKET_REGISTRY } from './market-registry';
 import { RiskPreference, SupportedMarket } from './enums';
 
 export const generationConfigSchema = z.object({
@@ -41,7 +42,7 @@ export const analyzeSlipSchema = z.object({
   bookingCode: z.string().min(3).max(32).trim(),
 });
 
-const matchDateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const matchDateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const date = new Date(`${value}T00:00:00Z`); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value; }, 'Choose a valid calendar date').optional();
 
 const ticketOddsFields = {
   /** Hard ticket-odds floor from the UI range control. */
@@ -66,6 +67,9 @@ export const pinnedSelectionSchema = z.object({
 });
 
 export const generateFromCodeSchema = z.object({
+  requestId: z.string().uuid().optional(),
+  riskMode: z.enum(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
+  selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
   ticketCount: z.number().int().min(1).max(50).optional(),
@@ -74,12 +78,16 @@ export const generateFromCodeSchema = z.object({
   bookingCode: z.string().min(3).max(32).trim().optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
+  matchDateEnd: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
   pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(50).optional(),
 });
 
 export const generateFromPromptSchema = z.object({
+  requestId: z.string().uuid().optional(),
+  riskMode: z.enum(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
+  selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
   ticketCount: z.number().int().min(1).max(50).optional(),
@@ -87,6 +95,7 @@ export const generateFromPromptSchema = z.object({
   splitInto: z.number().int().min(1).max(50).optional(),
   /** Africa/Lagos calendar day `YYYY-MM-DD`. Defaults to today (next 24 hours). */
   matchDate: matchDateField,
+  matchDateEnd: matchDateField,
   ...ticketOddsFields,
   instruction: z.string().min(3).max(6000).trim(),
   pinnedSelections: z.array(pinnedSelectionSchema).min(1).max(50).optional(),

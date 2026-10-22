@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import type { Response } from 'express';
 import {
-  Req, UseGuards,
+  Get, Req, Res, UseGuards,
   Body,
   Controller,
   HttpCode,
@@ -23,6 +25,16 @@ export class SlipsController {
     private readonly rateLimit: RateLimitService,
   ) {}
 
+  private requestScope(req: AuthRequest, res: Response) {
+    if (req.account) return req.account.id;
+    const existing = req.headers.cookie?.match(/(?:^|;\s*)myodd-guest=([a-f0-9-]{36})(?:;|$)/i)?.[1];
+    const guest = existing ?? randomUUID();
+    if (!existing) res.cookie('myodd-guest', guest, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 30 * 86400_000, path: '/' });
+    return `guest:${guest}`;
+  }
+
+  @Get('markets') async markets(@Req() req: AuthRequest, @Res({ passthrough: true }) res: Response) { this.requestScope(req, res); return this.slips.markets(); }
+
   @Post('analyze')
   @HttpCode(200)
   async analyze(@Body() body: unknown, @Req() req: AuthRequest) {
@@ -36,7 +48,7 @@ export class SlipsController {
 
   @Post('generate')
   @HttpCode(202)
-  async generate(@Body() body: unknown, @Req() req: AuthRequest) {
+  async generate(@Body() body: unknown, @Req() req: AuthRequest, @Res({ passthrough: true }) res: Response) {
     await this.rateLimit.consume('generate', 10);
     const parsed = generateFromCodeSchema.safeParse(body);
     if (!parsed.success) {
@@ -44,6 +56,11 @@ export class SlipsController {
     }
     return this.slips.startGeneration({
       instruction: parsed.data.instruction,
+      requestId: parsed.data.requestId,
+      requestScope: this.requestScope(req, res),
+      riskMode: parsed.data.riskMode,
+      selectedMarketIds: parsed.data.selectedMarketIds,
+
       splitInto: parsed.data.splitInto,
       operation: parsed.data.operation,
       profileId: req.account?.id ?? parsed.data.profileId,
@@ -51,6 +68,7 @@ export class SlipsController {
       ticketCount: parsed.data.ticketCount,
       gamesPerTicket: parsed.data.gamesPerTicket,
       matchDate: parsed.data.matchDate,
+      matchDateEnd: parsed.data.matchDateEnd,
       minimumOdds: parsed.data.minimumOdds,
       maximumOdds: parsed.data.maximumOdds,
       bookingCode: parsed.data.bookingCode,
@@ -60,7 +78,7 @@ export class SlipsController {
 
   @Post('generate-from-prompt')
   @HttpCode(202)
-  async generateFromPrompt(@Body() body: unknown, @Req() req: AuthRequest) {
+  async generateFromPrompt(@Body() body: unknown, @Req() req: AuthRequest, @Res({ passthrough: true }) res: Response) {
     await this.rateLimit.consume('generate', 10);
     const parsed = generateFromPromptSchema.safeParse(body);
     if (!parsed.success) {
@@ -68,6 +86,11 @@ export class SlipsController {
     }
     return this.slips.startGeneration({
       instruction: parsed.data.instruction,
+      requestId: parsed.data.requestId,
+      requestScope: this.requestScope(req, res),
+      riskMode: parsed.data.riskMode,
+      selectedMarketIds: parsed.data.selectedMarketIds,
+
       splitInto: parsed.data.splitInto,
       operation: parsed.data.operation,
       profileId: req.account?.id ?? parsed.data.profileId,
@@ -75,6 +98,7 @@ export class SlipsController {
       ticketCount: parsed.data.ticketCount,
       gamesPerTicket: parsed.data.gamesPerTicket,
       matchDate: parsed.data.matchDate,
+      matchDateEnd: parsed.data.matchDateEnd,
       minimumOdds: parsed.data.minimumOdds,
       maximumOdds: parsed.data.maximumOdds,
       pinnedSelections: parsed.data.pinnedSelections,

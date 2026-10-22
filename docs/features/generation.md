@@ -8,7 +8,7 @@ Create ranked booking-code variations from a SportyBet share code and/or a natur
 
 | Layer | Location |
 |-------|----------|
-| Web | `/` — `GenerateForm.tsx`, guardrails in `lib/generate-guardrails.ts` |
+| Web | `/generate` — `GenerateForm.tsx`, guardrails in `lib/generate-guardrails.ts` |
 | API | `slips/*`, `jobs/create-booking.processor.ts`, `ai/ai.client.ts` |
 | AI | `/intent`, `/generate`, `/split` — `apps/ai/app/` |
 | Policy | `packages/shared/src/mode-policy.ts`, `chat-request.ts` |
@@ -51,3 +51,11 @@ Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-
 - [jobs.md](./jobs.md) — progress polling
 - [booking.md](./booking.md) — SportyBet confirmation
 - [collections.md](./collections.md) — where results are stored
+
+## Production improvements (v0.2.15)
+
+Manual risk mode is optional. Explicit mode/market controls override prompt preferences; prompt intent overrides automatic defaults. Shared market IDs resolve against current provider catalogs, including dynamically observed specialty markets. Exact selection keys do not repeat across the batch unless original picks were explicitly pinned. Shortages return fewer tickets with an explanation.
+
+The optional request UUID is scoped to the authenticated account or an HTTP-only guest session. Identical retries reuse the same group/job; changing the payload with the same ID returns 409. Successful authenticated tickets are automatically retained privately in Codes. Job/group responses add an outcome summary while preserving existing fields.
+
+See [production-improvements.md](./production-improvements.md) for migration, deployment, caching, and validation details.

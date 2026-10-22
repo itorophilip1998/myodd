@@ -1,4 +1,5 @@
-import type { SelectionSettlement } from '@myodd/shared';
+import { collectionResponseSchema, ticketResponseSchema, generateResponseSchema, generationOutcomeSchema } from '@myodd/shared';
+import type { AccountUiSettings, SelectionSettlement } from '@myodd/shared';
 // Empty = same origin (Next proxies /api → backend). Needed for public tunnels.
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
@@ -6,28 +7,33 @@ let sessionToken: () => Promise<string | null> = async () => null;
 let signedIn = false;
 export function configureApiAuth(getToken: () => Promise<string | null>, authenticated: boolean) { sessionToken = getToken; signedIn = authenticated; }
 
+export class ApiError extends Error { constructor(message: string, readonly status: number, readonly code?: string) { super(message); } }
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await sessionToken();
   if (signedIn && !token) throw new Error('Your session needs to reconnect. Please sign in again before continuing.');
-  const res = await fetch(`${API_URL}/api${path}`, {
+  let res: Response;
+  try { res = await fetch(`${API_URL}/api${path}`, {
     ...init,
+    signal: init?.signal ?? AbortSignal.timeout(45_000),
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
-  });
+  }); } catch { throw new ApiError('The request timed out or could not reach the service. Please try again.', 0, 'NETWORK_ERROR'); }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(
+    throw new ApiError(
       typeof (body as { message?: unknown }).message === 'string'
         ? ((body as { message: string }).message)
         : Array.isArray((body as { message?: unknown }).message)
           ? ((body as { message: string[] }).message).join(', ')
           : `Request failed (${res.status})`,
+      res.status, typeof body.code === 'string' ? body.code : undefined,
     );
   }
-  return res.json() as Promise<T>;
+  try { return await res.json() as T; } catch { throw new ApiError('The server returned incomplete data. Please retry.', res.status, 'INVALID_RESPONSE'); }
 }
 
 export interface CreatorSummary { publicId: string; username: string | null; name: string }
@@ -95,6 +101,7 @@ export interface GenerateResponse {
 }
 
 export interface JobProgress {
+  outcome?: import('@myodd/shared').GenerationOutcome;
   id: string;
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
   createdAt?: string;
@@ -110,6 +117,8 @@ export interface JobProgress {
 }
 
 export interface SlipSelection {
+  matchPhase?: 'prematch' | 'live' | 'finished' | 'unknown';
+  matchCheckedAt?: string | null;
   homeTeam: string;
   awayTeam: string;
   league: string;
@@ -168,6 +177,8 @@ export interface GenerationReport {
 }
 
 export interface SlipGroup {
+  completedAt?: string | null;
+  deleteAfter?: string | null;
   creator?: CreatorSummary | null;
   id: string;
   publicId: string;
@@ -184,7 +195,7 @@ export interface SlipGroup {
   availability?: { saved: number; active?: number; checking: number; unavailable: number };
   playSummary?: PlaySummary;
   generationReport: GenerationReport | null;
-  job: Pick<JobProgress, 'createdAt' | 'updatedAt' | 'status' | 'stage' | 'stageDetail' | 'error' | 'progress' | 'total' | 'failedCount'> | null;
+  job: Pick<JobProgress, 'outcome' | 'createdAt' | 'updatedAt' | 'status' | 'stage' | 'stageDetail' | 'error' | 'progress' | 'total' | 'failedCount'> | null;
   slips: GeneratedSlip[];
   counts: { lower: number; moderate: number; higher: number };
 }
@@ -200,18 +211,23 @@ export const api = {
     const profileId = signedIn ? crypto.randomUUID() : browserProfileId(); if (!profileId) return Promise.reject(new Error('Enable browser storage to remember your settings.'));
     return request<{ saved: boolean; remembered: boolean }>('/learning/feedback', { method: 'POST', body: JSON.stringify({ ...body, id: crypto.randomUUID(), profileId }) });
   },
+  markets: () => request<{ version: number; options: Array<{ id: string; label: string; category: string; available: boolean }> }>('/slips/markets'),
   publicGroups(page = 1) { return request<CollectionSummary[]>(`/groups/public?page=${page}`); },
   editGroup(id: string, body: { title?: string; isPublic?: boolean }) { return request<{ publicId: string; title: string; isPublic: boolean }>(`/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }); },
   listGroups(page = 1) {
     return request<CollectionSummary[]>(`/groups?page=${page}`);
   },
   generate(body: {
+    requestId?: string;
+    riskMode?: RiskMode | null;
+    selectedMarketIds?: string[];
     bookingCode?: string;
     instruction: string;
     splitInto?: number;
     ticketCount?: number;
     gamesPerTicket?: number;
     matchDate?: string;
+    matchDateEnd?: string;
     minimumOdds?: number;
     maximumOdds?: number | null;
     profileId?: string;
@@ -236,7 +252,7 @@ export const api = {
     return request<GenerateResponse>(path, {
       method: 'POST',
       body: JSON.stringify({ ...body, profileId: browserProfileId() }),
-    });
+    }).then(value => generateResponseSchema.parse(value));
   },
   publishGroup(id: string) { return request<{ isPublic: boolean }>(`/groups/${encodeURIComponent(id)}/share`, { method: 'POST' }); },
   verifyCode(code: string) { return request<{ codes: string[]; unavailable: number }>(`/codes/${encodeURIComponent(code)}/verify`, { method: 'POST' }); },
@@ -251,13 +267,21 @@ export const api = {
     return request<CodeCheckLookup>('/checks/lookup', { method: 'POST', body: JSON.stringify({ identifier }) });
   },
   getJob(jobId: string) {
-    return request<JobProgress>(`/jobs/${jobId}`);
+    return request<JobProgress>(`/jobs/${jobId}`).then(value => {
+      if (!value || !['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'].includes(value.status) || !Number.isFinite(value.total)) throw new Error('The server returned incomplete job data. Please retry.');
+      if (value.outcome) generationOutcomeSchema.parse(value.outcome);
+      return value;
+    });
   },
   getGroup(publicId: string) {
-    return request<SlipGroup>(`/groups/${publicId}`);
+    return request<SlipGroup>(`/groups/${publicId}`).then(value => {
+      if (!collectionResponseSchema.safeParse(value).success) throw new Error('The server returned incomplete collection data. Please retry.');
+      if (value.job?.outcome) generationOutcomeSchema.parse(value.job.outcome);
+      return value;
+    });
   },
   getCode(code: string) {
-    return request<GeneratedSlip>(`/codes/${code}`);
+    return request<GeneratedSlip>(`/codes/${code}`).then(value => { if (!ticketResponseSchema.safeParse(value).success) throw new ApiError('The server returned incomplete ticket data. Please retry.', 502, 'INVALID_RESPONSE'); return value; });
   },
   analyze(bookingCode: string) {
     return request<{
@@ -304,8 +328,10 @@ export const exploreApi = {
 
 
 export const accountApi = {
+  settings: () => request<{ settings: Partial<AccountUiSettings> | null }>('/account/settings'),
+  updateSettings: (patch: Partial<AccountUiSettings>) => request<{ settings: Partial<AccountUiSettings> }>('/account/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
   remove: (publicIds: string[]) => request<{ removed: string[] }>('/account/collections/remove', { method: 'POST', body: JSON.stringify({ publicIds }) }),
   sync: () => request<{ id: string; synced: boolean }>('/account/sync', { method: 'POST' }),
-  save: (id: string) => request<{ saved: boolean }>(`/account/saves/${encodeURIComponent(id)}`, { method: 'POST' }),
+  save: (id: string, body: { title?: string; isPublic?: boolean } = {}) => request<{ saved: boolean }>(`/account/saves/${encodeURIComponent(id)}`, { method: 'POST', body: JSON.stringify(body) }),
   legacy: (page = 1) => request<CollectionSummary[]>(`/account/legacy?page=${page}`),
 };

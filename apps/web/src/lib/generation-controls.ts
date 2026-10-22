@@ -2,7 +2,7 @@ import { modeKeyFromLabel, previewOddsFromPrompt } from '@myodd/shared';
 
 /** Explicit prompt controls, used to keep the form in sync with the latest user edit. */
 export function readGenerationControls(text: string) {
-  const tickets = [...text.matchAll(/\b(\d+)\s+(?:tickets?|codes?|slips?)\b/gi)].at(-1);
+  const tickets = [...text.matchAll(/\b(\d+)\s+(?:tickets?|codes?|slips?|bookings?)\b/gi)].at(-1);
   const gameMatches = [
     /\b(?:exactly|make(?:\s+it)?)\s+(\d+)\s+(?:games?|matches?|legs?|picks?|selections?)\b/gi,
     /\b(\d+)\s+(?:games?|matches?|legs?|picks?|selections?)\s+(?:per\s+(?:ticket|slip|code)|each)\b/gi,

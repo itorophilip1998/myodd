@@ -40,7 +40,7 @@ export class CatalogService implements OnModuleInit {
     if (!/^[A-Z0-9_]{3,32}$/.test(normalized)) throw new Error('Invalid booking code format');
     const row = await this.prisma.bookingCode.upsert({ where: { code: normalized },
       create: { code: normalized, source, sourceUrl, expiresAt: codeExpiry(new Date()) },
-      update: { lastSeenAt: new Date() },
+      update: { lastSeenAt: new Date(), ...(['manual', 'crawl'].includes(source) ? { source } : {}) },
     });
     return booking ? this.validate(normalized, booking) : row;
   }
@@ -74,7 +74,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async importCode(code: string) {
-    await this.remember(code);
+    await this.remember(code, 'manual');
     const row = await this.validate(code.trim().toUpperCase());
     return { code: row.code, status: row.status, activeSelections: row.activeSelections, expiresAt: row.expiresAt };
   }
@@ -83,15 +83,15 @@ export class CatalogService implements OnModuleInit {
     await this.expire();
     // Prefer independently sourced/user codes and broad fixture coverage over generated two-leg slips.
     const candidates = await this.prisma.bookingCode.findMany({ where: {
-      status: { in: [BookingCodeStatus.ACTIVE, BookingCodeStatus.PARTIAL] }, activeSelections: { gte: 2 }, expiresAt: { gt: new Date() },
+      status: { in: [BookingCodeStatus.ACTIVE, BookingCodeStatus.PARTIAL] }, source: { in: ['crawl', 'manual', 'generated'] }, activeSelections: { gte: 2 }, expiresAt: { gt: new Date() },
     }, orderBy: [{ source: 'asc' }, { activeSelections: 'desc' }, { checkedAt: 'desc' }], take: 12 });
     const generatedCodes = candidates.filter(c => c.source === 'generated').map(c => c.code);
     const [privateUses, publicUses] = generatedCodes.length ? await Promise.all([
       this.prisma.generatedSlip.findMany({ where: { bookingCode: { in: generatedCodes }, group: { isPublic: false } }, select: { bookingCode: true } }),
-      this.prisma.generatedSlip.findMany({ where: { bookingCode: { in: generatedCodes }, group: { isPublic: true } }, select: { bookingCode: true } }),
+      this.prisma.generatedSlip.findMany({ where: { bookingCode: { in: generatedCodes }, group: { isPublic: true, userSaved: true, deletedAt: null } }, select: { bookingCode: true } }),
     ]) : [[], []];
     const privateOnly = new Set(privateUses.map(s => s.bookingCode).filter(code => !publicUses.some(s => s.bookingCode === code)));
-    const allowed = candidates.filter(c => !privateOnly.has(c.code));
+    const allowed = candidates.filter(c => !privateOnly.has(c.code) && (c.source !== 'generated' || publicUses.some(s => s.bookingCode === c.code)));
     allowed.sort((a, b) => Number(a.source === 'generated') - Number(b.source === 'generated'));
     for (const candidate of allowed.slice(0, 5)) {
       const verified = await this.validate(candidate.code);

@@ -1,18 +1,15 @@
-import { Suspense } from 'react';
-import { GenerateForm } from '@/components/GenerateForm';
-import { LogoLoader } from '@/components/LogoLoader';
+import type { Metadata } from 'next';
+export const metadata: Metadata = { title: 'myOdd — football booking codes', alternates: { canonical: '/' } };
+import Link from 'next/link';
+import { PublicPreview } from '@/components/PublicPreview';
 
 export default function HomePage() {
-  return (
-    <main className="home-workspace">
-      <div className="hero">
-        <p className="eyebrow"><span className="status-dot" /> SPORTYBET, REIMAGINED</p>
-        <h1>Your next code.<br /><span>Your way.</span></h1>
-        <p>AI prediction power for SportyBet — sharper picks, stronger codes, your edge.</p>
-      </div>
-      <Suspense fallback={<LogoLoader label="Loading create" />}>
-        <GenerateForm />
-      </Suspense>
-    </main>
-  );
+  return <main className="home-workspace">
+    <div className="hero"><p className="eyebrow">SPORTYBET BOOKING CODES</p>
+      <h1>Your next code.<br /><span>Your way.</span></h1>
+      <p>Describe your football selections, create booking codes, and manage your collections.</p>
+      <Link className="primary-button" href="/generate">Generate codes</Link>
+    </div>
+    <PublicPreview />
+  </main>;
 }

@@ -12,7 +12,7 @@ from .risk_modes import MODES, apply_default_investor, apply_named_mode
 from .draw_markets import draw_request
 from .llm import IntentProviderError, parse_chat_completions, resolve_provider_name, resolve_settings, select_model
 from .market_preferences import resolve_preferences
-from .odds_format import extract_games_per_ticket, extract_odds_bounds
+from .odds_format import extract_games_per_ticket, extract_odds_bounds, has_safer_slang
 
 
 def parse_rules(instruction: str) -> Config:
@@ -35,7 +35,10 @@ def parse_rules(instruction: str) -> Config:
     exact = extract_games_per_ticket(instruction)
     if exact is not None:
         data['minimumSelections'] = data['maximumSelections'] = exact
-    markets = []
+    markets = [Market.HOME, Market.DOUBLE_CHANCE_1X] if has_safer_slang(text) else []
+    if has_safer_slang(text):
+        data['riskPreference'] = 'LOWER'
+        data['unhandledRequests'] = ['Safer-ranked selections are not a guaranteed win.']
     if re.search(r'double\s*chance|\b1x\b|\bx2\b', text):
         markets += [Market.DOUBLE_CHANCE_1X, Market.DOUBLE_CHANCE_X2, Market.DOUBLE_CHANCE_12]
     for pattern, market in [(r'over\s*1\.5', Market.OVER_1_5), (r'over\s*2\.5', Market.OVER_2_5), (r'under\s*3\.5', Market.UNDER_3_5)]:

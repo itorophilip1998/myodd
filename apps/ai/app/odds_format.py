@@ -88,12 +88,17 @@ def extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:
         if value is not None:
             high = value if high is None else min(high, value)
 
-    around = list(re.finditer(rf'around\s+{token}', text, re.I))
+    around = list(re.finditer(rf'(?:around|about|sure|safe)\s+{token}', text, re.I))
     if around and low is None and high is None:
         value = parse_odds_token(around[-1][1])
         if value is not None:
-            low, high = max(1.1, value * .8), value * 1.2
+            low, high = max(1.1, value - .5), value + .5
 
+    if low is None and high is None:
+        bare = re.search(rf'{token}\s+odds\b', text, re.I)
+        if bare:
+            value = parse_odds_token(bare[1])
+            if value is not None: low, high = max(1.1, value - .5), value + .5
     return low, high
 
 
@@ -122,3 +127,7 @@ def has_explicit_odds_request(instruction: str) -> bool:
     return bool(re.search(
         rf'\b(?:between|around|odds(?:\s+(?:of|above|below|over|under|from|at))?)\s+\d|\d(?:\.\d+)?\s*(?:ks?|ms?|b|t|q)?\s*odds',
         instruction, re.I))
+
+
+def has_safer_slang(instruction: str) -> bool:
+    return bool(re.search(r'\b(?:sure|safe|safer|banker|conservative)\b', instruction, re.I))

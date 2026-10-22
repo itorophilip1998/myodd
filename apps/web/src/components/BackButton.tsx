@@ -54,11 +54,11 @@ export function BackLink({
 }
 
 export function fallbackForPath(path: string): { href: string; label: string } {
-  if (path.startsWith('/g/') || path.startsWith('/code/')) return { href: '/history', label: 'Saved codes' };
-  if (path.startsWith('/result/')) return { href: '/', label: 'Create' };
-  if (path.startsWith('/settings')) return { href: '/', label: 'Create' };
+  if (path.startsWith('/g/') || path.startsWith('/code/')) return { href: '/history', label: 'Codes' };
+  if (path.startsWith('/result/')) return { href: '/generate', label: 'Generate' };
+  if (path.startsWith('/settings')) return { href: '/generate', label: 'Generate' };
   if (path.startsWith('/live') || path.startsWith('/predictions') || path.startsWith('/history')) {
-    return { href: '/', label: 'Create' };
+    return { href: '/generate', label: 'Generate' };
   }
   if (path.startsWith('/sign-in') || path.startsWith('/sign-up')) return { href: '/', label: 'Home' };
   if (path.startsWith('/terms') || path.startsWith('/privacy')) return { href: '/', label: 'Home' };
