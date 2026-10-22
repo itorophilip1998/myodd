@@ -12,6 +12,8 @@ const selection = { eventId: leg.sportyEventId, marketId: leg.marketId, outcomeI
   specifier: leg.specifier, settlement: 'WON' };
 function setup(selections: any[] = [selection], page = new Map(), fixtures: any[] = [], footballResults?: any, bbcResults?: any) {
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    slipGroup: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     slipSelection: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     generatedSlip: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     trainingEvent: { create: vi.fn().mockImplementation(args => Promise.resolve(args)) },

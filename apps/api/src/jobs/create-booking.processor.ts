@@ -8,6 +8,7 @@ import { SlipValidatorService } from '../slips/slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from './job.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { slipFingerprint } from '../slips/slip-fingerprint';
+import { generationFailure } from '../common/generation-error';
 
 @Processor(CREATE_BOOKING_QUEUE, { concurrency: 3 })
 export class CreateBookingProcessor extends WorkerHost {
@@ -43,12 +44,27 @@ export class CreateBookingProcessor extends WorkerHost {
       await this.slips.settleBooking(job.id!, data, data.confirmed.booking, data.confirmed.selections);
       return;
     }
+    const confirmation = await this.prisma.trainingEvent.findUnique({ where: { eventKey: `${job.id}:booking-confirmed` } });
+    if (confirmation) {
+      const accepted = confirmation.payload as unknown as { booking: BookmakerBooking; selections: ScoredSelection[] };
+      await this.slips.settleBooking(job.id!, data, accepted.booking, accepted.selections);
+      return;
+    }
+    const started = await this.prisma.trainingEvent.findUnique({ where: { eventKey: `${job.id}:booking-started` } });
+    if (started) {
+      await this.slips.settleBooking(job.id!, { ...data, failure: { code: 'BOOKING_UNCERTAIN', message: 'A prior booking attempt could not be confirmed after interruption. It will not be created again automatically.', retryable: false } });
+      return;
+    }
     let upstreamBooking: BookmakerBooking | undefined;
+    let bookingStarted = false;
     let accepted: { booking: BookmakerBooking; selections: ScoredSelection[] };
     try {
       const selections = await this.validator.validate(data.selections, data.config, undefined, fixtures => this.slips.audit(data, 'VALIDATION_SNAPSHOT', { taskId: job.id, fixtures }, `${job.id}:validation:${job.attemptsMade}`));
       if (!selections) throw new Error('Selections no longer satisfy market availability or requested filters');
       await this.slips.audit(data, 'BOOKING_ATTEMPT', { taskId: job.id, selections, timestamp: new Date().toISOString() });
+      // A durable write barrier prevents worker restarts from blindly repeating a provider POST.
+      await this.slips.audit(data, 'BOOKING_STARTED', { taskId: job.id }, `${job.id}:booking-started`);
+      bookingStarted = true;
       const booking = await this.bookmaker.createBooking(selections);
       upstreamBooking = booking;
       if (booking.selections.some(s => s.isActive === false || (s.kickoffAt && new Date(s.kickoffAt).getTime() <= Date.now()))) throw new Error('SportyBet marked this code unavailable');
@@ -64,14 +80,16 @@ export class CreateBookingProcessor extends WorkerHost {
       if (!withinModeOdds(totalOdds, data.config.riskMode) || totalOdds < data.config.minimumOdds || (data.config.maximumOdds != null && totalOdds > data.config.maximumOdds)) throw new Error('Confirmed odds are outside requested range');
       accepted = { booking, selections: confirmed };
     } catch (error) {
-      this.logger.warn(`Booking ${job.id} failed: ${(error as Error).message}`);
-      await this.slips.audit(data, 'BOOKING_REJECTED', { taskId: job.id, error: (error as Error).message, upstreamBooking: upstreamBooking ?? null });
-      await this.slips.settleBooking(job.id!, data);
+      const failure = generationFailure(error, bookingStarted);
+      this.logger.warn(`Booking ${job.id} failed: ${failure.code}`);
+      await this.slips.audit(data, 'BOOKING_REJECTED', { taskId: job.id, failure, upstreamBooking: upstreamBooking ?? null });
+      await this.slips.settleBooking(job.id!, { ...data, failure });
       return;
     }
-    // Keep the confirmation in durable Redis before attempting the atomic database write.
-    // Persistence errors must retry; they must never turn a real accepted code into a failed empty task.
-    await job.updateData({ ...data, confirmed: accepted });
+    // Keep accepted codes in either durable store before settling the database transaction.
+    // Queue reconstruction can recover the confirmation even after Redis work is lost.
+    try { await this.slips.audit(data, 'BOOKING_CONFIRMED', accepted, `${job.id}:booking-confirmed`); }
+    catch { await job.updateData({ ...data, confirmed: accepted }); }
     await this.slips.settleBooking(job.id!, data, accepted.booking, accepted.selections);
   }
 }

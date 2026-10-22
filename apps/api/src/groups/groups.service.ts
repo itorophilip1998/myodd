@@ -1,4 +1,4 @@
-import { modeKeyFromLabel, type ModeKey } from '@myodd/shared';
+import { generationOutcome, modeKeyFromLabel, type ModeKey } from '@myodd/shared';
 import { creatorLabel, creatorSelect } from '../creators/creators.service';
 import {
   Injectable,
@@ -15,7 +15,7 @@ const MODE_KEYS = new Set(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']);
 function accessibleGroups(userId?: string): Prisma.SlipGroupWhereInput {
   return { deletedAt: null, OR: [
     { isPublic: true, userSaved: true },
-    { userSaved: false },
+    { userSaved: false, ownerId: null },
     ...(userId ? [{ ownerId: userId }] : []),
   ] };
 }
@@ -121,7 +121,7 @@ export class GroupsService {
       where: { publicId },
       include: {
         owner: { select: creatorSelect },
-        jobs: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true, updatedAt: true, status: true, stage: true, stageDetail: true, failedCount: true, error: true, progress: true, total: true } },
+        jobs: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true, updatedAt: true, status: true, stage: true, stageDetail: true, failedCount: true, error: true, progress: true, total: true, id: true, requestId: true, requestedCount: true, failures: true } },
         slips: {
           include: { selections: true },
           orderBy: [{ rankOrder: 'asc' }, { slipScore: 'desc' }, { totalOdds: 'asc' }],
@@ -169,6 +169,8 @@ export class GroupsService {
           modelVersion: sel.modelVersion,
           kickoffAt: sel.kickoffAt?.toISOString() ?? null,
           result: sel.result,
+          matchPhase: sel.matchPhase,
+          matchCheckedAt: sel.matchCheckedAt?.toISOString() ?? null,
           resultSource: sel.resultSource,
           resultCheckedAt: sel.resultCheckedAt?.toISOString() ?? null,
           playStatus: sel.playStatus,
@@ -182,6 +184,8 @@ export class GroupsService {
     const saved = group.userSaved && ((!!bookmark && !bookmark.hiddenAt) || (!!userId && group.ownerId === userId && !bookmark?.hiddenAt));
     return {
       saved,
+      completedAt: group.completedAt?.toISOString() ?? null,
+      deleteAfter: group.deleteAfter?.toISOString() ?? null,
       userSaved: group.userSaved,
       id: group.id,
       creator: group.owner ? creatorLabel(group.owner) : null,
@@ -194,7 +198,7 @@ export class GroupsService {
       expiresAt: group.expiresAt?.toISOString() ?? null,
       originalBookingCode: group.originalBookingCode,
       generationReport: group.generationReport,
-      job: group.jobs[0] ?? null,
+      job: group.jobs[0] ? { ...group.jobs[0], outcome: generationOutcome(group.jobs[0]) } : null,
       availability: {
         saved: group.slips.length,
         active: availability.valid.size,
@@ -209,6 +213,15 @@ export class GroupsService {
         higher: slips.filter((s) => s.riskLevel === 'HIGHER').length,
       },
     };
+  }
+
+  async publicMetadata(publicId: string) {
+    const group = await this.prisma.slipGroup.findFirst({ where: { publicId, isPublic: true, userSaved: true, deletedAt: null }, select: { publicId: true, title: true, createdAt: true } });
+    if (!group) throw new NotFoundException('Collection not found');
+    return group;
+  }
+  async sitemap() {
+    return this.prisma.slipGroup.findMany({ where: { isPublic: true, userSaved: true, deletedAt: null, slips: { some: {} } }, orderBy: { createdAt: 'desc' }, take: 49_000, select: { publicId: true, createdAt: true } });
   }
 
   async checkPlayGroup(publicId: string, userId?: string) {
@@ -306,14 +319,15 @@ export class GroupsService {
     const group = await this.prisma.slipGroup.findUnique({ where: { publicId } });
     if (!group || !canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
     await this.prisma.$transaction(async tx => {
-      await tx.slipGroup.update({
-        where: { id: group.id },
+      const claimed = await tx.slipGroup.updateMany({
+        where: { id: group.id, ownerId: group.ownerId, deletedAt: null },
         data: {
           userSaved: true,
           deletedAt: null,
           ...(group.ownerId ? {} : { ownerId: userId }),
         },
       });
+      if (claimed.count !== 1) throw new NotFoundException('Collection not found');
       await tx.savedCollection.upsert({
         where: { userId_groupId: { userId, groupId: group.id } },
         create: { userId, groupId: group.id },
@@ -330,10 +344,11 @@ export class GroupsService {
     const group = await this.prisma.slipGroup.findUnique({ where: { publicId } });
     if (!group || !canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
     if (!userId || (group.ownerId && group.ownerId !== userId)) throw new NotFoundException('Collection not found');
-    await this.prisma.slipGroup.update({
-      where: { id: group.id },
+    const claimed = await this.prisma.slipGroup.updateMany({
+      where: { id: group.id, ownerId: group.ownerId, deletedAt: null },
       data: { isPublic: true, userSaved: true, ownerId: group.ownerId ?? userId, deletedAt: null },
     });
+    if (claimed.count !== 1) throw new NotFoundException('Collection not found');
     return { publicId, isPublic: true, userSaved: true };
   }
 
@@ -398,6 +413,8 @@ export class GroupsService {
         modelVersion: sel.modelVersion,
         kickoffAt: sel.kickoffAt?.toISOString() ?? null,
         result: sel.result,
+        matchPhase: sel.matchPhase,
+        matchCheckedAt: sel.matchCheckedAt?.toISOString() ?? null,
         resultSource: sel.resultSource,
         resultCheckedAt: sel.resultCheckedAt?.toISOString() ?? null,
         playStatus: sel.playStatus,

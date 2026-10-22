@@ -1,4 +1,6 @@
 'use client';
+import { SettingsSync } from './SettingsSync';
+import { formatAppVersion } from '@myodd/shared';
 import { LogoLoader } from './LogoLoader';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth, UserButton } from '@clerk/nextjs';
@@ -40,7 +42,7 @@ export function AccountSession({ children }: { children: React.ReactNode }) {
   }
   return (
     <SessionContext.Provider value={{ configured: true, signedIn: !!userId, userId: userId ?? null }}>
-      {children}
+      <SettingsSync />{children}
     </SessionContext.Provider>
   );
 }
@@ -71,6 +73,7 @@ export function AccountControls() {
       <UserButton>
         <UserButton.MenuItems>
           <UserButton.Link label="Settings" labelIcon={<SettingsIcon />} href="/settings" />
+          <UserButton.Link label={formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)} labelIcon={<span aria-hidden>ⓘ</span>} href="/settings#app-version" />
         </UserButton.MenuItems>
       </UserButton>
     </div>

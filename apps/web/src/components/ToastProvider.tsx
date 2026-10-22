@@ -59,6 +59,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div className="toast-host" aria-live="polite" aria-relevant="additions">
+        {toasts.length > 1 && <button type="button" className="outline-button toast-dismiss-all" onClick={() => setToasts([])}>Dismiss all</button>}
         {toasts.map(t => (
           <div key={t.id} className={`toast-item${t.sticky ? ' is-sticky' : ''}`} role="status">
             <span>{t.message}</span>

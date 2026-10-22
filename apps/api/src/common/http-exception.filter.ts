@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ArgumentsHost,
   Catch,
@@ -42,8 +43,11 @@ export class AppExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    this.logger.error(exception);
+    const requestId = randomUUID();
+    const req = host.switchToHttp().getRequest();
+    this.logger.error(JSON.stringify({ requestId, type: exception instanceof Error ? exception.name : 'unknown', method: req.method, route: req.route?.path ?? 'unmatched' }));
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      requestId,
       statusCode: 500,
       message: 'Something went wrong. Please try again.',
     });

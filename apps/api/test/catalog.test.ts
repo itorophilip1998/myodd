@@ -32,7 +32,7 @@ it('keeps the original expiry when SportyBet returns a previously saved code', a
   const { SlipsService } = await import('../src/slips/slips.service');
   const firstSeenAt = new Date(Date.now() - 6 * 86400000);
   const create = vi.fn();
-  const tx = { trainingEvent: { create: vi.fn() }, generationJob: { updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  const tx = { slipGroup: { updateMany: vi.fn() }, trainingEvent: { create: vi.fn() }, generationJob: { updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'job', total: 1, progress: 1, failedCount: 0 }), update: vi.fn() },
     generatedSlip: { create }, bookingCode: { findUnique: vi.fn().mockResolvedValue({ firstSeenAt }), upsert: vi.fn() } };
   const prisma = { $transaction: (fn: any) => fn(tx) };

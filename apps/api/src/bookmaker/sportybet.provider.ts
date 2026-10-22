@@ -73,7 +73,7 @@ export class SportyBetProvider implements BookmakerProvider {
     const data = await this.client.get<{
       totalNum?: number;
       tournaments?: unknown[];
-    }>(path, { cacheKey });
+    }>(path, { cacheKey: query.fresh ? undefined : cacheKey });
     return mapFixtures(data as never);
   }
 

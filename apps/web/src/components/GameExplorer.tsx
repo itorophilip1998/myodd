@@ -90,7 +90,7 @@ export function GameExplorer({ kind }: { kind: 'live' | 'predictions' }) {
   function submitBook() {
     if (!book.length) return;
     writePredictionBook(book);
-    router.push('/?book=1');
+    router.push('/generate?book=1');
   }
 
   return <main className={`workspace explore-workspace${!live && book.length ? ' has-prediction-book' : ''}`}><header className="explore-hero"><div><p className="eyebrow">{live ? 'ON THE PITCH' : 'BEFORE KICKOFF'}</p><h1>{live ? <>The game. <em>Right now.</em></> : <>A clearer view. <em>Every game.</em></>}</h1><p>{live ? 'Find live football by team or league. Scores and the reported match clock refresh automatically.' : 'Explore upcoming matches, compare estimated outcomes, and build a prediction book to generate on Create.'}</p></div><span className={`explore-badge ${live ? 'is-live' : ''}`}>{live ? '● LIVE' : '◇ MODEL INSIGHTS'}</span></header>

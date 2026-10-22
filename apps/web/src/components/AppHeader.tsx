@@ -3,18 +3,16 @@ import { BrandMark } from './BrandMark';
 import { AccountControls } from './AccountSession';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { formatAppVersion } from '@myodd/shared';
 
 const LINKS = [
-  { href: '/', label: 'Create', active: (path: string) => path === '/' || path.startsWith('/result') },
-  { href: '/live', label: 'Live', live: true, active: (path: string) => path.startsWith('/live') },
-  { href: '/predictions', label: 'Predictions', active: (path: string) => path.startsWith('/predictions') },
-  { href: '/history', label: 'Saved', active: (path: string) => path.startsWith('/history') || path.startsWith('/g/') },
+  { href: '/', label: 'Home', active: (path: string) => path === '/' },
+  { href: '/generate', label: 'Generate', active: (path: string) => path.startsWith('/generate') || path.startsWith('/result') },
+  { href: '/history', label: 'Codes', active: (path: string) => path.startsWith('/history') || path.startsWith('/g/') || path.startsWith('/code/') },
+  { href: '/settings', label: 'Settings', active: (path: string) => path.startsWith('/settings') },
 ] as const;
 
 export function AppHeader() {
   const path = usePathname();
-  const version = formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA);
 
   return (
     <>
@@ -23,7 +21,6 @@ export function AppHeader() {
           <Link href="/" className="brand">
             <BrandMark />myOdd<span className="brand-dot">.</span>
           </Link>
-          <span className="header-version" title="App version">{version}</span>
         </div>
 
         <nav className="app-nav-desktop" aria-label="Main navigation">
@@ -31,10 +28,10 @@ export function AppHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className={`app-nav-link${'live' in link && link.live ? ' is-live' : ''}`}
+              className="app-nav-link"
               aria-current={link.active(path) ? 'page' : undefined}
             >
-              {'live' in link && link.live ? <i className="nav-live-dot" aria-hidden /> : null}
+
               {link.label}
             </Link>
           ))}
@@ -51,7 +48,7 @@ export function AppHeader() {
             className="app-nav-mobile-item"
             aria-current={link.active(path) ? 'page' : undefined}
           >
-            {'live' in link && link.live ? <i className="nav-live-dot" aria-hidden /> : null}
+
             <span>{link.label}</span>
           </Link>
         ))}

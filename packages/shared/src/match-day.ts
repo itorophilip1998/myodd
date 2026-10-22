@@ -55,7 +55,7 @@ export function matchDayKickoffWindow(
   let end = typeof matchDateEnd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(matchDateEnd) ? matchDateEnd : day;
   if (end < day) end = day;
   const max = addLagosDays(today, 6);
-  if (end > max) end = max;
+  if (end > max && day <= max) end = max;
 
   if (day === today && end === today) {
     const after = now.toISOString();
@@ -82,4 +82,20 @@ export function matchDayKickoffWindow(
 /** Latest selectable match day (Lagos): today + 6 days. */
 export function matchDayMaxYmd(now = new Date()): string {
   return addLagosDays(lagosDateYmd(now), 6);
+}
+
+/** Resolve common calendar requests locally so default controls cannot override the prompt. */
+export function promptMatchDay(instruction: string, now = new Date()): { start: string; end: string } | null {
+  const requested = instruction.match(/\b(?:on|match days?:)\s*(\d{4}-\d{2}-\d{2})(?:\s*(?:to|through)\s*(\d{4}-\d{2}-\d{2}))?/i);
+  const dates = requested ? [requested[1], ...(requested[2] ? [requested[2]] : [])] : null;
+  if (dates?.length && dates.every(day => Number.isFinite(new Date(`${day}T00:00:00+01:00`).getTime()))) return { start: dates[0], end: dates.at(-1)! };
+  const today = lagosDateYmd(now);
+  if (/\btomorrow\b/i.test(instruction)) { const day = addLagosDays(today, 1); return { start: day, end: day }; }
+  if (/\bweekend\b/i.test(instruction)) {
+    const weekday = new Date(`${today}T12:00:00+01:00`).getUTCDay();
+    const saturday = addLagosDays(today, weekday === 0 ? 0 : (6 - weekday + 7) % 7);
+    return { start: saturday, end: weekday === 0 ? saturday : addLagosDays(saturday, 1) };
+  }
+  if (/\btoday\b|\btonight\b/i.test(instruction)) return { start: today, end: today };
+  return null;
 }

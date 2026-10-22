@@ -14,7 +14,7 @@ Persist generation results as **collections** (`SlipGroup`), browse public vs pe
 
 ## Visibility model
 
-New generations start **private** and **unsaved** (`isPublic: false`, `userSaved: false`) for guests and signed-in users. Drafts remain reachable by `publicId` link until saved/shared.
+New generations start private. Successful authenticated generations are automatically retained in Codes; authenticated drafts are owner-only. Guest drafts retain unguessable result links until claimed. Saving a title and optional public visibility updates the same collection transactionally.
 
 | State | Who can see |
 |-------|-------------|
@@ -37,14 +37,14 @@ Access rules: `apps/api/src/groups/group-access.ts`.
 
 ## UI behaviour
 
-- History: Public codes vs My collections; grid/compact/list layouts.
+- Codes (`/history`): Public codes vs My collections; grid/compact/list layouts.
 - Collection menu: edit tickets (new generation), rename, make private/public, delete.
 - Delete retracts public visibility but retains training/journal history.
 - Share uses app links (`/g/...`) plus SportyBet share URLs for individual codes.
 
 ## Play / cut labels
 
-Verify runs settlement-aware play-check (see [play-verification.md](./play-verification.md)). **CUT** means lost/void (or removed before kickoff), not merely “inactive on the share ticket.”
+Verify runs settlement-aware play-check (see [play-verification.md](./play-verification.md)). **CUT** means confirmed lost. Each card shows one of OPEN, LIVE, CUT, WIN, UNKNOWN; void and unconfirmed results remain identifiable in expanded details.
 
 ## Related
 
@@ -52,3 +52,9 @@ Verify runs settlement-aware play-check (see [play-verification.md](./play-verif
 - [generation.md](./generation.md) — creating collections
 - [learning.md](./learning.md) — feedback on collections
 - [play-verification.md](./play-verification.md) — accurate win/loss checks
+
+## Temporary retention
+
+All collections, including public/named/bookmarked collections, become eligible for permanent deletion 24 hours after every underlying match is confirmed finished and every selection has a final result. Unknown, live, postponed, and pending events block completion. Corrections clear the completion clock. Existing final collections get a full window when first verified after rollout.
+
+Lifecycle tracking runs every five minutes. Physical deletion is gated by `COLLECTION_CLEANUP_ENABLED=true`, refreshes settlement evidence, and rechecks under row locks. Collection-owned slips, selections, bookmarks, and jobs are removed; independent audit/training records remain. See [production-improvements.md](./production-improvements.md).

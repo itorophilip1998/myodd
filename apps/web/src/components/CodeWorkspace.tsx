@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SlipGroup } from '@/lib/api';
 import { GenerateForm } from './GenerateForm';
 import { SlipGroups } from './SlipGroups';
+import { GenerationOutcome } from './GenerationOutcome';
 import { SaveCollection } from './SaveCollection';
 import { ProgressQuest } from './ProgressQuest';
 import { JobNoticeToast } from './JobNoticeToast';
@@ -44,6 +45,8 @@ export function CodeWorkspace({ group, busy = false, promptToSave = false }: { g
   }, [hasResults, building, group.job?.total, group.job?.progress, toast]);
 
   return <>
+    <p className="collection-retention">Collections are permanently deleted 24 hours after every match has a confirmed final result.{group.deleteAfter && <> Scheduled deletion: <time dateTime={group.deleteAfter}>{new Date(group.deleteAfter).toLocaleString('en-NG', { timeZone: 'Africa/Lagos' })} (Lagos time).</time></>}</p>
+    <GenerationOutcome outcome={group.job?.outcome} />
     {!hasResults && building && <ProgressQuest job={group.job} />}
     {hasResults && notice && (
       <JobNoticeToast noticeKey={`${group.publicId}:notice`} message={notice} sticky />
@@ -51,13 +54,14 @@ export function CodeWorkspace({ group, busy = false, promptToSave = false }: { g
     {showWorkspace && (
       <div className="result-toolbar">
         <BackButton
-          href={group.saved || group.userSaved ? '/history' : '/'}
-          label={group.saved || group.userSaved ? 'Saved codes' : 'Create'}
+          href={group.saved || group.userSaved ? '/history' : '/generate'}
+          label={group.saved || group.userSaved ? 'Codes' : 'Generate'}
         />
         <div className="result-toolbar-spacer" />
         {hasResults && (
           <SaveCollection
             publicId={group.publicId}
+            title={group.title}
             saved={group.saved}
             userSaved={group.userSaved}
             isOwner={group.isOwner}

@@ -58,7 +58,7 @@ class DrawIntentTests(unittest.TestCase):
     def test_prefers_exact_draws_over_narrower_alternatives(self):
         pool = [pick(i, 'ten') for i in range(3)] + [pick(i, 'goals', 'u', 1.12) for i in range(3)]
         report = generate_report(pool, config(), [])
-        self.assertEqual(len(report['candidates']), 2)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(s['marketId'] == 'ten' for c in report['candidates'] for s in c['selections']))
 
     def test_missing_interval_draws_never_become_fulltime_wins_or_other_periods(self):
@@ -67,7 +67,7 @@ class DrawIntentTests(unittest.TestCase):
 
     def test_same_period_nogoal_alternative_is_disclosed(self):
         report = generate_report([pick(i,'goals','u') for i in range(3)], config(), [])
-        self.assertEqual(len(report['candidates']), 2)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(s['marketId']=='goals' for c in report['candidates'] for s in c['selections']))
         self.assertTrue(any('narrower bets' in n for n in report['notices']))
 

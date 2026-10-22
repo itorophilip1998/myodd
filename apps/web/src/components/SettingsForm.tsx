@@ -26,6 +26,12 @@ export function SettingsForm() {
 
   return (
     <div className="settings-page-body">
+      <section className="settings-card" aria-labelledby="appearance-heading">
+        <h3 id="appearance-heading">Appearance</h3>
+        <div className="settings-grid"><label>Theme <select aria-label="Theme" value={settings.theme} onChange={e => update({ theme: e.target.value as UiSettings['theme'] })}>
+          <option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option>
+        </select></label></div>
+      </section>
       <section className="settings-card" aria-labelledby="pref-heading">
         <div className="settings-card-head">
           <h3 id="pref-heading">Generation defaults</h3>
@@ -34,8 +40,8 @@ export function SettingsForm() {
         <div className="settings-grid">
           <label>
             Default mode
-            <select value="INVESTOR" disabled aria-label="Default mode Investor (recommended)">
-              <option value="INVESTOR">Investor (recommended)</option>
+            <select value={settings.defaultMode ?? ''} onChange={e => update({ defaultMode: (e.target.value || null) as UiSettings['defaultMode'] })}>
+              <option value="">Auto</option><option value="INVESTOR">Investor</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
             </select>
           </label>
           <label>

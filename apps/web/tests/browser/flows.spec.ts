@@ -1,0 +1,122 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const slip = { id: 'test-slip', bookingCode: 'TEST123', shareUrl: '', totalOdds: 4, confidence: .6, riskLevel: 'LOWER', selectionCount: 1, expiresAt: null, displayStatus: 'ACTIVE', result: 'PENDING', playStatus: 'OPEN', selections: [{ homeTeam: 'Test Home', awayTeam: 'Test Away', league: 'Test League', marketName: 'Total goals', selectionName: 'Over 1.5', odds: 4, result: 'PENDING', playStatus: 'UPCOMING', kickoffAt: null }] };
+const outcome = { requestId: 'test-request', status: 'partial_success', requested: 10, generated: 1, failed: 9, errors: [{ code: 'SHORTAGE', message: 'Fewer unique selections are available.', retryable: false }] };
+const job = { id: 'test-job', status: 'COMPLETED', total: 1, progress: 1, failedCount: 0, groupId: 'test-group', publicId: 'test-group', error: null, outcome };
+const group = { id: 'test-group', publicId: 'test-group', title: 'Test Collection', isOwner: false, isPublic: true, userSaved: true, slips: [slip], job, counts: { lower: 1, moderate: 0, higher: 0 }, createdAt: new Date().toISOString() };
+
+async function mockApi(page: Page) {
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    const value = path.includes('/slips/markets') ? { version: 1, options: [{ id: 'goals.over.1.5', label: 'Over 1.5', category: 'Total Goals', available: true }] }
+      : path.includes('/jobs/') ? job : path === '/api/groups/public' ? [] : path.includes('/groups/test-group') ? group : path.includes('/codes/') ? slip : { preferences: null };
+    return route.fulfill({ json: value });
+  });
+}
+test('prompt generation works in Auto with multiple typed controls and a visible partial result', async ({ page }) => {
+  await mockApi(page);
+  let payload: Record<string, unknown> = {};
+  await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
+  await page.goto('/generate');
+  await page.locator('.mode-advanced summary').click();
+  await expect(page.getByRole('button', { name: 'Auto — follow my prompt' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.mode-advanced summary').click();
+  await page.locator('textarea').fill('Generate 5 tickets using over 1.5 targeting around 15 odds');
+  await page.locator('textarea').press('ControlOrMeta+Enter');
+  await expect(page).toHaveURL(/\/result\/test-group/);
+  await expect(page.getByRole('heading', { name: 'Partial success' })).toBeVisible();
+  expect(payload.riskMode).toBeNull(); expect(payload.ticketCount).toBe(5); expect(payload.requestId).toMatch(/^[a-f0-9-]{36}$/);
+});
+test('copying a code does not open details, and each card has one result badge', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await mockApi(page);
+  await page.goto('/result/test-group?job=test-job');
+  await page.getByRole('button', { name: 'Copy code TEST123' }).click();
+  await expect(page.getByText('Code copied!', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('TEST123');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.code-card .play-chip')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Open TEST123 details' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close picks' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]'))).toBe(true);
+  await expect(page.getByText(/Settlement: Pending/).first()).toBeVisible();
+  await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open TEST123 details' })).toBeFocused();
+});
+test('loaded tickets survive a subsequent API failure', async ({ page }) => {
+  await mockApi(page); await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
+  await page.route('**/api/groups/test-group', route => route.fulfill({ status: 503, json: { message: 'Temporary provider error' } }));
+  await page.getByRole('button', { name: 'Check results', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Results could not refresh' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
+});
+test('failed initial results show an actionable error rather than a blank page', async ({ page }) => {
+  await page.route('**/api/**', route => route.fulfill({ status: 404, json: { message: 'This booking code is unavailable.' } }));
+  await page.goto('/result/missing?job=missing');
+  await expect(page.getByRole('heading', { name: 'Results could not refresh' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+});
+test('theme overrides persist and System follows operating system changes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' }); await page.goto('/settings');
+  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('dark');
+  await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('system');
+  await page.emulateMedia({ colorScheme: 'light' }); await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.emulateMedia({ colorScheme: 'dark' }); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+test('market selection survives navigation', async ({ page }) => {
+  await mockApi(page); await page.goto('/generate'); await page.locator('.market-picker summary').click();
+  await page.getByLabel('Over 1.5', { exact: true }).check();
+  await page.goto('/settings'); await page.goto('/generate');
+  await page.locator('.market-picker summary').click(); await expect(page.getByLabel('Over 1.5', { exact: true })).toBeChecked();
+});
+test('unified save uses one request with editable title and optional public visibility', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fixture-account', 'test-owner'));
+  const saves: unknown[] = [];
+  await page.route('**/api/account/settings', route => route.fulfill({ json: { settings: null } }));
+  await page.route('**/api/account/saves/**', route => { saves.push(route.request().postDataJSON()); return route.fulfill({ json: { saved: true } }); });
+  await page.goto('http://127.0.0.1:3101/collection-fixture');
+  await page.getByRole('button', { name: 'Save Collection', exact: true }).click();
+  await expect(page.getByLabel('Make this collection public')).not.toBeChecked();
+  await page.getByLabel('Collection title').fill('My Weekend Picks');
+  await page.getByLabel('Make this collection public').check();
+  await page.getByRole('dialog').getByRole('button', { name: 'Save Collection', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  expect(saves).toEqual([{ title: 'My Weekend Picks', isPublic: true }]);
+});
+test('save draft inputs survive the sign-in round trip', async ({ page }) => {
+  await page.route('**/api/account/settings', route => route.fulfill({ json: { settings: null } }));
+  await page.goto('http://127.0.0.1:3101/collection-fixture');
+  await page.getByRole('button', { name: 'Save Collection', exact: true }).click();
+  await page.getByLabel('Collection title').fill('Keep this title'); await page.getByLabel('Make this collection public').check();
+  await page.getByRole('link', { name: 'Sign in to save' }).click();
+  await page.evaluate(() => localStorage.setItem('fixture-account', 'test-owner'));
+  await page.goto('http://127.0.0.1:3101/collection-fixture');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Collection title')).toHaveValue('Keep this title');
+  await expect(page.getByLabel('Make this collection public')).toBeChecked();
+});
+test('dismiss all removes visible notifications permanently across rerenders', async ({ page }) => {
+  await page.goto('http://127.0.0.1:3101/toasts-fixture');
+  await page.getByRole('button', { name: 'First toast' }).click(); await page.getByRole('button', { name: 'Second toast' }).click();
+  await page.getByRole('button', { name: 'Dismiss all' }).click(); await expect(page.locator('.toast-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'First toast' }).click(); await expect(page.locator('.toast-item')).toHaveCount(1);
+});
+for (const width of [320, 375, 767, 768, 1023, 1280]) {
+  test(`major screens fit a ${width}px viewport`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width, height: 900 }); await mockApi(page);
+    for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme });
+    for (const path of ['/', '/generate', '/history', '/settings', '/result/test-group?job=test-job', '/code/TEST123']) {
+      await page.goto(path); await expect(page.locator('main')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      const overflowing = await page.locator('button:visible, input:visible, textarea:visible, select:visible').evaluateAll(nodes => nodes.filter(node => { const r = node.getBoundingClientRect(); return r.width > 0 && (r.left < -1 || r.right > innerWidth + 1); }).map(node => node.textContent?.slice(0, 50)));
+      expect(overflowing).toEqual([]);
+      if (width === 375 && (path === '/generate' || path.startsWith('/result'))) await page.screenshot({ path: testInfo.outputPath(`${theme}-${path === '/generate' ? 'generate' : 'results'}.png`), fullPage: true });
+    }
+    }
+  });
+}

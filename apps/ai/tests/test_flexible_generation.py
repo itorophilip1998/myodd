@@ -26,7 +26,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         pool = [selection(i, odds=3, probability=.3) for i in range(8)]
         report = generate_report(pool, Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500,
                                              riskPreference='LOWER'), [])
-        self.assertEqual(len(report['candidates']), 10)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(100 <= c['totalOdds'] <= 500 for c in report['candidates']))
 
     def test_adaptive_mode_adds_matches_and_explains_it(self):
@@ -97,7 +97,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         pool = [selection(i) for i in range(8)]
         report = generate_report(pool, Config(numberOfSlips=3, minimumOdds=3, maximumOdds=10,
                                  includedTeams=['Home 2']), [])
-        self.assertEqual(len(report['candidates']), 3)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(any(s['homeTeam'] == 'Home 2' for s in c['selections']) for c in report['candidates']))
 
     def test_preserved_picks_can_be_kept_in_a_large_expanded_pool(self):

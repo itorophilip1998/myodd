@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/analytics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { playSound, unlockAudio, type SoundId } from '@/lib/sounds';
 import { DEFAULT_UI_SETTINGS, readUiSettings, writeUiSettings, type UiSettings } from '@/lib/ui-settings';
@@ -8,6 +9,7 @@ type SettingsContextValue = {
   settings: UiSettings;
   update: (patch: Partial<UiSettings>) => void;
   reset: () => void;
+  hydrate: (settings: Partial<UiSettings>) => void;
   play: (id: SoundId, opts?: { force?: boolean }) => void;
 };
 
@@ -15,6 +17,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_UI_SETTINGS,
   update: () => undefined,
   reset: () => undefined,
+  hydrate: () => undefined,
   play: () => undefined,
 });
 
@@ -42,11 +45,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => { document.documentElement.dataset.theme = settings.theme === 'system' ? (media.matches ? 'dark' : 'light') : settings.theme; };
+    apply(); media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [settings.theme, ready]);
+  const hydrate = useCallback((patch: Partial<UiSettings>) => setSettings(prev => ({ ...prev, ...patch })), []);
+
   const update = useCallback((patch: Partial<UiSettings>) => {
+    if (patch.theme) track('theme_changed', { theme: patch.theme });
     setSettings(prev => ({ ...prev, ...patch }));
+    window.dispatchEvent(new CustomEvent('myodd:settings-change', { detail: patch }));
   }, []);
 
-  const reset = useCallback(() => setSettings(DEFAULT_UI_SETTINGS), []);
+  const reset = useCallback(() => update(DEFAULT_UI_SETTINGS), [update]);
 
   const play = useCallback((id: SoundId, opts?: { force?: boolean }) => {
     const enabled = opts?.force || settings.soundsEnabled;
@@ -57,8 +71,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings.soundsEnabled, settings.soundVolume, settings.toastSounds, settings.progressSounds]);
 
   const value = useMemo(
-    () => ({ settings, update, reset, play }),
-    [settings, update, reset, play],
+    () => ({ settings, update, reset, hydrate, play }),
+    [settings, update, reset, hydrate, play],
   );
 
   return (

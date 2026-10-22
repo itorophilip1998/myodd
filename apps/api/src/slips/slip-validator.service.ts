@@ -7,7 +7,7 @@ export class SlipValidatorService {
   constructor(@Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider) {}
 
   async validate(selections: ScoredSelection[], config: GenerationConfig, fixtures?: BookmakerFixture[], capture?: (fixtures: BookmakerFixture[]) => Promise<unknown>) {
-    const current = fixtures ?? await this.bookmaker.getFixtures({ eventIds: selections.map(selection => selection.eventId) });
+    const current = fixtures ?? await this.bookmaker.getFixtures({ fresh: true, eventIds: selections.map(selection => selection.eventId) });
     if (capture) await capture(current);
     const events = new Map(current.map(f => [f.eventId, f]));
     const seenEvents = new Set<string>();

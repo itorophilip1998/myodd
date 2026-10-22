@@ -65,7 +65,7 @@ describe('saved code result lookup', () => {
     await service.checkPlayCode(' abc123 ', 'owner');
     expect(prisma.generatedSlip.findFirst.mock.calls[0][0].where).toMatchObject({
       bookingCode: 'ABC123', group: { AND: [
-        { deletedAt: null, OR: [{ isPublic: true, userSaved: true }, { userSaved: false }, { ownerId: 'owner' }] },
+        { deletedAt: null, OR: [{ isPublic: true, userSaved: true }, { userSaved: false, ownerId: null }, { ownerId: 'owner' }] },
         { OR: [{ userSaved: true }, { ownerId: 'owner' }] },
       ] },
     });

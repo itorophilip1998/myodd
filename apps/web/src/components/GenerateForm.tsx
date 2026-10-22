@@ -1,8 +1,10 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MarketPicker } from './MarketPicker';
 import { ProgressQuest } from './ProgressQuest';
 import { MatchDayPicker } from './MatchDayPicker';
 import { OptionsPopover } from './OptionsPopover';
@@ -84,12 +86,16 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const fileInputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const bookingCode = sourceCode ?? initialBookingCode;
+  const [selectedMarketIds, setSelectedMarketIds] = useState<string[]>([]);
+  const requestRef = useRef<{ payload: string; id: string } | null>(null);
+  useEffect(() => { try { const ids = JSON.parse(sessionStorage.getItem('myodd-market-draft') ?? '[]'); if (Array.isArray(ids)) setSelectedMarketIds(ids.filter((id: unknown) => typeof id === 'string')); } catch {} }, []);
+  function changeMarkets(ids: string[]) { if (ids.some(id => !selectedMarketIds.includes(id))) track('market_selected', { count: ids.length }); setSelectedMarketIds(ids); try { sessionStorage.setItem('myodd-market-draft', JSON.stringify(ids)); } catch {} }
   const [preferSource, setPreferSource] = useState(false);
   useEffect(() => { if (sourceRevision) setPreferSource(true); }, [sourceRevision]);
   const [instruction, setInstruction] = useState(initialInstruction);
   const initialControls = readGenerationControls(initialInstruction);
-  // Always land on recommended Investor Mode; user can still switch for a single run.
-  const [mode, setMode] = useState(() => MODES.find(m => m.key === (initialControls.mode ?? modeKeyFromLabel(initialMode)))?.name ?? 'Investor Mode');
+  // Manual mode is optional; Auto lets the backend resolve prompt intent.
+  const [mode, setMode] = useState(() => MODES.find(m => m.key === (initialControls.mode ?? modeKeyFromLabel(initialMode)))?.name ?? '');
   const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(() => {
     if (initialSplitInto) return 'split';
     return settings.defaultOperation === 'split' ? 'split' : 'generate';
@@ -151,12 +157,14 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setOperation('generate');
     edited.current = true;
   }, []);
+  const [dateEdited, setDateEdited] = useState(false);
+  const promptDay = promptMatchDay(instruction);
   const [rangeStart, setRangeStart] = useState(() => lagosDateYmd());
   const [rangeEnd, setRangeEnd] = useState(() => lagosDateYmd());
-  const matchWindow = matchDayKickoffWindow(rangeStart, new Date(), rangeEnd);
+  const matchWindow = matchDayKickoffWindow(!dateEdited && promptDay ? promptDay.start : rangeStart, new Date(), !dateEdited && promptDay ? promptDay.end : rangeEnd);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
-    setMode('Investor Mode');
+    setMode(MODES.find(item => item.key === settings.defaultMode)?.name ?? '');
     if (!initialSplitInto) setOperation(settings.defaultOperation === 'split' ? 'split' : 'generate');
     if (settings.defaultTickets) setTicketCount(String(settings.defaultTickets));
     else if (settings.defaultTickets === null) setTicketCount('');
@@ -167,7 +175,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setStrict(settings.defaultStrict);
     setNearest(settings.defaultNearest);
     setOddsSource(settings.defaultOddsSource);
-  }, [initialInstruction, initialSplitInto, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, settings.defaultOddsSource]);
+  }, [initialInstruction, initialSplitInto, settings.defaultMode, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, settings.defaultOddsSource]);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
     void api.preferences().then(({ preferences }) => {
@@ -220,7 +228,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setInstruction(next);
     if (after.tickets !== before.tickets && after.tickets !== null) setTicketCount(String(after.tickets));
     if (after.games !== before.games && after.games !== null) setGamesPerTicket(String(after.games));
-    if (after.mode && after.mode !== before.mode) chooseMode(MODES.find(m => m.key === after.mode)!.name);
     if (after.odds && JSON.stringify(after.odds) !== JSON.stringify(before.odds)) setOddsSource('prompt');
   }
 
@@ -229,7 +236,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const parsedMin = Number(minOdds);
     const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
     if (!Number.isFinite(parsedMin) || (parsedMax != null && !Number.isFinite(parsedMax))) return null;
-    return clampOddsToMode(parsedMin, parsedMax, modeBand.key);
+    return mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
   }
 
   const appliedSummary = useMemo(() => {
@@ -241,11 +248,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const parsedMin = Number(minOdds);
       const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
       if (Number.isFinite(parsedMin) && (parsedMax == null || Number.isFinite(parsedMax))) {
-        optionsOdds = clampOddsToMode(parsedMin, parsedMax, modeBand.key);
+        optionsOdds = mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
       }
     }
     const fromPrompt = oddsSource === 'prompt' ? previewOddsFromPrompt(instruction) : null;
-    const previewOdds = optionsOdds ?? (fromPrompt ? clampOddsToMode(fromPrompt.minimum, fromPrompt.maximum, modeBand.key) : null);
+    const previewOdds = optionsOdds ?? (fromPrompt ? (mode ? clampOddsToMode(fromPrompt.minimum, fromPrompt.maximum, modeBand.key) : fromPrompt) : null);
     const oddsBit = previewOdds
       ? `${previewOdds.minimum}–${previewOdds.maximum == null ? MAX_TICKET_ODDS : previewOdds.maximum}${optionsOdds ? '' : ' (from prompt)'}`
       : oddsSource === 'prompt'
@@ -256,7 +263,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       ? matchWindow.label
       : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
     const overrideNote = optionsOdds || ticketCount ? ' · Options win when set' : '';
-    return `Applied: ${mode} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
+    return `Applied: ${mode || 'Auto'} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
   }, [wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
 
   function applyPreset(min: number, max: number | null) {
@@ -303,7 +310,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       rawMinOdds: rawMin,
       rawMaxOdds: rawMax,
       oddsSource,
-      mode: modeBand.key,
+      mode: mode ? modeBand.key : undefined,
     });
     if (guard) {
       play('error');
@@ -311,6 +318,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       setOptionsOpen(true);
       return;
     }
+    track('generate_started');
     play('submit');
     setSubmittedAt(new Date().toISOString()); setLoading(true);
     const odds = !wantsSplit ? resolvedOdds() : null;
@@ -331,23 +339,25 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
-      mode ? `Risk mode: ${mode}.` : '',
+
       oddsLabel,
       dateLine,
       `Ticket odds must not exceed ${MAX_TICKET_ODDS}.`,
-      'Never reuse the same game across tickets in this generation.',
     ].filter(Boolean).join(' ');
     const basePrompt = instruction.trim() || (predictionBook.length ? predictionBookPrompt(predictionBook) : '') || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
     const prompt = dateLine && !/match day/i.test(basePrompt) ? `${basePrompt}\n${dateLine}` : basePrompt;
     try {
       const hasBook = predictionBook.length > 0;
-      const result = await api.generate({
+      const payload = {
+        riskMode: mode ? modeBand.key : null,
+        selectedMarketIds,
         bookingCode: effectiveCode || undefined,
         ticketCount: uiTickets ?? (hasBook ? 1 : undefined),
         gamesPerTicket: hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
-        operation: wantsSplit ? 'split' : 'generate',
+        operation: wantsSplit ? 'split' as const : 'generate' as const,
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
+        matchDateEnd: wantsSplit ? undefined : matchWindow.matchDateEnd,
         minimumOdds: hasBook ? undefined : odds?.minimum,
         maximumOdds: hasBook ? undefined : (odds ? (odds.maximum ?? MAX_TICKET_ODDS) : undefined),
         instruction: prompt + (settingsLine ? `\nFinal request settings (take precedence): ${settingsLine}` : ''),
@@ -366,13 +376,20 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               kickoffAt: pick.kickoffAt,
             }))
           : undefined,
-      });
+      };
+      const payloadKey = JSON.stringify(payload);
+      if (!requestRef.current) { try { requestRef.current = JSON.parse(sessionStorage.getItem('myodd-generation-retry') ?? 'null'); } catch {} }
+      if (!requestRef.current || requestRef.current.payload !== payloadKey) requestRef.current = { payload: payloadKey, id: crypto.randomUUID() };
+      try { sessionStorage.setItem('myodd-generation-retry', JSON.stringify(requestRef.current)); } catch {}
+      const result = await api.generate({ ...payload, requestId: requestRef.current.id });
+      try { sessionStorage.removeItem('myodd-generation-retry'); } catch {}
+      requestRef.current = null;
       if (hasBook) {
         clearPredictionBook();
         setPredictionBook([]);
       }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { play('error'); toast((err as Error).message, { sticky: true }); setLoading(false); }
+    } catch (err) { track('generate_failed'); play('error'); toast((err as Error).message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
@@ -386,8 +403,10 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   }
 
   return <form onSubmit={submit} className="chat-composer">
+    <details className="mode-advanced"><summary>Mode: {mode || 'Auto'} <span>optional</span></summary>
     <fieldset className="mode-picker">
-      <legend>Pick your mode <span>Investor recommended for best-ranked tickets</span></legend>
+      <legend>Mode <span>Optional — Auto follows your prompt</span></legend>
+      <button type="button" className="outline-button" aria-pressed={!mode} onClick={() => { touch(); setMode(''); setOddsSource('prompt'); }}>Auto — follow my prompt</button>
       <div className="mode-grid">
         {MODES.map(item => (
           <div key={item.name} className={`mode-option-wrap ${item.tone}${mode === item.name ? ' selected' : ''}`}>
@@ -421,8 +440,10 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
           </div>
         ))}
       </div>
-    </fieldset>
+    </fieldset></details>
 
+    <MarketPicker selected={selectedMarketIds} onChange={changeMarkets} />
+    {mode && initialControls.mode && initialControls.mode !== modeBand.key && <p role="status">Your selected mode takes precedence over the prompt mode.</p>}
     <div className="composer chat-input-box">
       {predictionBook.length > 0 && (
         <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
@@ -501,7 +522,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
             <MatchDayPicker
               start={rangeStart}
               end={rangeEnd}
-              onChange={(s, e) => { touch(); setRangeStart(s); setRangeEnd(e); setOptionsOpen(false); }}
+              onChange={(s, e) => { touch(); setDateEdited(true); setRangeStart(s); setRangeEnd(e); setOptionsOpen(false); }}
             />
           )}
 
