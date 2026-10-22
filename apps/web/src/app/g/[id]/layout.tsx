@@ -10,7 +10,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const url = new URL(`/g/${encodeURIComponent(collection.publicId)}`, siteUrl()).href;
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, images: ['/icon.png'] }, twitter: { card: 'summary', title, description }, robots: { index: true, follow: true } };
 }
-export default async function GroupLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
-  const collection = await publicCollection((await params).id);
-  return <>{collection && <header className="workspace public-collection-heading"><h1>{collection.title}</h1><p>Public football collection · 18+ · Gamble responsibly</p></header>}{children}</>;
+export default function GroupLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

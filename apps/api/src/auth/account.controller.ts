@@ -34,7 +34,7 @@ export class AccountController {
   }
   @Get('settings') async settings(@Req() req: AuthRequest) {
     const user = await this.prisma.appUser.findUniqueOrThrow({ where: { id: req.account!.id }, select: { uiSettings: true } });
-    return { settings: user.uiSettings };
+    return { settings: user.uiSettings ? uiSettingsSchema.partial().strip().parse(user.uiSettings) : null };
   }
   @Patch('settings') async updateSettings(@Req() req: AuthRequest, @Body() body: unknown) {
     const patch = uiSettingsSchema.partial().safeParse(body);
@@ -43,7 +43,7 @@ export class AccountController {
       // Serialize concurrent device updates without dropping unrelated preferences.
       await tx.$queryRaw`SELECT id FROM app_users WHERE id = ${req.account!.id} FOR UPDATE`;
       const user = await tx.appUser.findUniqueOrThrow({ where: { id: req.account!.id } });
-      const settings = { ...(user.uiSettings as object ?? {}), ...patch.data };
+      const settings = uiSettingsSchema.partial().strip().parse({ ...(user.uiSettings as object ?? {}), ...patch.data });
       await tx.appUser.update({ where: { id: user.id }, data: { uiSettings: settings as Prisma.InputJsonValue } });
       return { settings };
     });

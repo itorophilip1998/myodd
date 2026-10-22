@@ -98,12 +98,12 @@ describe('privacy, settings, and safe caching', () => {
     expect(confirmedFinalTicket({ ...ticket, selections: [{ result: 'WON', matchPhase: 'live' }] })).toBe(false);
     expect(confirmedFinalTicket({ ...ticket, selections: [] })).toBe(false);
   });
-  it('preserves explicit saved theme and mode preferences', () => {
+  it('preserves saved mode preferences and rejects removed theme settings', () => {
     let raw = '';
     vi.stubGlobal('window', {}); vi.stubGlobal('localStorage', { getItem: () => raw, setItem: (_key: string, value: string) => { raw = value; } });
-    writeUiSettings({ ...DEFAULT_UI_SETTINGS, theme: 'dark', defaultMode: 'JAPA' });
-    expect(readUiSettings()).toMatchObject({ theme: 'dark', defaultMode: 'JAPA' });
-    expect(uiSettingsSchema.safeParse({ ...DEFAULT_UI_SETTINGS, theme: 'invalid' }).success).toBe(false);
+    writeUiSettings({ ...DEFAULT_UI_SETTINGS, defaultMode: 'JAPA' });
+    expect(readUiSettings()).toMatchObject({ defaultMode: 'JAPA' });
+    expect(uiSettingsSchema.safeParse({ ...DEFAULT_UI_SETTINGS, theme: 'dark' }).success).toBe(false);
   });
   it('deduplicates simultaneous safe reads and never caches booking POSTs', async () => {
     const redis = { getJson: vi.fn().mockResolvedValue(null), setJson: vi.fn().mockResolvedValue(undefined) };

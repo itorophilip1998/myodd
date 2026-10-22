@@ -52,11 +52,11 @@ describe.skipIf(!url)('production improvements against PostgreSQL', () => {
   });
   it('merges concurrent settings patches without leaking another account preferences', async () => {
     const controller = new AccountController(db as any);
-    await Promise.all([controller.updateSettings({ account: owner } as any, { theme: 'dark' }), controller.updateSettings({ account: owner } as any, { soundVolume: .2 })]);
-    expect((await controller.settings({ account: owner } as any)).settings).toMatchObject({ theme: 'dark', soundVolume: .2 });
+    await Promise.all([controller.updateSettings({ account: owner } as any, { soundsEnabled: false }), controller.updateSettings({ account: owner } as any, { soundVolume: .2 })]);
+    expect((await controller.settings({ account: owner } as any)).settings).toMatchObject({ soundsEnabled: false, soundVolume: .2 });
     expect((await controller.settings({ account: other } as any)).settings).toBeNull();
   });
-  it('automatically retains a successful authenticated ticket privately and settles its task once', async () => {
+  it('keeps a successful authenticated ticket as a private draft and settles its task once', async () => {
     const group = await db.slipGroup.create({ data: { publicId: `${prefix}-autosave`, title: 'Generated result', ownerId: owner.id } }); groupIds.push(group.id);
     const job = await db.generationJob.create({ data: { groupId: group.id, total: 1, requestedCount: 1 } });
     const service = new SlipsService({} as any, {} as any, {} as any, {} as any, db as any, {} as any, {} as any);
@@ -65,7 +65,7 @@ describe.skipIf(!url)('production improvements against PostgreSQL', () => {
     const input: any = { jobId: job.id, groupId: group.id, config: {}, selections: picks };
     await service.settleBooking('test-task', input, booking, picks);
     await service.settleBooking('test-task', input, booking, picks);
-    expect(await db.slipGroup.findUnique({ where: { id: group.id } })).toMatchObject({ userSaved: true, isPublic: false });
+    expect(await db.slipGroup.findUnique({ where: { id: group.id } })).toMatchObject({ userSaved: false, isPublic: false });
     expect(await db.generatedSlip.count({ where: { groupId: group.id } })).toBe(1);
     expect(await db.generationJob.findUnique({ where: { id: job.id } })).toMatchObject({ status: 'COMPLETED', progress: 1 });
     await db.bookingCode.deleteMany({ where: { code: booking.code.toUpperCase() } });

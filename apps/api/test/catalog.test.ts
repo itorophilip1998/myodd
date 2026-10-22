@@ -28,7 +28,7 @@ describe('catalog lifetime and active master policy', () => {
   });
 });
 
-it('keeps the original expiry when SportyBet returns a previously saved code', async () => {
+it('persists generated tickets as drafts and keeps the original expiry of reused codes', async () => {
   const { SlipsService } = await import('../src/slips/slips.service');
   const firstSeenAt = new Date(Date.now() - 6 * 86400000);
   const create = vi.fn();
@@ -40,6 +40,7 @@ it('keeps the original expiry when SportyBet returns a previously saved code', a
   const picks: any[] = [{ eventId: '1', marketId: '1', outcomeId: '1', odds: 1.5, confidence: 60, probability: .6, modelVersion: 'odds-v2' }];
   await service.settleBooking('task', { jobId: 'job', groupId: 'group', config: {} as any, selections: picks }, { ...booking, code: 'SAME123', shareUrl: 'https://www.sportybet.com/ng/?shareCode=SAME123' }, picks);
   expect(create.mock.calls[0][0].data.expiresAt).toEqual(codeExpiry(firstSeenAt));
+  expect(tx.slipGroup.updateMany).not.toHaveBeenCalled();
 });
 
 it('keeps last-known-active codes visible while rechecking stale snapshots', async () => {

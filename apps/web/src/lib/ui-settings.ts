@@ -6,13 +6,11 @@ export const MAX_GAMES_PER_TICKET = 50;
 export const MAX_TICKETS = 50;
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-  theme: 'system',
   soundsEnabled: true,
   soundVolume: 0.55,
   progressSounds: true,
   toastSounds: true,
-  /** Null lets the prompt and available odds determine the mode. */
-  defaultMode: null,
+  defaultMode: 'INVESTOR',
   defaultOperation: 'generate',
   defaultTickets: 10,
   defaultGames: null as null,
@@ -20,7 +18,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   defaultScope: 'prompt',
   defaultStrict: false,
   defaultNearest: false,
-  defaultOddsSource: 'prompt',
+  defaultOddsSource: 'manual',
 };
 
 export function clampVolume(value: number) {
@@ -44,12 +42,11 @@ export function readUiSettings(): UiSettings {
     // Older releases automatically stored five as the default on first load.
     const tickets = parsed.defaultsVersion !== 2 && parsed.defaultsVersion !== 3 && parsed.defaultTickets === 5 ? 10 : parsed.defaultTickets;
     return {
-      theme: parsed.theme === 'light' || parsed.theme === 'dark' ? parsed.theme : 'system',
       soundsEnabled: parsed.soundsEnabled !== false,
       soundVolume: clampVolume(Number(parsed.soundVolume ?? DEFAULT_UI_SETTINGS.soundVolume)),
       progressSounds: parsed.progressSounds !== false,
       toastSounds: parsed.toastSounds !== false,
-      defaultMode: parsed.defaultsVersion === 3 && ['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'].includes(parsed.defaultMode ?? '') ? parsed.defaultMode! : null,
+      defaultMode: parsed.defaultsVersion === 3 && ['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'].includes(parsed.defaultMode ?? '') ? parsed.defaultMode! : 'INVESTOR',
       defaultOperation: parsed.defaultOperation === 'split' ? 'split' : 'generate',
       defaultTickets: clampTickets(tickets === undefined ? DEFAULT_UI_SETTINGS.defaultTickets : tickets),
       defaultGames: clampTickets(parsed.defaultGames),

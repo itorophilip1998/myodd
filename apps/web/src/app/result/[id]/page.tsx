@@ -67,7 +67,7 @@ function ResultInner() {
 
   return (
     <main className="workspace result-workspace">
-      {(groupQuery.error || jobQuery.error) && <section role="alert" className="generation-outcome"><h1>Results could not refresh</h1><p>{(groupQuery.error ?? jobQuery.error)?.message}</p><p>Any codes already loaded remain below.</p><button type="button" className="outline-button" onClick={() => { void groupQuery.refetch(); if (jobId) void jobQuery.refetch(); }}>Try again</button><a href="/generate">Adjust your request</a></section>}
+      {(groupQuery.error || jobQuery.error) && <section role="alert" className="generation-outcome"><h1>Results could not refresh</h1><p>{(groupQuery.error ?? jobQuery.error)?.message}</p><p>Any codes already loaded remain below.</p><button type="button" className="outline-button" onClick={() => { void groupQuery.refetch(); if (jobId) void jobQuery.refetch(); }}>Try again</button><a href="/">Adjust your request</a></section>}
       {!group && !groupQuery.error && !jobQuery.error && (
         <ProgressQuest job={job ?? { status: 'PENDING', stage: 'QUEUED', progress: 0, total: 0, failedCount: 0 }} />
       )}

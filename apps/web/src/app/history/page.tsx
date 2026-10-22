@@ -191,7 +191,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="workspace library-workspace"><p className="collection-retention">All collections are temporary: permanently deleted 24 hours after every match has a confirmed final result.</p>
+    <main className="workspace library-workspace">
       <header className="library-header">
         <div>
           <p className="eyebrow">YOUR CODE LIBRARY</p>

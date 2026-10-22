@@ -26,12 +26,6 @@ export function SettingsForm() {
 
   return (
     <div className="settings-page-body">
-      <section className="settings-card" aria-labelledby="appearance-heading">
-        <h3 id="appearance-heading">Appearance</h3>
-        <div className="settings-grid"><label>Theme <select aria-label="Theme" value={settings.theme} onChange={e => update({ theme: e.target.value as UiSettings['theme'] })}>
-          <option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option>
-        </select></label></div>
-      </section>
       <section className="settings-card" aria-labelledby="pref-heading">
         <div className="settings-card-head">
           <h3 id="pref-heading">Generation defaults</h3>
@@ -40,8 +34,8 @@ export function SettingsForm() {
         <div className="settings-grid">
           <label>
             Default mode
-            <select value={settings.defaultMode ?? ''} onChange={e => update({ defaultMode: (e.target.value || null) as UiSettings['defaultMode'] })}>
-              <option value="">Auto</option><option value="INVESTOR">Investor</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
+            <select value={settings.defaultMode ?? 'INVESTOR'} onChange={e => update({ defaultMode: (e.target.value || null) as UiSettings['defaultMode'] })}>
+              <option value="INVESTOR">Investor</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
             </select>
           </label>
           <label>
@@ -105,19 +99,6 @@ export function SettingsForm() {
               <option value="prompt">Prompt</option>
               <option value="original_only">Original</option>
               <option value="upcoming">Upcoming</option>
-            </select>
-          </label>
-          <label>
-            Odds source
-            <select
-              value={settings.defaultOddsSource}
-              onChange={e => {
-                update({ defaultOddsSource: e.target.value as UiSettings['defaultOddsSource'] });
-                play('click');
-              }}
-            >
-              <option value="manual">Options</option>
-              <option value="prompt">Prompt</option>
             </select>
           </label>
         </div>
