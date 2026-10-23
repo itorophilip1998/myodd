@@ -204,7 +204,7 @@ def _system_prompt(catalog: list[dict]) -> str:
         'Use the whole mode band unless explicit requested odds narrow it. Never allow nearest odds outside a mode band. '
         'Honor shorthand odds like “4-5 odds”, “only 4–5 odds”, “not below 4 odds”, and “make it 10 games” as hard minimumOdds/maximumOdds and exact selection counts. '
         'A final mode selection overrides earlier mode names; preserve explicit odds and other filters. '
-        'Counts of games/picks/legs per ticket are selection limits; counts of tickets/codes are numberOfSlips (hard max 50 per request). Exactly N games means minimumSelections=maximumSelections=N. '
+        'Counts of games/picks/legs per ticket are selection limits; counts of tickets/codes are numberOfSlips (hard max 10 per request). Exactly N games means minimumSelections=maximumSelections=N. '
         'Risk is a ranking preference, never a minimum probability unless the user explicitly asks for one. '
         'Use fixtureMode=adaptive unless the user explicitly restricts to original matches; use original_only for same matches only. '
         'Preserve every requested market and period: use marketPolicy=only when markets are specified. Never substitute unrelated outcomes to fill a ticket count. '

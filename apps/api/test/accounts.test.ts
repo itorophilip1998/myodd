@@ -42,6 +42,10 @@ describe('account-scoped saved collections', () => {
     await expect(service.getByPublicId('PRIVATE')).rejects.toThrow('Collection not found');
     expect(displayStatus).not.toHaveBeenCalled();
   });
+  it('keeps stored collections readable when optional availability refresh fails', async () => {
+    const service = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue({ ...draft, ownerId: null, slips: [{ id: 'stored', bookingCode: 'VALID123', selections: [], totalOdds: 2.25, confidence: .6, selectionCount: 0, riskLevel: 'LOWER' }] }) }, savedCollection: { findUnique: vi.fn() } } as any, { displayStatus: vi.fn().mockRejectedValue(new Error('Redis unavailable')) } as any, playCheck as any);
+    await expect(service.getByPublicId('DRAFT')).resolves.toMatchObject({ publicId: 'DRAFT', slips: [{ bookingCode: 'VALID123', displayStatus: 'UNKNOWN' }] });
+  });
   it('keeps guest drafts reachable by publicId without adding them to history', async () => {
     const displayStatus = vi.fn().mockResolvedValue({ valid: new Set(), checking: 0, unavailable: 0, statuses: new Map() });
     const service = new GroupsService({

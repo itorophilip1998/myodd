@@ -1,4 +1,4 @@
-import { MAX_TICKET_ODDS, MODE_ODDS, previewOddsFromPrompt, type ModeKey } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, requestedTicketCount, previewOddsFromPrompt, type ModeKey } from '@myodd/shared';
 import { MAX_GAMES_PER_TICKET, MAX_TICKETS } from './ui-settings';
 
 /** Pre-flight checks that should toast and abort before a generate job starts. */
@@ -16,6 +16,7 @@ export function generateGuardrailMessage(input: {
 }): string | null {
   const { wantsSplit, instruction, ticketCount, splitParts, rawMinOdds, rawMaxOdds, oddsSource } = input;
 
+  if ((requestedTicketCount(instruction) ?? 0) > MAX_TICKETS || (ticketCount ?? 0) > MAX_TICKETS || (splitParts ?? 0) > MAX_TICKETS) return 'You can generate up to 10 tickets at a time.';
   if (wantsSplit) {
     if (splitParts != null && (!Number.isInteger(splitParts) || splitParts < 1 || splitParts > MAX_TICKETS)) {
       return `Choose 1–${MAX_TICKETS} parts.`;
@@ -33,10 +34,10 @@ export function generateGuardrailMessage(input: {
 
   if (oddsSource === 'manual') {
     if (rawMinOdds == null || !Number.isFinite(rawMinOdds)) {
-      return 'Enter a valid ticket odds range, pick a preset, or choose “Prompt”.';
+      return 'Enter a valid Min and Max odds range.';
     }
     if (rawMaxOdds != null && !Number.isFinite(rawMaxOdds)) {
-      return 'Enter a valid ticket odds range, pick a preset, or choose “Prompt”.';
+      return 'Enter a valid Min and Max odds range.';
     }
     if (rawMinOdds > MAX_TICKET_ODDS || (rawMaxOdds != null && rawMaxOdds > MAX_TICKET_ODDS)) {
       return `Ticket odds cannot exceed ${MAX_TICKET_ODDS}. Lower the odds before generating.`;

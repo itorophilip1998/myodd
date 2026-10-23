@@ -1,6 +1,6 @@
 {
   "name": "@myodd/api",
-  "version": "0.2.16",
+  "version": "0.2.18",
   "private": true,
   "scripts": {
     "dev": "nest start --watch",

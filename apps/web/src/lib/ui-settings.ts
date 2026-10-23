@@ -3,7 +3,7 @@ export type UiSettings = AccountUiSettings;
 
 export const UI_SETTINGS_KEY = 'myodd-ui-settings-v1';
 export const MAX_GAMES_PER_TICKET = 50;
-export const MAX_TICKETS = 50;
+export const MAX_TICKETS = 10;
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
   soundsEnabled: true,
@@ -26,11 +26,11 @@ export function clampVolume(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
-function clampTickets(value: unknown) {
+function clampTickets(value: unknown, maximum = MAX_TICKETS) {
   if (value == null || value === '') return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  return Math.min(MAX_TICKETS, Math.max(1, Math.round(n)));
+  return Math.min(maximum, Math.max(1, Math.round(n)));
 }
 
 export function readUiSettings(): UiSettings {
@@ -49,7 +49,7 @@ export function readUiSettings(): UiSettings {
       defaultMode: parsed.defaultsVersion === 3 && ['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'].includes(parsed.defaultMode ?? '') ? parsed.defaultMode! : 'INVESTOR',
       defaultOperation: parsed.defaultOperation === 'split' ? 'split' : 'generate',
       defaultTickets: clampTickets(tickets === undefined ? DEFAULT_UI_SETTINGS.defaultTickets : tickets),
-      defaultGames: clampTickets(parsed.defaultGames),
+      defaultGames: clampTickets(parsed.defaultGames, MAX_GAMES_PER_TICKET),
       defaultSplitParts: clampTickets(parsed.defaultSplitParts ?? DEFAULT_UI_SETTINGS.defaultSplitParts),
       defaultScope: parsed.defaultScope === 'original_only' || parsed.defaultScope === 'upcoming' || parsed.defaultScope === 'prompt'
         ? parsed.defaultScope

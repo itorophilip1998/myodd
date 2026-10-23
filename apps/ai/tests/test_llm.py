@@ -123,8 +123,8 @@ class LlmOrchestratorTests(unittest.TestCase):
     @patch('app.llm.httpx.post')
     def test_rate_limit_can_use_a_faithful_numeric_request_fallback(self, post):
         post.return_value = httpx.Response(429)
-        result = parse_intent('Create 50 lower variance slips between 3 and 5 odds. Prefer double chance.')
-        self.assertEqual(result.numberOfSlips, 50)
+        result = parse_intent('Create 10 lower variance slips between 3 and 5 odds. Prefer double chance.')
+        self.assertEqual(result.numberOfSlips, 10)
         self.assertEqual((result.minimumOdds, result.maximumOdds), (3, 5))
         self.assertEqual(result.riskMode, 'INVESTOR')
         self.assertTrue(any('local parser' in message for message in result.unhandledRequests))
@@ -133,7 +133,7 @@ class LlmOrchestratorTests(unittest.TestCase):
     def test_unknown_hard_constraints_do_not_use_a_guessing_fallback(self, post):
         post.return_value = httpx.Response(429)
         with self.assertRaises(IntentProviderError):
-            parse_intent('Create 50 slips between 3 and 5 odds. Only tomorrow before noon.')
+            parse_intent('Create 10 slips between 3 and 5 odds. Only tomorrow before noon.')
 
     @patch('app.llm.httpx.post')
     def test_mode_controls_work_during_a_provider_outage(self, post):

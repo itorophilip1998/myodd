@@ -31,10 +31,10 @@ class GenerationVarietyTests(unittest.TestCase):
         self.assertEqual(len(tickets), 10)
         self.assertTrue(all(len(t['selections']) == 5 and 4 <= t['totalOdds'] <= 5 for t in tickets))
 
-    def test_fifty_tickets_and_games_are_supported_but_fifty_one_is_rejected(self):
-        config = Config(numberOfSlips=50, minimumSelections=50, maximumSelections=50)
-        self.assertEqual(config.numberOfSlips, 50)
-        for values in [{'numberOfSlips': 51}, {'maximumSelections': 51}]:
+    def test_ten_tickets_and_fifty_games_are_supported(self):
+        config = Config(numberOfSlips=10, minimumSelections=50, maximumSelections=50)
+        self.assertEqual(config.numberOfSlips, 10)
+        for values in [{'numberOfSlips': 11}, {'maximumSelections': 51}]:
             with self.assertRaises(ValueError):
                 Config(**values)
 
@@ -44,7 +44,7 @@ class GenerationVarietyTests(unittest.TestCase):
         self.assertEqual((config.minimumSelections, config.maximumSelections), (1, 50))
 
     def test_typed_counts_and_exact_games_are_respected(self):
-        config = parse_rules('Create 50 tickets with exactly 35 games per ticket. Lagoslife Mode')
-        self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (50, 35, 35))
+        config = parse_rules('Create 10 tickets with exactly 35 games per ticket. Lagoslife Mode')
+        self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (10, 35, 35))
         default = parse_rules('Investor Mode')
         self.assertEqual((default.numberOfSlips, default.minimumSelections, default.maximumSelections), (10, 1, 50))

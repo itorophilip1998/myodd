@@ -1,4 +1,5 @@
 import json
+from .generation_limits import validate_ticket_count
 import hashlib
 import os
 import re
@@ -22,8 +23,7 @@ def parse_rules(instruction: str) -> Config:
         return int(match[1]) if match else default
 
     data = {}
-    count = re.search(r'(?:create|generate|give me)\s+(\d+)\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
-    data['numberOfSlips'] = min(50, max(1, int(count[1]) if count else 10))
+    data['numberOfSlips'] = validate_ticket_count(instruction) or 10
     low, high = extract_odds_bounds(instruction)
     if low is not None:
         data['minimumOdds'] = low
@@ -154,11 +154,12 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
 
 
 def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None) -> Config:
+    explicit_count = validate_ticket_count(instruction)
     config = _parse_intent(instruction, available_markets)
     memory = learned_defaults or {}
     text = instruction.casefold()
-    if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
-        config.numberOfSlips = min(50, max(1, int(memory['ticketCount'])))
+    if memory.get('ticketCount') and explicit_count is None and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
+        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))
     games = extract_games_per_ticket(instruction)
     if games is not None:
         config.minimumSelections = config.maximumSelections = games
