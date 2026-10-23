@@ -49,14 +49,14 @@ test('loaded tickets survive a subsequent API failure', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
   await page.route('**/api/groups/test-group', route => route.fulfill({ status: 503, json: { message: 'Temporary provider error' } }));
   await page.getByRole('button', { name: 'Check results', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Results could not refresh' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Reconnecting to updates. Your saved codes are below.')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
 });
 test('failed initial results show an actionable error rather than a blank page', async ({ page }) => {
   await page.route('**/api/**', route => route.fulfill({ status: 404, json: { message: 'This booking code is unavailable.' } }));
   await page.goto('/result/missing?job=missing');
-  await expect(page.getByRole('heading', { name: 'Results could not refresh' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Open your generation' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
 });
 test('settings have no theme controls and ignore old saved themes and OS appearance', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('myodd-ui-settings-v1', JSON.stringify({ theme: 'light' })));
@@ -302,4 +302,50 @@ test('ten existing tickets remain visible with at most five cards per row', asyn
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 1280) await page.screenshot({ path: testInfo.outputPath('five-ticket-columns.png'), fullPage: true });
   }
+});
+
+test('result reads recover automatically after connection resets without submitting another generation', async ({ page }) => {
+  await mockApi(page); let groupReads = 0; let jobReads = 0; let generations = 0;
+  await page.route('**/api/slips/generate*', route => { generations++; return route.abort(); });
+  await page.route('**/api/jobs/**', route => { jobReads++; return route.fulfill(jobReads <= 3 ? { status: 503, json: { message: 'ECONNRESET' } } : { json: job }); });
+  await page.route('**/api/groups/test-group', route => { groupReads++; return route.fulfill(groupReads <= 3 ? { status: 503, json: { message: 'ECONNREFUSED' } } : { json: group }); });
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByText(/Reconnecting to your generation/).first()).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText(/ECONN|Results could not refresh/)).toHaveCount(0); expect(generations).toBe(0);
+});
+test('an unavailable job endpoint cannot hide a collection with completed tickets', async ({ page }) => {
+  await mockApi(page); let reads = 0;
+  await page.route('**/api/jobs/**', route => { reads++; return route.fulfill({ status: 503, json: { message: 'Service restarting' } }); });
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
+  await expect.poll(() => reads).toBeGreaterThanOrEqual(3);
+  await expect(page.locator('.result-connection')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /Results could not refresh/ })).toHaveCount(0);
+});
+test('terminal progress arriving before persisted tickets keeps fetching until codes load', async ({ page }) => {
+  await mockApi(page); let reads = 0;
+  const completed = { ...job, outcome: { ...outcome, status: 'success', generated: 1, requested: 1, failed: 0, errors: [] } };
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: completed }));
+  await page.route('**/api/groups/test-group', route => { reads++; return route.fulfill({ json: { ...group, job: completed, slips: reads < 4 ? [] : [slip] } }); });
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Unable to create codes' })).toHaveCount(0);
+});
+test('fresh prompts do not inherit hidden original-only settings without a source code', async ({ page }) => {
+  await mockApi(page); let payload: any;
+  await page.addInitScript(() => localStorage.setItem('myodd-ui-settings-v1', JSON.stringify({ defaultsVersion: 3, defaultScope: 'original_only' })));
+  await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
+  await page.goto('/'); await page.locator('textarea').fill('Create two tickets'); await page.locator('textarea').press('ControlOrMeta+Enter');
+  await expect(page).toHaveURL(/result/); expect(payload.bookingCode).toBeUndefined(); expect(payload.instruction).not.toContain('Only use the original matches');
+  expect(payload.ticketCount).toBe(2);
+});
+
+test('saved collection reads reconnect after a temporary API restart', async ({ page }) => {
+  await mockApi(page); let reads = 0;
+  await page.route('**/api/groups/test-group', route => { reads++; return route.fulfill(reads <= 3 ? { status: 503, json: { message: 'Service restarting' } } : { json: group }); });
+  await page.goto('/g/test-group');
+  await expect(page.getByText('Reconnecting to your collection')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('Collection not found.')).toHaveCount(0);
 });

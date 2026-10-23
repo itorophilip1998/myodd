@@ -2,6 +2,7 @@ import { generationOutcome, modeKeyFromLabel, type ModeKey } from '@myodd/shared
 import { creatorLabel, creatorSelect } from '../creators/creators.service';
 import {
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -29,6 +30,15 @@ function resolveRiskMode(generationReport: unknown, description?: string | null)
 
 @Injectable()
 export class GroupsService {
+  private readonly logger = new Logger(GroupsService.name);
+  private async readableAvailability(codes: string[]) {
+    try { return await this.catalog.displayStatus(codes); }
+    catch {
+      // Optional availability refresh must not prevent access to persisted tickets.
+      this.logger.warn('Availability refresh unavailable; returning stored tickets with unconfirmed availability');
+      return { valid: new Set<string>(), checking: 0, unavailable: 0, statuses: new Map(codes.map(code => [code.toUpperCase(), 'UNKNOWN'] as const)) };
+    }
+  }
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
@@ -130,7 +140,7 @@ export class GroupsService {
     });
     if (!canAccessGroup(group, userId)) throw new NotFoundException('Collection not found');
 
-    const availability = await this.catalog.displayStatus(group.slips.map(s => s.bookingCode));
+    const availability = await this.readableAvailability(group.slips.map(s => s.bookingCode));
     const riskMode = resolveRiskMode(group.generationReport, group.description);
     const slips = group.slips.map((s) => {
       const code = s.bookingCode.toUpperCase();
@@ -373,7 +383,7 @@ export class GroupsService {
       orderBy: { createdAt: 'desc' },
     });
     if (!slip || !canAccessGroup(slip.group, userId)) throw new NotFoundException('Slip not found');
-    const availability = await this.catalog.displayStatus([slip.bookingCode]);
+    const availability = await this.readableAvailability([slip.bookingCode]);
     const displayStatus = availability.statuses.get(slip.bookingCode.toUpperCase()) ?? 'UNKNOWN';
     const riskMode = resolveRiskMode(slip.group.generationReport, slip.group.description);
     const isOwner = !!userId && slip.group.ownerId === userId;

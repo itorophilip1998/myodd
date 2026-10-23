@@ -10,7 +10,7 @@ import { MatchDayPicker } from './MatchDayPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { extractPromptFromFile } from '@/lib/prompt-import';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useSettings, useUiSound } from '@/components/SettingsProvider';
 import { useToast } from '@/components/ToastProvider';
 import { generateGuardrailMessage } from '@/lib/generate-guardrails';
@@ -301,7 +301,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
       uiTickets ? `Generate ${uiTickets} tickets.` : '',
       gamesPerTicket ? `Exactly ${gamesPerTicket} games per ticket.` : 'Games per ticket: Random (1–50). Ignore saved game counts.',
-      scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
+      scope === 'original_only' && (effectiveCode || predictionBook.length) ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
 
@@ -354,7 +354,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         setPredictionBook([]);
       }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { const message = (err as Error).message.includes('You can generate up to 10 tickets') ? 'You can generate up to 10 tickets at a time.' : 'Your request could not be started. Please try again.'; track('generate_failed'); play('error'); setSubmitError(message); toast(message, { sticky: true }); setLoading(false); }
+    } catch (err) { const message = (err as Error).message.includes('You can generate up to 10 tickets') ? 'You can generate up to 10 tickets at a time.' : err instanceof ApiError && err.code === 'SOURCE_REQUIRED' ? 'Paste a source booking code to reuse its original matches.' : 'Your request could not be started. Please try again.'; track('generate_failed'); play('error'); setSubmitError(message); toast(message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }

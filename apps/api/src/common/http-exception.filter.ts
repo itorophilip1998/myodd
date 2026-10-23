@@ -25,7 +25,9 @@ export class AppExceptionFilter implements ExceptionFilter {
           ? payload
           : (payload as { message?: string | string[] }).message ??
             exception.message;
+      const code = typeof payload === 'object' && payload !== null ? (payload as { code?: unknown }).code : undefined;
       res.status(status).json({
+        ...(typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(code) ? { code } : {}),
         statusCode: status,
         message: Array.isArray(message) ? message.join(', ') : message,
       });

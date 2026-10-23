@@ -153,6 +153,9 @@ export class SlipsService implements OnModuleInit {
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
     if (splitInto !== undefined && (!Number.isInteger(splitInto) || splitInto < 1 || splitInto > 10)) throw new BadRequestException('Choose between 1 and 10 split parts.');
+    if (!(parsed.bookingCode ?? req.bookingCode) && !req.pinnedSelections?.length && (splitInto !== undefined || /\boriginal\s+(?:matches|picks|selections)\b/i.test(req.instruction))) {
+      throw new BadRequestException({ code: 'SOURCE_REQUIRED', message: 'Paste a source booking code to reuse its original matches.' });
+    }
     req = { ...req, bookingCode: parsed.bookingCode ?? req.bookingCode, splitInto };
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
     const requestKey = req.requestId ? hash(`${req.userId ?? req.requestScope}:${req.requestId}`) : null;
@@ -227,8 +230,8 @@ export class SlipsService implements OnModuleInit {
         },
       });
     }
-    const master = input.bookingCode ? null : await this.catalog.master();
-    const original = input.bookingCode ? await this.bookmaker.getBooking(input.bookingCode, { fresh: true }) : master?.booking ?? null;
+    // A fresh prompt has no implicit source: catalog templates may already be settled.
+    const original = input.bookingCode ? await this.bookmaker.getBooking(input.bookingCode, { fresh: true }) : null;
     if (input.bookingCode && original && !input.userId) await this.catalog.remember(input.bookingCode, 'private', undefined, original);
     const promptDay = promptMatchDay(input.instruction);
     const matchDay = matchDayKickoffWindow(input.matchDate ?? promptDay?.start, new Date(), input.matchDateEnd ?? promptDay?.end);
@@ -259,6 +262,7 @@ export class SlipsService implements OnModuleInit {
       : requestInstruction;
     let config = await this.ai.parse(intentInstruction + (input.riskMode ? `\nFinal request settings (take precedence): Risk mode: ${input.riskMode.replace('_', ' ')} Mode.` : ''), fixtures, memory?.preferences);
     config = this.explicitControls(config, input, fixtures);
+    if (!original) config = { ...config, fixtureMode: 'upcoming', preserveOriginalSelections: false };
     if (input.splitInto) {
       if (!original) throw new BadRequestException('No verified source code is available to split. Paste a SportyBet code.');
       const explicitOdds = /\b(?:between|around|odds(?:\s+(?:of|above|below|over|under|from|at))?)\s+\d|\d(?:\.\d+)?\s*(?:to|-|and)\s*\d(?:\.\d+)?\s*odds|\d(?:\.\d+)?\s*odds/i.test(input.instruction);
@@ -369,7 +373,6 @@ export class SlipsService implements OnModuleInit {
     await this.prisma.generationJob.update({ where: { id: input.jobId }, data: { requestedCount: config.numberOfSlips } });
     await this.prisma.slipGroup.update({ where: { id: input.groupId }, data: {
       generationReport: report as unknown as Prisma.InputJsonValue,
-      ...(master && config.fixtureMode !== 'upcoming' ? { originalBookingCode: master.code } : {}),
     } });
     if (!candidates.length) {
       await this.failPreparation(input.jobId, result.notices.join(' ') || 'No combinations satisfy the explicit constraints. Try different markets, a wider odds range, or allow new matches.', 'SHORTAGE');
