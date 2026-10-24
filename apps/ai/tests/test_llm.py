@@ -123,8 +123,8 @@ class LlmOrchestratorTests(unittest.TestCase):
     @patch('app.llm.httpx.post')
     def test_rate_limit_can_use_a_faithful_numeric_request_fallback(self, post):
         post.return_value = httpx.Response(429)
-        result = parse_intent('Create 50 lower variance slips between 3 and 5 odds. Prefer double chance.')
-        self.assertEqual(result.numberOfSlips, 50)
+        result = parse_intent('Create 10 lower variance slips between 3 and 5 odds. Prefer double chance.')
+        self.assertEqual(result.numberOfSlips, 10)
         self.assertEqual((result.minimumOdds, result.maximumOdds), (3, 5))
         self.assertEqual(result.riskMode, 'INVESTOR')
         self.assertTrue(any('local parser' in message for message in result.unhandledRequests))
@@ -133,7 +133,7 @@ class LlmOrchestratorTests(unittest.TestCase):
     def test_unknown_hard_constraints_do_not_use_a_guessing_fallback(self, post):
         post.return_value = httpx.Response(429)
         with self.assertRaises(IntentProviderError):
-            parse_intent('Create 50 slips between 3 and 5 odds. Only tomorrow before noon.')
+            parse_intent('Create 10 slips between 3 and 5 odds. Only tomorrow before noon.')
 
     @patch('app.llm.httpx.post')
     def test_mode_controls_work_during_a_provider_outage(self, post):
@@ -145,10 +145,10 @@ class LlmOrchestratorTests(unittest.TestCase):
         self.assertTrue(any('local parser' in note for note in result.unhandledRequests))
 
     @patch('app.llm.httpx.post')
-    def test_mode_fallback_rejects_unparsed_constraints(self, post):
+    def test_investor_fallback_keeps_the_fixed_band(self, post):
         post.return_value = httpx.Response(429)
-        with self.assertRaises(IntentProviderError):
-            parse_intent('Create tickets using Investor Mode with odds at least 8.')
+        result = parse_intent('Create tickets using Investor Mode with odds at least 8.')
+        self.assertEqual((result.riskMode, result.minimumOdds, result.maximumOdds, result.markets), ('INVESTOR', 2, 5, []))
 
     @patch('app.llm.httpx.post')
     def test_cache_is_separate_for_different_market_catalogs(self, post):
@@ -193,6 +193,13 @@ class LlmOrchestratorTests(unittest.TestCase):
         post.return_value = httpx.Response(200, json={'choices': [{'finish_reason': 'length', 'message': {'content': '{}'}}]})
         with self.assertRaises(IntentProviderError):
             parse_chat_completions('Create seven slips')
+
+    def test_investor_without_an_api_key_uses_the_local_parser(self):
+        with patch.dict(os.environ, {'AI_PROVIDER': 'openai', 'AI_API_KEY': '', 'OPENAI_API_KEY': ''}), patch('app.llm.httpx.post') as post:
+            result = parse_intent('Create tickets for today.\nFinal request settings (take precedence): Investor Mode system ticket. Risk mode: Investor Mode.')
+            post.assert_not_called()
+            self.assertEqual((result.riskMode, result.minimumOdds, result.maximumOdds), ('INVESTOR', 2, 5))
+            self.assertTrue(any('no API key' in note for note in result.unhandledRequests))
 
     def test_missing_credentials_fail_without_http(self):
         with patch.dict(os.environ, {'AI_API_KEY': '', 'OPENAI_API_KEY': ''}), patch('app.llm.httpx.post') as post:

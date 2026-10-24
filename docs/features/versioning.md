@@ -13,11 +13,11 @@ Bump these together when shipping user-visible changes:
 
 For patch/fix work, name the branch `bug/[version]-[what-you-fixed]` using that same version — see [branching.md](./branching.md).
 
-`formatAppVersion(gitSha)` renders `v0.2.1` or `v0.2.1 · a1b2c3d`.
+`formatAppVersion(gitSha)` renders `v0.2.1` or `v0.2.1.a1b2c3d`.
 
 ## Where it appears
 
-- Create page composer footer — bold label under the input (`GenerateForm`).
+- Site footer and signed-in profile menu; no header version or separate build badge.
 - `GET /api/health` → `{ version, gitSha, label }`.
 
 ## Deploy bake-in

@@ -8,6 +8,7 @@ type SettingsContextValue = {
   settings: UiSettings;
   update: (patch: Partial<UiSettings>) => void;
   reset: () => void;
+  hydrate: (settings: Partial<UiSettings>) => void;
   play: (id: SoundId, opts?: { force?: boolean }) => void;
 };
 
@@ -15,6 +16,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_UI_SETTINGS,
   update: () => undefined,
   reset: () => undefined,
+  hydrate: () => undefined,
   play: () => undefined,
 });
 
@@ -42,11 +44,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const hydrate = useCallback((patch: Partial<UiSettings>) => setSettings(prev => ({ ...prev, ...patch })), []);
+
   const update = useCallback((patch: Partial<UiSettings>) => {
     setSettings(prev => ({ ...prev, ...patch }));
+    window.dispatchEvent(new CustomEvent('myodd:settings-change', { detail: patch }));
   }, []);
 
-  const reset = useCallback(() => setSettings(DEFAULT_UI_SETTINGS), []);
+  const reset = useCallback(() => update(DEFAULT_UI_SETTINGS), [update]);
 
   const play = useCallback((id: SoundId, opts?: { force?: boolean }) => {
     const enabled = opts?.force || settings.soundsEnabled;
@@ -57,8 +62,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings.soundsEnabled, settings.soundVolume, settings.toastSounds, settings.progressSounds]);
 
   const value = useMemo(
-    () => ({ settings, update, reset, play }),
-    [settings, update, reset, play],
+    () => ({ settings, update, reset, hydrate, play }),
+    [settings, update, reset, hydrate, play],
   );
 
   return (

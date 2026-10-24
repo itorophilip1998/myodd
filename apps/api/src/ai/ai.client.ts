@@ -1,5 +1,21 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
-import { generationConfigSchema, type BookmakerFixture, type BookmakerSelection, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { BadGatewayException, Injectable, Optional } from '@nestjs/common';
+import { APP_VERSION, SupportedMarket, generationConfigSchema, type BookmakerFixture, type BookmakerSelection, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { RedisService } from '../redis/redis.service';
+
+const scoredSelection = z.object({
+  eventId: z.string(), marketId: z.string(), outcomeId: z.string(), specifier: z.string(),
+  homeTeam: z.string(), awayTeam: z.string(), league: z.string(), marketName: z.string(), selectionName: z.string(),
+  kickoffAt: z.string(), odds: z.number().finite().positive(), probability: z.number().min(0).max(1),
+  confidence: z.number().finite(), modelVersion: z.string(), supportedMarket: z.nativeEnum(SupportedMarket),
+}).passthrough();
+const generationResponse = z.object({
+  notices: z.array(z.string()), needsExpansion: z.boolean(), effectiveConfig: generationConfigSchema,
+  pool: z.array(scoredSelection), modelVersion: z.string(),
+  candidates: z.array(z.object({ selections: z.array(scoredSelection).min(1), totalOdds: z.number().finite().positive(), slipScore: z.number().finite(), fingerprint: z.string() })),
+  diagnostics: z.object({ requestedSlips: z.number().int(), foundSlips: z.number().int(), eligibleEvents: z.number().int(), preferredSelections: z.number().int(), selectionPool: z.number().int(), oddsBounds: z.object({ minimum: z.number(), maximum: z.number() }).nullable() }),
+});
 
 export interface GenerationReport {
   notices: string[];
@@ -19,6 +35,8 @@ export interface AiGenerationResult extends GenerationReport {
 /** HTTP boundary only. All intent, prediction, and combination logic lives in Python. */
 @Injectable()
 export class AiClient {
+  private readonly interpretations = new Map<string, Promise<GenerationConfig>>();
+  constructor(@Optional() private readonly cache?: RedisService) {}
   private async post<T>(path: string, body: unknown): Promise<T> {
     try {
       const response = await fetch(`${process.env.AI_SERVICE_URL ?? 'http://localhost:8000'}${path}`, {
@@ -74,7 +92,22 @@ export class AiClient {
   }
 
   async parse(instruction: string, fixtures: BookmakerFixture[] = [], learnedDefaults?: unknown): Promise<GenerationConfig> {
-    return generationConfigSchema.parse(await this.post('/intent', { instruction, availableMarkets: this.catalog(instruction, fixtures), learnedDefaults: learnedDefaults ?? {} }));
+    const defaults = learnedDefaults && typeof learnedDefaults === 'object' ? { ...learnedDefaults } as Record<string, unknown> : {};
+    if (typeof defaults.ticketCount === 'number') defaults.ticketCount = Math.min(10, defaults.ticketCount);
+    const body = { instruction, availableMarkets: this.catalog(instruction, fixtures), learnedDefaults: defaults };
+    const key = `intent:${APP_VERSION}:${createHash('sha256').update(JSON.stringify(body)).digest('hex')}`;
+    const existing = this.interpretations.get(key);
+    if (existing) return structuredClone(await existing);
+    const load = async () => {
+      const cached = await this.cache?.getJson(key).catch(() => null);
+      const valid = generationConfigSchema.safeParse(cached);
+      if (valid.success) return valid.data;
+      const config = generationConfigSchema.parse(await this.post('/intent', body));
+      await this.cache?.setJson(key, config, 300).catch(() => undefined);
+      return config;
+    };
+    const pending = load(); this.interpretations.set(key, pending);
+    try { return structuredClone(await pending); } finally { this.interpretations.delete(key); }
   }
 
   async resolve(instruction: string, fixtures: BookmakerFixture[], config: GenerationConfig) {
@@ -91,11 +124,16 @@ export class AiClient {
     );
   }
 
-  split(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[], parts: number) {
-    return this.post<AiGenerationResult>('/split', { fixtures, config, originalSelections, parts });
+  private validateGeneration(value: unknown): AiGenerationResult {
+    if (!generationResponse.safeParse(value).success) throw new BadGatewayException('The generation service returned incomplete data. Please retry or adjust your request.');
+    return value as AiGenerationResult;
   }
 
-  generate(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[] = [], expandedSearch = false) {
-    return this.post<AiGenerationResult>('/generate', { fixtures, config, originalSelections, expandedSearch });
+  async split(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[], parts: number) {
+    return this.validateGeneration(await this.post('/split', { fixtures, config, originalSelections, parts }));
+  }
+
+  async generate(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[] = [], expandedSearch = false) {
+    return this.validateGeneration(await this.post('/generate', { fixtures, config, originalSelections, expandedSearch }));
   }
 }

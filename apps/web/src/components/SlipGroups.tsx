@@ -1,5 +1,8 @@
 'use client';
-import { ResultBadge, RESULT_LABEL } from './ResultBadge';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
+import { CopyCode } from './CopyCode';
+import { ResultBadge, ResultDetails } from './ResultBadge';
+import { resultStatus } from '@/lib/result-status';
 import { formatOdds, exactOdds } from '@myodd/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -35,22 +38,6 @@ function isDoneSlip(status?: SlipPlayStatus | null) {
 function isDoneLeg(status?: LegPlayStatus | null) {
   return status === 'PLAYED' || status === 'CUT';
 }
-
-const PLAY_LABEL: Record<SlipPlayStatus, string> = {
-  OPEN: 'Open',
-  LIVE: 'Live',
-  CUT: 'Done',
-  ALL_PLAYED: 'Done',
-  UNKNOWN: 'Not checked',
-};
-
-const LEG_LABEL: Record<LegPlayStatus, string> = {
-  UPCOMING: 'Upcoming',
-  LIVE: 'Live',
-  PLAYED: 'Done',
-  CUT: 'Done',
-  UNKNOWN: 'Unknown',
-};
 
 function summarizeLocal(slips: GeneratedSlip[]): PlaySummary {
   const done = slips.filter(s => isDoneSlip(s.playStatus)).length;
@@ -222,6 +209,7 @@ function ShareSheet({
   groupUrl: string;
   onClose: () => void;
 }) {
+  const dialogFocus = useDialogFocus();
   const toast = useToast();
   const text = formatTicketCopy(slip);
   const loadUrl = sportyLoadUrl(slip.bookingCode, slip.shareUrl);
@@ -234,7 +222,7 @@ function ShareSheet({
 
   return (
     <div className="picks-modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="share-sheet" role="dialog" aria-modal="true" aria-label={`Share ${slip.bookingCode}`} onClick={e => e.stopPropagation()}>
+      <div ref={dialogFocus} tabIndex={-1} className="share-sheet" role="dialog" aria-modal="true" aria-label={`Share ${slip.bookingCode}`} onClick={e => e.stopPropagation()}>
         <div className="picks-modal-head">
           <div>
             <p className="eyebrow">SHARE</p>
@@ -272,17 +260,16 @@ function PicksModal({
   slip,
   modeLabel,
   modeKey,
-  playLabel,
   onClose,
   onShare,
 }: {
   slip: GeneratedSlip;
   modeLabel: string | null;
   modeKey: string;
-  playLabel: string | null;
   onClose: () => void;
   onShare: () => void;
 }) {
+  const dialogFocus = useDialogFocus();
   const toast = useToast();
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
@@ -298,6 +285,8 @@ function PicksModal({
   return (
     <div className="picks-modal-backdrop" role="presentation" onClick={onClose}>
       <div
+        ref={dialogFocus}
+        tabIndex={-1}
         className="picks-modal"
         role="dialog"
         aria-modal="true"
@@ -310,8 +299,7 @@ function PicksModal({
             <h3>{slip.bookingCode}</h3>
             <div className="picks-modal-tags">
               {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
-              <ResultBadge result={slip.result} />
-              {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
+              <ResultBadge {...slip} />
               <span className="code-badge">{STATUS_LABEL[slip.displayStatus ?? 'UNKNOWN']} · {slip.selectionCount} picks</span>
             </div>
           </div>
@@ -322,16 +310,15 @@ function PicksModal({
           {slip.createdAt && <time dateTime={slip.createdAt}>{formatLagosDateTime(slip.createdAt)}</time>}
           <Link href={`/code/${slip.bookingCode}`} onClick={onClose}>Open ticket page ↗</Link>
         </div>
+        <ResultDetails {...slip} checkedAt={slip.playCheckedAt} />
         <ul className="picks-modal-list">
           {slip.selections.map((pick, i) => (
             <li key={i} className={pick.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(pick.playStatus) ? 'is-played-leg' : ''}>
               <div className="picks-modal-row">
                 <strong>{pick.homeTeam} vs {pick.awayTeam}</strong>
-                <ResultBadge result={pick.result} checkedAt={pick.resultCheckedAt} source={pick.resultSource} />
-                {pick.playStatus && pick.playStatus !== 'UNKNOWN' && (
-                  <span className={`play-chip play-${isDoneLeg(pick.playStatus) ? 'all_played' : pick.playStatus.toLowerCase()}`}>{LEG_LABEL[pick.playStatus]}</span>
-                )}
+                <ResultBadge {...pick} checkedAt={pick.resultCheckedAt} source={pick.resultSource} />
               </div>
+              <ResultDetails {...pick} checkedAt={pick.resultCheckedAt} source={pick.resultSource} />
               <span className="picks-modal-league">{pick.league}</span>
               <span>{pick.marketName}: {pick.selectionName} <b>{formatOdds(pick.odds)}</b></span>
               {(pick.score || pick.playNote || pick.kickoffAt) && (
@@ -478,7 +465,7 @@ export function SlipGroups({
       ]);
       play(isDoneSlip(result.playStatus) ? 'done' : result.playStatus === 'LIVE' ? 'tick' : 'tick');
       const doneLegs = result.playedLegs || 0;
-      toast(`${code}: ${RESULT_LABEL[result.result]} · ${PLAY_LABEL[result.playStatus]}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
+      toast(`${code}: ${resultStatus(result)}${doneLegs ? ` · ${doneLegs} done` : ''}${result.liveLegs ? ` · ${result.liveLegs} live` : ''}`, { sticky: true });
     } catch {
       play('error');
       toast('Could not check this ticket.', { sticky: true });
@@ -510,7 +497,6 @@ export function SlipGroups({
 
   const picksModeLabel = picksFor ? (modeTag(picksFor.riskMode) ?? collectionMode) : null;
   const picksModeKey = picksFor ? (picksFor.riskMode ?? riskMode ?? '').toLowerCase() : '';
-  const picksPlayLabel = picksFor?.playStatus && picksFor.playStatus !== 'UNKNOWN' ? PLAY_LABEL[picksFor.playStatus] : null;
 
   return <section className="codes-section" aria-label="Booking codes">
     <div className="codes-heading">
@@ -546,23 +532,17 @@ export function SlipGroups({
     </div>}
     <ul className="code-grid">{visibleSlips.map((slip, index) => {
       const label = STATUS_LABEL[slip.displayStatus ?? (expired(slip) ? 'EXPIRED' : 'ACTIVE')];
-      const playLabel = slip.playStatus && slip.playStatus !== 'UNKNOWN' ? PLAY_LABEL[slip.playStatus] : null;
       const ticketMode = modeTag(slip.riskMode) ?? collectionMode;
       const ticketModeKey = (slip.riskMode ?? riskMode ?? '').toLowerCase();
       const gamesLabel = `${slip.selectionCount} ${slip.selectionCount === 1 ? 'game' : 'games'}`;
       return (
         <li key={slip.id} className={`code-card ${expired(slip) || slip.displayStatus === 'UNAVAILABLE' ? 'is-expired' : ''} ${isDoneSlip(slip.playStatus) ? 'is-played' : ''} ${slip.playStatus === 'LIVE' ? 'is-live' : ''} ${menuFor === slip.id ? 'is-menu-open' : ''}`}>
-          <button
-            type="button"
-            className="code-card-main"
-            onClick={() => { play('click'); setMenuFor(null); setPicksFor(slip); }}
-            aria-label={`Open ${slip.bookingCode} details · ${gamesLabel}`}
-          >
+          <div className="code-card-main">
             <div className="card-top">
               <span className="card-index">{String(index + 1).padStart(2, '0')}</span>
               <span className="code-badge">{label} · {gamesLabel}</span>
             </div>
-            <span className="booking-code">{slip.bookingCode}</span>
+            <CopyCode code={slip.bookingCode} />
             <div className="odds-line">
               <span>Total odds</span>
               <strong title={`Exact odds: ${exactOdds(slip.totalOdds)}`} aria-label={`${formatOdds(slip.totalOdds)} odds; exact total ${exactOdds(slip.totalOdds)}`}>{formatOdds(slip.totalOdds)}</strong>
@@ -572,12 +552,12 @@ export function SlipGroups({
                 <time dateTime={slip.createdAt}>{formatLagosDateTime(slip.createdAt)}</time>
               </div>
             )}
-          </button>
+            <button type="button" className="text-link card-details-link" onClick={() => { play('click'); setMenuFor(null); setPicksFor(slip); }} aria-label={`Open ${slip.bookingCode} details`}>View details ↗</button>
+          </div>
           <div className="ticket-footer">
             <div className="ticket-tags">
               {ticketMode && <span className={`mode-tag mode-${ticketModeKey}`}>{ticketMode}</span>}
-              {slip.result && slip.result !== 'UNKNOWN' && <ResultBadge result={slip.result} />}
-              {playLabel && <span className={`play-chip play-${isDoneSlip(slip.playStatus) ? 'all_played' : (slip.playStatus ?? 'UNKNOWN').toLowerCase()}`}>{playLabel}</span>}
+              <ResultBadge {...slip} />
             </div>
             <TicketMenu
               open={menuFor === slip.id}
@@ -607,7 +587,6 @@ export function SlipGroups({
         slip={picksFor}
         modeLabel={picksModeLabel}
         modeKey={picksModeKey}
-        playLabel={picksPlayLabel}
         onClose={() => setPicksFor(null)}
         onShare={() => { setPicksFor(null); setShareFor(picksFor); }}
       />

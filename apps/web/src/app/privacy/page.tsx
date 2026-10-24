@@ -37,7 +37,7 @@ export default function PrivacyPage() {
       <h3>Technical and device data</h3>
       <p>
         We may process standard logs (IP address, browser type, approximate region, timestamps) and local browser
-        storage for UI settings (for example sound preferences) that stay on your device unless you clear them.
+        storage for UI settings (for example sound preferences) that synchronize with your account when signed in.
       </p>
 
       <h2>3. How we use information</h2>
@@ -65,10 +65,12 @@ export default function PrivacyPage() {
         client UI settings. You can clear site data in your browser; doing so may sign you out or reset preferences.
       </p>
 
+      <h3>Optional analytics</h3>
+      <p>When enabled in production, Google Analytics 4 runs only after you opt in. We send anonymous action counts and generalized page categories, excluding prompts, booking codes, account identifiers, and private URLs. You can disable usage analytics in the footer at any time.</p>
       <h2>6. Retention</h2>
+      <p>Collections, including public and named collections, are permanently deleted 24 hours after every match has a confirmed final result. Unsettled or unidentified matches block automatic deletion. Independent audit and training records may be retained separately.</p>
       <p>
-        We keep account-linked collections and related records while your account is active and as needed for the
-        Service, backups, security, and legal requirements. You may delete collections you own from Saved codes.
+        Account settings and independent audit records are retained as needed for the Service, backups, security, and legal requirements. You may delete collections you own from Codes.
         Account deletion requests can be sent to <a href="mailto:support@myodd.app">support@myodd.app</a>.
       </p>
 

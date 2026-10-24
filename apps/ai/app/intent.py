@@ -1,4 +1,5 @@
 import json
+from .generation_limits import validate_ticket_count
 import hashlib
 import os
 import re
@@ -12,7 +13,7 @@ from .risk_modes import MODES, apply_default_investor, apply_named_mode
 from .draw_markets import draw_request
 from .llm import IntentProviderError, parse_chat_completions, resolve_provider_name, resolve_settings, select_model
 from .market_preferences import resolve_preferences
-from .odds_format import extract_games_per_ticket, extract_odds_bounds
+from .odds_format import extract_games_per_ticket, extract_odds_bounds, has_safer_slang
 
 
 def parse_rules(instruction: str) -> Config:
@@ -22,8 +23,7 @@ def parse_rules(instruction: str) -> Config:
         return int(match[1]) if match else default
 
     data = {}
-    count = re.search(r'(?:create|generate|give me)\s+(\d+)\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text) or re.search(r'(\d+)(?:\s+[\w-]+){0,3}\s+(?:slips?|codes?|tickets?|combinations?|versions?)', text)
-    data['numberOfSlips'] = min(50, max(1, int(count[1]) if count else 10))
+    data['numberOfSlips'] = validate_ticket_count(instruction) or 10
     low, high = extract_odds_bounds(instruction)
     if low is not None:
         data['minimumOdds'] = low
@@ -35,7 +35,10 @@ def parse_rules(instruction: str) -> Config:
     exact = extract_games_per_ticket(instruction)
     if exact is not None:
         data['minimumSelections'] = data['maximumSelections'] = exact
-    markets = []
+    markets = [Market.HOME, Market.DOUBLE_CHANCE_1X] if has_safer_slang(text) else []
+    if has_safer_slang(text):
+        data['riskPreference'] = 'LOWER'
+        data['unhandledRequests'] = ['Safer-ranked selections are not a guaranteed win.']
     if re.search(r'double\s*chance|\b1x\b|\bx2\b', text):
         markets += [Market.DOUBLE_CHANCE_1X, Market.DOUBLE_CHANCE_X2, Market.DOUBLE_CHANCE_12]
     for pattern, market in [(r'over\s*1\.5', Market.OVER_1_5), (r'over\s*2\.5', Market.OVER_2_5), (r'under\s*3\.5', Market.UNDER_3_5)]:
@@ -87,6 +90,10 @@ _intent_cache: dict[tuple, tuple[float, Config]] = {}
 
 def local_fallback_supported(instruction: str) -> bool:
     text = instruction.casefold()
+    # Investor Mode drops user odds, markets, and counts, so extra wording is safe to ignore.
+    named = [(m.start(), mode) for pattern, mode, *_ in MODES for m in re.finditer(pattern, text, re.I)]
+    if named and max(named)[1] == 'INVESTOR':
+        return True
     numeric = bool(re.search(r'(?:create|generate|give me)\s+\d+', text) and re.search(r'between\s+\d+(?:\.\d+)?\s*(?:and|to|-|–)\s*\d+', text))
     numeric = numeric or bool(re.search(r'\b(?:split|spilt|splate|divide|partition)\b', text) and re.search(r'\binto\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', text))
     # Simple mode buttons and count controls remain usable during provider outages.
@@ -122,11 +129,15 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
         try:
             config = parse_chat_completions(instruction, available_markets, model=model)
         except IntentProviderError as exc:
-            transient = 'rate limit' in str(exc).casefold() or 'could not reach' in str(exc).casefold() or bool(re.search(r'HTTP 5\d\d', str(exc)))
-            if not transient or not local_fallback_supported(instruction):
+            reason = str(exc).casefold()
+            transient = 'rate limit' in reason or 'could not reach' in reason or bool(re.search(r'http 5\d\d', reason))
+            missing_key = 'api_key is required' in reason
+            if not local_fallback_supported(instruction) or not (transient or missing_key):
                 raise
             config = parse_rules(instruction)
             config.unhandledRequests.append(
+                f'{settings.label} has no API key; this request was interpreted by the local parser.'
+                if missing_key else
                 f'{settings.label} was temporarily unavailable; this request was interpreted by the local parser. Review the settings shown below.'
             )
         if len(_intent_cache) >= 128:
@@ -151,11 +162,12 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
 
 
 def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None) -> Config:
+    explicit_count = validate_ticket_count(instruction)
     config = _parse_intent(instruction, available_markets)
     memory = learned_defaults or {}
     text = instruction.casefold()
-    if memory.get('ticketCount') and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
-        config.numberOfSlips = min(50, max(1, int(memory['ticketCount'])))
+    if memory.get('ticketCount') and explicit_count is None and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
+        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))
     games = extract_games_per_ticket(instruction)
     if games is not None:
         config.minimumSelections = config.maximumSelections = games

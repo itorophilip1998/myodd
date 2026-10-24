@@ -1,3 +1,4 @@
+import { formatAppVersion } from '@myodd/shared';
 import Link from 'next/link';
 
 export function ResponsibleFooter() {
@@ -9,6 +10,7 @@ export function ResponsibleFooter() {
         <span aria-hidden>·</span>
         <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
       </nav>
+      <span id="app-version" className="footer-version">{formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)}</span>
     </footer>
   );
 }

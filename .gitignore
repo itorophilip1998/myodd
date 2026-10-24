@@ -4,6 +4,7 @@ dist
 .turbo
 .env
 .env.local
+.env.copy
 *.log
 coverage
 .DS_Store
@@ -23,3 +24,8 @@ apps/ai/data/*
 /backup/*
 !/backup/.gitkeep
 /Backup/
+
+# Browser test artifacts
+playwright-report/
+test-results/
+.pnpm-store/

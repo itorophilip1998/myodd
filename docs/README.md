@@ -14,6 +14,7 @@ Product docs for the myOdd monorepo: SportyBet Nigeria booking-code variations f
 |---------|-----|
 | Authentication & accounts | [features/auth.md](./features/auth.md) |
 | Slip generation & modes | [features/generation.md](./features/generation.md) |
+| Investor Mode system ticket | [features/investor-system-mode.md](./features/investor-system-mode.md) |
 | Collections, share & history | [features/collections.md](./features/collections.md) |
 | Booking codes (SportyBet) | [features/booking.md](./features/booking.md) |
 | Live games explorer | [features/live.md](./features/live.md) |
@@ -24,4 +25,5 @@ Product docs for the myOdd monorepo: SportyBet Nigeria booking-code variations f
 | Jobs & progress | [features/jobs.md](./features/jobs.md) |
 | App versioning | [features/versioning.md](./features/versioning.md) |
 | Branch naming | [features/branching.md](./features/branching.md) |
+| Production improvements / release notes | [features/production-improvements.md](./features/production-improvements.md) |
 | Play verification | [features/play-verification.md](./features/play-verification.md) |

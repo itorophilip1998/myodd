@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { MAX_TICKET_ODDS, MODE_ODDS } from '@myodd/shared';
 import { LegalPage } from '@/components/LegalPage';
 
 export const metadata: Metadata = {
@@ -49,31 +50,25 @@ export default function TermsPage() {
         produce longer or more volatile tickets.
       </p>
 
+      <p>Ticket odds are the combined decimal odds of all selections, multiplied together. Per-selection limits apply to each individual pick. For example, three selections at 1.50 each produce total odds of approximately 3.38. A mode describes construction rules, not a measured chance of winning.</p>
       <h3 id="mode-investor">Investor Mode</h3>
-      <p>
-        Recommended · lower risk profile. Typical ticket odds about <strong>2–5</strong>, with each selection
-        commonly in the <strong>1.10–1.50</strong> range. Aimed at steadier, best-ranked constructions when the
-        catalog allows.
-      </p>
-
+      <p>Recommended starting point, and a system-built ticket. You choose a match day or a date range. The model chooses the markets, how many tickets to build (up to 10), and how many games each ticket needs. Combined ticket odds stay <strong>{MODE_ODDS.INVESTOR.minimum}–{MODE_ODDS.INVESTOR.maximum}</strong>, and individual selections stay between <strong>1.10 and 1.50</strong>. Typed requests for different odds, markets, ticket counts, or game counts are not applied in this mode. The same pick is not repeated on another ticket in the collection; a game can appear again only with a different option. The name does not mean an investment, a safe bet, or a promised return. Even a short-priced selection can lose.</p>
       <h3 id="mode-gambler">Gambler Mode</h3>
-      <p>
-        Medium risk. Typical ticket odds about <strong>5.01–20</strong>, with each selection commonly up to
-        about <strong>1.80</strong>. More upside than Investor Mode, with higher variance.
-      </p>
-
+      <p>Medium relative risk, targeting combined odds <strong>{MODE_ODDS.GAMBLER.minimum}–{MODE_ODDS.GAMBLER.maximum}</strong>. Each selection is between <strong>1.10 and 1.80</strong>. The higher total can require more selections or higher-priced selections than Investor Mode. Results can vary substantially; every required accumulator selection must succeed for the ticket to win under the bookmaker’s settlement rules.</p>
       <h3 id="mode-japa">Japa Mode</h3>
-      <p>
-        High risk. Typical ticket odds from about <strong>20.01</strong> upward (within product limits), with
-        each selection commonly up to about <strong>2.00</strong>. Longer shots; expect frequent misses.
-      </p>
-
+      <p>High relative risk, targeting combined odds <strong>{MODE_ODDS.JAPA.minimum}–{MODE_ODDS.JAPA.maximum}</strong>, with individual selections between <strong>1.10 and 2.00</strong>. Combining selections increases the ways an accumulator can fail. Expect frequent losses; a high potential return does not establish a high probability of success.</p>
       <h3 id="mode-lagos-life">Lagoslife Mode</h3>
-      <p>
-        Super high risk. Typical ticket odds from about <strong>100.01</strong> upward (within product limits),
-        with each selection commonly up to about <strong>2.00</strong>. Speculative entertainment only — treat
-        stakes as money you can afford to lose.
-      </p>
+      <p>The highest target range, beginning at <strong>{MODE_ODDS.LAGOS_LIFE.minimum}</strong> combined odds and subject to the product ceiling of <strong>{MAX_TICKET_ODDS.toLocaleString('en-US')}</strong>. Individual selections remain between <strong>1.10 and 2.00</strong>. This is highly speculative and can require many selections. Frequent losses are possible. Do not treat generated codes as an income plan or use money needed for essential expenses.</p>
+      <h3>How mode settings are applied</h3>
+      <ul>
+        <li>Investor Mode accepts a match day or date range. Markets, ticket count, games per ticket, and odds are chosen by the model inside the fixed Investor band. Options for those controls are hidden, and prompt text does not change them.</li>
+        <li>For Gambler, Japa, and Lagoslife, select a mode on Create, then use Min and Max in Options to narrow its ticket-odds range. Those controls stay within the mode’s allowed band.</li>
+        <li>On those modes, explicit mode and market choices take precedence over conflicting prompt instructions. Selected markets restrict the available choices; without manual markets, your prompt guides market selection.</li>
+        <li>Inside one collection, the same pick (match, market, outcome, and line) is not placed on more than one ticket. A match may appear on another ticket only with a different option. If the match day cannot fill the request without a repeat, fewer tickets are returned.</li>
+        <li>Available fixtures, markets, selection limits, pinned picks, and diversification rules may prevent the requested number of tickets or target odds from being achieved. The service may return fewer tickets with an explanation.</li>
+        <li>Provider availability and prices are checked during code creation, but they may change afterward. Confirm the actual selections and current odds with the bookmaker before using a code.</li>
+        <li>“Lower”, “medium”, and “high” describe relative product settings. They are not calibrated win probabilities or guarantees. myOdd creates booking codes and does not place bets.</li>
+      </ul>
 
       <h2>6. Generated codes and content</h2>
       <ul>

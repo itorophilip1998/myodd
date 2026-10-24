@@ -35,11 +35,9 @@ class SurePromptRulesTests(unittest.TestCase):
             'sure 5 odds\nFinal request settings (take precedence): Risk mode: Investor Mode.'
         )
         self.assertEqual(config.riskMode, 'INVESTOR')
-        # Intersect target 4.5–5.5 with Investor 2–5
-        self.assertEqual((config.minimumOdds, config.maximumOdds), (4.5, 5.0))
-        self.assertIn(Market.HOME, config.markets)
-        self.assertIn(Market.DOUBLE_CHANCE_1X, config.markets)
-        self.assertTrue(any('safer-ranked' in n.casefold() or 'not a guaranteed' in n.casefold()
+        self.assertEqual((config.minimumOdds, config.maximumOdds), (2, 5))
+        self.assertEqual(config.markets, [])
+        self.assertTrue(any('not a guaranteed' in n.casefold() or 'requested odds were not applied' in n.casefold()
                             for n in config.unhandledRequests))
 
     def test_sure_maps_risk_preference_before_mode(self):
@@ -48,6 +46,7 @@ class SurePromptRulesTests(unittest.TestCase):
         self.assertEqual(config.riskMode, 'INVESTOR')
         self.assertEqual(config.riskPreference, 'VERY_LOW')
         self.assertEqual((config.minimumOdds, config.maximumOdds), (4.5, 5.0))
+        self.assertIn(Market.HOME, config.markets)
 
 
 if __name__ == '__main__':

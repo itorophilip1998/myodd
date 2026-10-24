@@ -1,40 +1,23 @@
 'use client';
-import { ResultBadge, RESULT_LABEL } from '@/components/ResultBadge';
+import { confirmedFinalTicket } from '@/lib/cache-policy';
+import { CopyCode } from '@/components/CopyCode';
+import { ResultBadge, ResultDetails } from '@/components/ResultBadge';
+import { resultStatus } from '@/lib/result-status';
 import { formatOdds, exactOdds } from '@myodd/shared';
 
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { api, type LegPlayStatus, type SlipPlayStatus } from '@/lib/api';
+import { api, type LegPlayStatus } from '@/lib/api';
 import { ShareButtons } from '@/components/ShareButtons';
 import { formatLagosDateTime } from '@/lib/datetime';
 import { modeTag } from '@/lib/mode-label';
 import { useToast } from '@/components/ToastProvider';
 import { BackLink } from '@/components/BackButton';
 
-function isDoneSlip(status?: SlipPlayStatus | null) {
-  return status === 'ALL_PLAYED' || status === 'CUT';
-}
-
 function isDoneLeg(status?: LegPlayStatus | null) {
   return status === 'PLAYED' || status === 'CUT';
 }
-
-const PLAY_LABEL: Record<SlipPlayStatus, string> = {
-  OPEN: 'Open',
-  LIVE: 'Live',
-  CUT: 'Done',
-  ALL_PLAYED: 'Done',
-  UNKNOWN: 'Not checked',
-};
-
-const LEG_LABEL: Record<LegPlayStatus, string> = {
-  UPCOMING: 'Upcoming',
-  LIVE: 'Live',
-  PLAYED: 'Done',
-  CUT: 'Done',
-  UNKNOWN: 'Unknown',
-};
 
 export default function CodePage() {
   const params = useParams<{ code: string }>();
@@ -44,7 +27,8 @@ export default function CodePage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['code', params.code],
     queryFn: () => api.getCode(params.code),
-    refetchInterval: 60_000,
+    staleTime: query => confirmedFinalTicket(query.state.data) ? 3600_000 : 30_000,
+    refetchInterval: query => confirmedFinalTicket(query.state.data) ? false : 60_000,
   });
 
   async function checkPlayed() {
@@ -54,8 +38,7 @@ export default function CodePage() {
       await queryClient.invalidateQueries({ queryKey: ['code', params.code] });
       if (data?.groupPublicId) await queryClient.invalidateQueries({ queryKey: ['group', data.groupPublicId] });
       const bits = [
-        RESULT_LABEL[result.result],
-        PLAY_LABEL[result.playStatus],
+        resultStatus(result),
         result.liveLegs ? `${result.liveLegs} live` : '',
         result.playedLegs ? `${result.playedLegs} done` : '',
       ].filter(Boolean);
@@ -92,30 +75,25 @@ export default function CodePage() {
   const modeLabel = modeTag(data.riskMode);
   const modeKey = (data.riskMode ?? '').toLowerCase();
   const expired = !!data.expiresAt && new Date(data.expiresAt).getTime() <= Date.now();
-  const playChipClass = isDoneSlip(data.playStatus) ? 'all_played' : (data.playStatus ?? 'UNKNOWN').toLowerCase();
 
   return (
     <main className="workspace code-detail-workspace">
       <BackLink
         href={data.groupPublicId ? `/g/${data.groupPublicId}` : '/history'}
-        label={data.groupPublicId ? 'Collection' : 'Saved codes'}
+        label={data.groupPublicId ? 'Collection' : 'Codes'}
       />
       <header className="code-detail-head">
         <p className="eyebrow">SportyBet code</p>
-        <h1 className="code-detail-title">{data.bookingCode}</h1>
+        <h1 className="code-detail-title"><CopyCode code={data.bookingCode} className="code-detail-title" /></h1>
         <p className="code-detail-sub">
           Odds <span title={exactOdds(data.totalOdds)}>{formatOdds(data.totalOdds)}</span> · {data.selectionCount} selections
         </p>
         <div className="ticket-meta">
-          <ResultBadge result={data.result} />
+          <ResultBadge {...data} />
           {modeLabel && <span className={`mode-tag mode-${modeKey}`}>{modeLabel}</span>}
           {data.createdAt && <time dateTime={data.createdAt}>{formatLagosDateTime(data.createdAt)}</time>}
-          {data.playStatus && data.playStatus !== 'UNKNOWN' && (
-            <span className={`play-chip play-${playChipClass}`}>
-              {PLAY_LABEL[data.playStatus]}
-            </span>
-          )}
         </div>
+        <ResultDetails {...data} checkedAt={data.playCheckedAt} />
         <div className="code-detail-actions">
           {canVerify && (
             <button type="button" className="outline-button" disabled={checking} onClick={() => void checkPlayed()}>
@@ -132,7 +110,7 @@ export default function CodePage() {
           />
         </div>
         {!canVerify && (
-          <p className="code-detail-hint">Save this collection from Saved codes to check its results.</p>
+          <p className="code-detail-hint">Save this collection from Codes to check its results.</p>
         )}
         {expired && <p className="code-detail-hint">Archived code. Generate a fresh collection to use upcoming matches.</p>}
       </header>
@@ -142,11 +120,9 @@ export default function CodePage() {
           <li key={i} className={s.playStatus === 'LIVE' ? 'is-live-leg' : isDoneLeg(s.playStatus) ? 'is-played-leg' : undefined}>
             <div className="code-leg-top">
               <p className="code-leg-league">{s.league}</p>
-              <ResultBadge result={s.result} checkedAt={s.resultCheckedAt} source={s.resultSource} />
-              {s.playStatus && s.playStatus !== 'UNKNOWN' && (
-                <span className={`play-chip play-${isDoneLeg(s.playStatus) ? 'all_played' : s.playStatus.toLowerCase()}`}>{LEG_LABEL[s.playStatus]}</span>
-              )}
+              <ResultBadge {...s} checkedAt={s.resultCheckedAt} source={s.resultSource} />
             </div>
+            <ResultDetails {...s} checkedAt={s.resultCheckedAt} source={s.resultSource} />
             <p className="code-leg-match">{s.homeTeam} vs {s.awayTeam}</p>
             <p className="code-leg-pick">
               {s.marketName}: {s.selectionName} @ {formatOdds(s.odds)}

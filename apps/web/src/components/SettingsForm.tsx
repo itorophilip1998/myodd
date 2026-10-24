@@ -2,7 +2,7 @@
 
 import { useSettings } from './SettingsProvider';
 import type { SoundId } from '@/lib/sounds';
-import { MAX_TICKETS, type UiSettings } from '@/lib/ui-settings';
+import { MAX_TICKETS, MAX_GAMES_PER_TICKET, type UiSettings } from '@/lib/ui-settings';
 
 const PREVIEWS: Array<{ id: SoundId; label: string; note: string }> = [
   { id: 'mic-on', label: 'Mic open', note: 'When dictation starts' },
@@ -19,6 +19,7 @@ const PREVIEWS: Array<{ id: SoundId; label: string; note: string }> = [
 ];
 
 const TICKET_OPTIONS = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
+const GAME_OPTIONS = Array.from({ length: MAX_GAMES_PER_TICKET }, (_, i) => i + 1);
 const SPLIT_OPTIONS = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
 
 export function SettingsForm() {
@@ -29,13 +30,13 @@ export function SettingsForm() {
       <section className="settings-card" aria-labelledby="pref-heading">
         <div className="settings-card-head">
           <h3 id="pref-heading">Generation defaults</h3>
-          <p>Applied when you open Create. Options on the form still override for a single run.</p>
+          <p>Applied when you open Create. Gambler, Japa, and Lagoslife options on the form override these for a single run. Investor Mode ignores them and builds the ticket itself.</p>
         </div>
         <div className="settings-grid">
           <label>
             Default mode
-            <select value="INVESTOR" disabled aria-label="Default mode Investor (recommended)">
-              <option value="INVESTOR">Investor (recommended)</option>
+            <select value={settings.defaultMode ?? 'INVESTOR'} onChange={e => update({ defaultMode: (e.target.value || null) as UiSettings['defaultMode'] })}>
+              <option value="INVESTOR">Investor</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
             </select>
           </label>
           <label>
@@ -71,7 +72,7 @@ export function SettingsForm() {
               play('click');
             }}>
               <option value="">Random (1–50)</option>
-              {TICKET_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+              {GAME_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
           <label>
@@ -99,19 +100,6 @@ export function SettingsForm() {
               <option value="prompt">Prompt</option>
               <option value="original_only">Original</option>
               <option value="upcoming">Upcoming</option>
-            </select>
-          </label>
-          <label>
-            Odds source
-            <select
-              value={settings.defaultOddsSource}
-              onChange={e => {
-                update({ defaultOddsSource: e.target.value as UiSettings['defaultOddsSource'] });
-                play('click');
-              }}
-            >
-              <option value="manual">Options</option>
-              <option value="prompt">Prompt</option>
             </select>
           </label>
         </div>

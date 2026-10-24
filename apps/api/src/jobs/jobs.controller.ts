@@ -1,3 +1,4 @@
+import { generationOutcome } from '@myodd/shared';
 import { Controller, Get, NotFoundException, Param, Req, UseGuards } from '@nestjs/common';
 import { ClerkGuard, type AuthRequest } from '../auth/auth.guard';
 import { canAccessGroup } from '../groups/group-access';
@@ -17,6 +18,7 @@ export class JobsController {
     if (!job || !job.group || !canAccessGroup(job.group, req.account?.id)) throw new NotFoundException('Job not found');
     return {
       id: job.id,
+      outcome: generationOutcome(job),
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
       status: job.status,

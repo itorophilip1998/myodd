@@ -15,10 +15,10 @@ export function previewOddsFromPrompt(instruction: string): { minimum: number; m
     const maximum = Number(between[2]);
     if (Number.isFinite(minimum) && Number.isFinite(maximum)) return { minimum, maximum };
   }
-  const around = text.match(/\b(?:around|about|~)\s*(\d+(?:\.\d+)?)\b/i);
+  const around = text.match(/\b(?:around|about|sure|safe|~)\s*(\d+(?:\.\d+)?)\b/i);
   if (around) {
     const mid = Number(around[1]);
-    if (Number.isFinite(mid)) return { minimum: mid * 0.9, maximum: mid * 1.1 };
+    if (Number.isFinite(mid)) return { minimum: Math.max(1.1, mid - .5), maximum: mid + .5 };
   }
   const minOnly = text.match(/\b(?:min(?:imum)?|at\s*least)\s*(\d+(?:\.\d+)?)\b/i);
   const maxOnly = text.match(/\b(?:max(?:imum)?|up\s*to|under|below)\s*(\d+(?:\.\d+)?)\b/i);

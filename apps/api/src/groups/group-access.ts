@@ -7,6 +7,6 @@ export function canAccessGroup(
   if (group.isPublic && group.userSaved) return true;
   if (userId && group.ownerId === userId) return true;
   // Draft collections remain reachable by their unguessable publicId while unsaved.
-  if (!group.userSaved) return true;
+  if (!group.userSaved && !group.ownerId) return true;
   return false;
 }

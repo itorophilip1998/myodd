@@ -1,8 +1,9 @@
+from .generation_limits import validate_ticket_count
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import field_validator, BaseModel, Field, ConfigDict, model_validator
 
 
 class Market(StrEnum):
@@ -27,7 +28,7 @@ class MarketRule(BaseModel):
 
 
 class Config(BaseModel):
-    numberOfSlips: int = Field(default=10, ge=1, le=50)
+    numberOfSlips: int = Field(default=10, ge=1, le=10)
     minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)
     maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)
     maximumSelections: int = Field(default=50, ge=1, le=50)
@@ -67,14 +68,25 @@ class Config(BaseModel):
 
 class LearnedDefaults(BaseModel):
     riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
-    ticketCount: int | None = Field(default=None, ge=1, le=50)
+    ticketCount: int | None = Field(default=None, ge=1, le=10)
     gamesPerTicket: int | None = Field(default=None, ge=1, le=50)
+
+
+    @field_validator('ticketCount', mode='before')
+    @classmethod
+    def cap_legacy_count(cls, value):
+        return min(10, value) if isinstance(value, (int, float)) else value
 
 
 class Instruction(BaseModel):
     learnedDefaults: LearnedDefaults = Field(default_factory=LearnedDefaults)
     instruction: str = Field(min_length=3, max_length=6000)
     availableMarkets: list[dict] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode='after')
+    def enforce_output_limit(self):
+        validate_ticket_count(self.instruction)
+        return self
 
 
 class ResolveInput(Instruction):
@@ -141,4 +153,4 @@ class GenerateInput(BaseModel):
 
 
 class SplitInput(GenerateInput):
-    parts: int = Field(ge=1, le=50)
+    parts: int = Field(ge=1, le=10)

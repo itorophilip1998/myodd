@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { generationOutcome } from '@myodd/shared';
 import { SlipGroup } from '@/lib/api';
 import { GenerateForm } from './GenerateForm';
 import { SlipGroups } from './SlipGroups';
+import { GenerationOutcome } from './GenerationOutcome';
 import { SaveCollection } from './SaveCollection';
 import { ProgressQuest } from './ProgressQuest';
-import { JobNoticeToast } from './JobNoticeToast';
 import { useToast } from './ToastProvider';
 import { BackButton } from './BackButton';
 
@@ -34,7 +35,6 @@ export function CodeWorkspace({ group, busy = false, promptToSave = false }: { g
   }
   const hasResults = group.slips.length > 0;
   const building = !!group.job && ['PENDING', 'RUNNING'].includes(group.job.status);
-  const notice = group.generationReport?.notices?.[0] ?? null;
   const showWorkspace = hasResults || (!building && !!group.job);
   useEffect(() => {
     if (!(hasResults && building) || buildingToast.current) return;
@@ -44,20 +44,20 @@ export function CodeWorkspace({ group, busy = false, promptToSave = false }: { g
   }, [hasResults, building, group.job?.total, group.job?.progress, toast]);
 
   return <>
-    {!hasResults && building && <ProgressQuest job={group.job} />}
-    {hasResults && notice && (
-      <JobNoticeToast noticeKey={`${group.publicId}:notice`} message={notice} sticky />
-    )}
+
+    {!building && <GenerationOutcome outcome={group.job?.outcome ?? (group.job ? generationOutcome({ id: group.publicId, ...group.job }) : undefined)} />}
+    {building && <ProgressQuest job={group.job} />}
     {showWorkspace && (
       <div className="result-toolbar">
         <BackButton
           href={group.saved || group.userSaved ? '/history' : '/'}
-          label={group.saved || group.userSaved ? 'Saved codes' : 'Create'}
+          label={group.saved || group.userSaved ? 'Codes' : 'Create'}
         />
         <div className="result-toolbar-spacer" />
         {hasResults && (
           <SaveCollection
             publicId={group.publicId}
+            title={group.title}
             saved={group.saved}
             userSaved={group.userSaved}
             isOwner={group.isOwner}

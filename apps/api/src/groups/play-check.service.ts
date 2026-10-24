@@ -107,7 +107,7 @@ export class PlayCheckService {
     const now = Date.now();
     let openLegs = 0, liveLegs = 0, doneLegs = 0;
     const results: SelectionSettlement[] = [];
-    const updates: Prisma.PrismaPromise<unknown>[] = [];
+    const updates: Prisma.PrismaPromise<unknown>[] = [this.prisma.$queryRaw`SELECT g.id FROM slip_groups g JOIN generated_slips t ON t.group_id = g.id WHERE t.id = ${slipId} FOR UPDATE OF g`];
     const checkedAt = new Date();
     const matchEvidence: Array<{ selectionId: string; evidence: MatchEvidence }> = [];
     const cuts: Array<{ homeTeam: string; awayTeam: string; league: string; marketName: string;
@@ -202,7 +202,7 @@ export class PlayCheckService {
 
       updates.push(this.prisma.slipSelection.update({
         where: { id: leg.id },
-        data: { playStatus, playNote, score, result: settlement,
+        data: { playStatus, playNote, score, result: settlement, matchPhase: phase, matchCheckedAt: checkedAt,
           ...(!retained ? { resultSource: source, resultCheckedAt: checkedAt, resultEvidence: evidence } : {}),
         },
       }));
@@ -231,6 +231,7 @@ export class PlayCheckService {
         cutSummary: cutLegs ? `${cutLegs} confirmed losing selection(s)` : null,
       },
     }));
+    updates.push(this.prisma.slipGroup.updateMany({ where: { slips: { some: { id: slipId } }, OR: [{ slips: { some: { selections: { some: { matchPhase: { not: 'finished' } } } } } }, { slips: { some: { selections: { some: { result: { in: ['UNKNOWN', 'PENDING'] } } } } } }] }, data: { completedAt: null, deleteAfter: null } }));
     updates.push(this.prisma.trainingEvent.create({ data: {
       kind: 'SETTLEMENT_CHECKED', payload: JSON.parse(JSON.stringify({
         slipId, bookingCode, checkedAt, result, results,

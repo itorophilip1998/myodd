@@ -1,18 +1,20 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import { ModeInfo } from './ModeInfo';
 import { useRouter } from 'next/navigation';
-import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest } from '@myodd/shared';
+import { MarketPicker } from './MarketPicker';
 import { ProgressQuest } from './ProgressQuest';
 import { MatchDayPicker } from './MatchDayPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { extractPromptFromFile } from '@/lib/prompt-import';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useSettings, useUiSound } from '@/components/SettingsProvider';
 import { useToast } from '@/components/ToastProvider';
 import { generateGuardrailMessage } from '@/lib/generate-guardrails';
-import { MAX_TICKETS } from '@/lib/ui-settings';
+import { MAX_TICKETS, MAX_GAMES_PER_TICKET } from '@/lib/ui-settings';
 import { readGenerationControls } from '@/lib/generation-controls';
 import {
   clearPredictionBook,
@@ -30,44 +32,12 @@ const MODES = [
 ];
 
 const TICKET_CHOICES = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
+const GAME_CHOICES = Array.from({ length: MAX_GAMES_PER_TICKET }, (_, i) => i + 1);
 const MAX_PROMPT = 4000;
 
 function bandForMode(modeName: string) {
   const key = modeKeyFromLabel(modeName) ?? 'INVESTOR';
   return { key, ...MODE_ODDS[key] };
-}
-
-function oddsPresets(key: ModeKey): Array<{ label: string; min: number; max: number | null }> {
-  switch (key) {
-    case 'INVESTOR':
-      return [
-        { label: '2–5', min: 2, max: 5 },
-        { label: '2–3', min: 2, max: 3 },
-        { label: '3–4', min: 3, max: 4 },
-        { label: '4–5', min: 4, max: 5 },
-      ];
-    case 'GAMBLER':
-      return [
-        { label: '5–20', min: 5.01, max: 20 },
-        { label: '5–10', min: 5.01, max: 10 },
-        { label: '10–15', min: 10, max: 15 },
-        { label: '15–20', min: 15, max: 20 },
-      ];
-    case 'JAPA':
-      return [
-        { label: `20–${MODE_ODDS.JAPA.maximum}`, min: 20.01, max: MODE_ODDS.JAPA.maximum },
-        { label: '20–30', min: 20.01, max: 30 },
-        { label: '30–40', min: 30, max: 40 },
-        { label: '40–50', min: 40, max: 50 },
-      ];
-    case 'LAGOS_LIFE':
-      return [
-        { label: `100+`, min: 100.01, max: null },
-        { label: '100–500', min: 100.01, max: 500 },
-        { label: '500–2k', min: 500, max: 2000 },
-        { label: '2k+', min: 2000, max: null },
-      ];
-  }
 }
 
 function appendPrompt(current: string, addition: string) {
@@ -84,11 +54,14 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const fileInputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const bookingCode = sourceCode ?? initialBookingCode;
+  const [selectedMarketIds, setSelectedMarketIds] = useState<string[]>([]);
+  const requestRef = useRef<{ payload: string; id: string } | null>(null);
+  useEffect(() => { try { const ids = JSON.parse(sessionStorage.getItem('myodd-market-draft') ?? '[]'); if (Array.isArray(ids)) setSelectedMarketIds(ids.filter((id: unknown) => typeof id === 'string')); } catch {} }, []);
+  function changeMarkets(ids: string[]) { if (ids.some(id => !selectedMarketIds.includes(id))) track('market_selected', { count: ids.length }); setSelectedMarketIds(ids); try { sessionStorage.setItem('myodd-market-draft', JSON.stringify(ids)); } catch {} }
   const [preferSource, setPreferSource] = useState(false);
   useEffect(() => { if (sourceRevision) setPreferSource(true); }, [sourceRevision]);
   const [instruction, setInstruction] = useState(initialInstruction);
   const initialControls = readGenerationControls(initialInstruction);
-  // Always land on recommended Investor Mode; user can still switch for a single run.
   const [mode, setMode] = useState(() => MODES.find(m => m.key === (initialControls.mode ?? modeKeyFromLabel(initialMode)))?.name ?? 'Investor Mode');
   const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(() => {
     if (initialSplitInto) return 'split';
@@ -103,7 +76,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   ));
   const parsedChat = readChatRequest(instruction);
   const effectiveSplit = splitEnabled ? Number(splitCount) : parsedChat.splitInto;
-  const wantsSplit = splitEnabled || (operation === 'auto' && parsedChat.isSplit);
   const edited = useRef(false);
   const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
   const [bookOpen, setBookOpen] = useState(false);
@@ -114,19 +86,20 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
-  const presets = useMemo(() => oddsPresets(modeBand.key), [modeBand.key]);
-  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : settings.defaultOddsSource);
-  const [minOdds, setMinOdds] = useState(() => String(bandForMode(mode).minimum));
+  const systemInvestor = modeBand.key === 'INVESTOR' && predictionBook.length === 0;
+  const wantsSplit = !systemInvestor && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
+  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
+  const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
   const [maxOdds, setMaxOdds] = useState(() => {
-    const max = bandForMode(mode).maximum;
+    const max = initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).maximum : modeBand.maximum;
     return max == null ? '' : String(max);
   });
   useEffect(() => {
     if (edited.current || initialInstruction) return;
-    setOddsSource(settings.defaultOddsSource);
+    setOddsSource('manual');
     setMinOdds(String(modeBand.minimum));
     setMaxOdds(modeBand.maximum == null ? '' : String(modeBand.maximum));
-  }, [modeBand, settings.defaultOddsSource, initialInstruction]);
+  }, [modeBand, initialInstruction]);
   useEffect(() => {
     const sync = () => setPredictionBook(readPredictionBook());
     sync();
@@ -151,12 +124,14 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setOperation('generate');
     edited.current = true;
   }, []);
+  const [dateEdited, setDateEdited] = useState(false);
+  const promptDay = promptMatchDay(instruction);
   const [rangeStart, setRangeStart] = useState(() => lagosDateYmd());
   const [rangeEnd, setRangeEnd] = useState(() => lagosDateYmd());
-  const matchWindow = matchDayKickoffWindow(rangeStart, new Date(), rangeEnd);
+  const matchWindow = matchDayKickoffWindow(!dateEdited && promptDay ? promptDay.start : rangeStart, new Date(), !dateEdited && promptDay ? promptDay.end : rangeEnd);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
-    setMode('Investor Mode');
+    setMode(MODES.find(item => item.key === settings.defaultMode)?.name ?? 'Investor Mode');
     if (!initialSplitInto) setOperation(settings.defaultOperation === 'split' ? 'split' : 'generate');
     if (settings.defaultTickets) setTicketCount(String(settings.defaultTickets));
     else if (settings.defaultTickets === null) setTicketCount('');
@@ -166,8 +141,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setGamesPerTicket(settings.defaultGames ? String(settings.defaultGames) : '');
     setStrict(settings.defaultStrict);
     setNearest(settings.defaultNearest);
-    setOddsSource(settings.defaultOddsSource);
-  }, [initialInstruction, initialSplitInto, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, settings.defaultOddsSource]);
+    setOddsSource('manual');
+  }, [initialInstruction, initialSplitInto, settings.defaultMode, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest]);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
     void api.preferences().then(({ preferences }) => {
@@ -179,6 +154,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [submittedAt, setSubmittedAt] = useState<string>();
 
   const speech = useSpeechDictation(text => {
@@ -202,11 +178,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     return bits.join(' · ') || 'defaults';
   }, [wantsSplit, effectiveSplit, ticketCount, oddsSource, minOdds, maxOdds]);
 
-  function touch() { edited.current = true; }
+  function touch() { edited.current = true; setSubmitError(''); }
 
   function chooseMode(name: string) {
     touch();
     setMode(name);
+    if (modeKeyFromLabel(name) === 'INVESTOR') setOperation('generate');
     const band = bandForMode(name);
     setMinOdds(String(band.minimum));
     setMaxOdds(band.maximum == null ? '' : String(band.maximum));
@@ -220,8 +197,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setInstruction(next);
     if (after.tickets !== before.tickets && after.tickets !== null) setTicketCount(String(after.tickets));
     if (after.games !== before.games && after.games !== null) setGamesPerTicket(String(after.games));
-    if (after.mode && after.mode !== before.mode) chooseMode(MODES.find(m => m.key === after.mode)!.name);
-    if (after.odds && JSON.stringify(after.odds) !== JSON.stringify(before.odds)) setOddsSource('prompt');
+    if (after.odds && JSON.stringify(after.odds) !== JSON.stringify(before.odds)) {
+      const odds = clampOddsToMode(after.odds.minimum, after.odds.maximum, modeBand.key);
+      setMinOdds(String(odds.minimum));
+      setMaxOdds(odds.maximum == null ? '' : String(odds.maximum));
+      setOddsSource('prompt');
+    }
   }
 
   function resolvedOdds() {
@@ -229,10 +210,16 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const parsedMin = Number(minOdds);
     const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
     if (!Number.isFinite(parsedMin) || (parsedMax != null && !Number.isFinite(parsedMax))) return null;
-    return clampOddsToMode(parsedMin, parsedMax, modeBand.key);
+    return mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
   }
 
   const appliedSummary = useMemo(() => {
+    if (systemInvestor) {
+      const dayBit = matchWindow.matchDate === matchWindow.matchDateEnd
+        ? matchWindow.label
+        : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
+      return `Applied: Investor Mode · system picks markets, tickets, and games · ticket 2–5 · each game 1.10–1.50 · ${dayBit}`;
+    }
     if (wantsSplit) {
       return `Applied: Split into ${effectiveSplit || '?'} · ${mode}`;
     }
@@ -241,11 +228,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const parsedMin = Number(minOdds);
       const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
       if (Number.isFinite(parsedMin) && (parsedMax == null || Number.isFinite(parsedMax))) {
-        optionsOdds = clampOddsToMode(parsedMin, parsedMax, modeBand.key);
+        optionsOdds = mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
       }
     }
     const fromPrompt = oddsSource === 'prompt' ? previewOddsFromPrompt(instruction) : null;
-    const previewOdds = optionsOdds ?? (fromPrompt ? clampOddsToMode(fromPrompt.minimum, fromPrompt.maximum, modeBand.key) : null);
+    const previewOdds = optionsOdds ?? (fromPrompt ? (mode ? clampOddsToMode(fromPrompt.minimum, fromPrompt.maximum, modeBand.key) : fromPrompt) : null);
     const oddsBit = previewOdds
       ? `${previewOdds.minimum}–${previewOdds.maximum == null ? MAX_TICKET_ODDS : previewOdds.maximum}${optionsOdds ? '' : ' (from prompt)'}`
       : oddsSource === 'prompt'
@@ -256,15 +243,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       ? matchWindow.label
       : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
     const overrideNote = optionsOdds || ticketCount ? ' · Options win when set' : '';
-    return `Applied: ${mode} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
-  }, [wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
-
-  function applyPreset(min: number, max: number | null) {
-    touch();
-    setOddsSource('manual');
-    setMinOdds(String(min));
-    setMaxOdds(max == null ? '' : String(max));
-  }
+    return `Applied: ${mode || 'Auto'} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
+  }, [systemInvestor, wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
 
   async function onImportFile(file: File | undefined) {
     if (!file) return;
@@ -294,7 +274,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const uiTickets = !wantsSplit && ticketCount ? Number(ticketCount) : undefined;
     const rawMin = oddsSource === 'manual' ? Number(minOdds) : null;
     const rawMax = oddsSource === 'manual' ? (maxOdds.trim() === '' ? null : Number(maxOdds)) : null;
-    const guard = generateGuardrailMessage({
+    const guard = systemInvestor ? null : generateGuardrailMessage({
       wantsSplit,
       instruction,
       ticketCount: uiTickets,
@@ -303,14 +283,15 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       rawMinOdds: rawMin,
       rawMaxOdds: rawMax,
       oddsSource,
-      mode: modeBand.key,
+      mode: mode ? modeBand.key : undefined,
     });
-    if (guard) {
+    if (guard) { setSubmitError(guard);
       play('error');
       toast(guard, { sticky: true });
       setOptionsOpen(true);
       return;
     }
+    track('generate_started');
     play('submit');
     setSubmittedAt(new Date().toISOString()); setLoading(true);
     const odds = !wantsSplit ? resolvedOdds() : null;
@@ -322,34 +303,40 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         ? `Match day: ${matchWindow.label} (${matchWindow.matchDate}).`
         : `Match days: ${matchWindow.matchDate} to ${matchWindow.matchDateEnd}.`)
       : '';
-    const settingsLine = [
+    const settingsLine = (systemInvestor ? [
+      effectiveCode ? `Source code: ${effectiveCode}.` : '',
+      'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ignore requested markets, odds, ticket counts, and game counts.',
+      'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.',
+      dateLine,
+    ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
       uiTickets ? `Generate ${uiTickets} tickets.` : '',
       gamesPerTicket ? `Exactly ${gamesPerTicket} games per ticket.` : 'Games per ticket: Random (1–50). Ignore saved game counts.',
-      scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
+      scope === 'original_only' && (effectiveCode || predictionBook.length) ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
-      mode ? `Risk mode: ${mode}.` : '',
       oddsLabel,
       dateLine,
       `Ticket odds must not exceed ${MAX_TICKET_ODDS}.`,
-      'Never reuse the same game across tickets in this generation.',
-    ].filter(Boolean).join(' ');
+    ]).filter(Boolean).join(' ');
     const basePrompt = instruction.trim() || (predictionBook.length ? predictionBookPrompt(predictionBook) : '') || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
     const prompt = dateLine && !/match day/i.test(basePrompt) ? `${basePrompt}\n${dateLine}` : basePrompt;
     try {
       const hasBook = predictionBook.length > 0;
-      const result = await api.generate({
+      const payload = {
+        riskMode: mode ? modeBand.key : null,
+        selectedMarketIds: systemInvestor ? [] : selectedMarketIds,
         bookingCode: effectiveCode || undefined,
-        ticketCount: uiTickets ?? (hasBook ? 1 : undefined),
-        gamesPerTicket: hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
-        operation: wantsSplit ? 'split' : 'generate',
+        ticketCount: systemInvestor ? undefined : uiTickets ?? (hasBook ? 1 : undefined),
+        gamesPerTicket: systemInvestor ? undefined : hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
+        operation: wantsSplit ? 'split' as const : 'generate' as const,
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
-        minimumOdds: hasBook ? undefined : odds?.minimum,
-        maximumOdds: hasBook ? undefined : (odds ? (odds.maximum ?? MAX_TICKET_ODDS) : undefined),
+        matchDateEnd: wantsSplit ? undefined : matchWindow.matchDateEnd,
+        minimumOdds: systemInvestor || hasBook ? undefined : odds?.minimum,
+        maximumOdds: systemInvestor || hasBook ? undefined : (odds ? (odds.maximum ?? MAX_TICKET_ODDS) : undefined),
         instruction: prompt + (settingsLine ? `\nFinal request settings (take precedence): ${settingsLine}` : ''),
         pinnedSelections: hasBook
           ? predictionBook.map((pick) => ({
@@ -366,13 +353,20 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               kickoffAt: pick.kickoffAt,
             }))
           : undefined,
-      });
+      };
+      const payloadKey = JSON.stringify(payload);
+      if (!requestRef.current) { try { requestRef.current = JSON.parse(sessionStorage.getItem('myodd-generation-retry') ?? 'null'); } catch {} }
+      if (!requestRef.current || requestRef.current.payload !== payloadKey) requestRef.current = { payload: payloadKey, id: crypto.randomUUID() };
+      try { sessionStorage.setItem('myodd-generation-retry', JSON.stringify(requestRef.current)); } catch {}
+      const result = await api.generate({ ...payload, requestId: requestRef.current.id });
+      try { sessionStorage.removeItem('myodd-generation-retry'); } catch {}
+      requestRef.current = null;
       if (hasBook) {
         clearPredictionBook();
         setPredictionBook([]);
       }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { play('error'); toast((err as Error).message, { sticky: true }); setLoading(false); }
+    } catch (err) { const message = (err as Error).message.includes('You can generate up to 10 tickets') ? 'You can generate up to 10 tickets at a time.' : err instanceof ApiError && err.code === 'SOURCE_REQUIRED' ? 'Paste a source booking code to reuse its original matches.' : 'Your request could not be started. Please try again.'; track('generate_failed'); play('error'); setSubmitError(message); toast(message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
@@ -387,7 +381,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
 
   return <form onSubmit={submit} className="chat-composer">
     <fieldset className="mode-picker">
-      <legend>Pick your mode <span>Investor recommended for best-ranked tickets</span></legend>
+      <legend>Choose your mode</legend>
       <div className="mode-grid">
         {MODES.map(item => (
           <div key={item.name} className={`mode-option-wrap ${item.tone}${mode === item.name ? ' selected' : ''}`}>
@@ -408,21 +402,14 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               </span>
               <span className="mode-check" aria-hidden>{mode === item.name ? '✓' : ''}</span>
             </button>
-            <Link
-              href={`/terms#${item.termsHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mode-info"
-              aria-label={`About ${item.name}`}
-              title={`Learn about ${item.name}`}
-            >
-              <span aria-hidden>ⓘ</span>
-            </Link>
+            <ModeInfo name={item.name} mode={item.key} termsHash={item.termsHash} />
           </div>
         ))}
       </div>
     </fieldset>
 
+    {mode && initialControls.mode && initialControls.mode !== modeBand.key && <p role="status">Your selected mode takes precedence over the prompt mode.</p>}
+    {submitError && <p role="alert" className="generation-outcome">{submitError}</p>}
     <div className="composer chat-input-box">
       {predictionBook.length > 0 && (
         <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
@@ -482,7 +469,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         onKeyDown={shortcut}
         maxLength={MAX_PROMPT}
         rows={2}
-        placeholder={'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
+        placeholder={systemInvestor ? 'Optional note. Investor Mode picks the markets, tickets, and games.' : 'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
       />
       {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && (
         <p className="parsed-code-hint" title={`Using ${parsedChat.bookingCode} from your message`}>Using {parsedChat.bookingCode}</p>
@@ -501,11 +488,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
             <MatchDayPicker
               start={rangeStart}
               end={rangeEnd}
-              onChange={(s, e) => { touch(); setRangeStart(s); setRangeEnd(e); setOptionsOpen(false); }}
+              onChange={(s, e) => { touch(); setDateEdited(true); setRangeStart(s); setRangeEnd(e); setOptionsOpen(false); }}
             />
           )}
 
-          <OptionsPopover
+          {!systemInvestor && <OptionsPopover
             summary={optionsSummary}
             open={optionsOpen}
             onOpenChange={open => { setOptionsOpen(open); }}
@@ -532,16 +519,9 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               {!wantsSplit && <label>Games per ticket
                 <select aria-label="Games per ticket" value={gamesPerTicket} onChange={e => { touch(); setGamesPerTicket(e.target.value); }}>
                   <option value="">Random (1–50)</option>
-                  {TICKET_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
+                  {GAME_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>}
-              <label>Matches
-                <select value={scope} onChange={e => { touch(); setScope(e.target.value as 'prompt' | 'original_only' | 'upcoming'); }}>
-                  <option value="prompt">Prompt</option>
-                  <option value="original_only">Original</option>
-                  <option value="upcoming">Upcoming</option>
-                </select>
-              </label>
             </div>
 
             {!wantsSplit && (
@@ -549,32 +529,22 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
                 <div className="compact-odds-head">
                   <strong>Odds</strong>
                   <span>{modeBand.minimum}–{modeBand.maximum ?? MAX_TICKET_ODDS}</span>
-                  <div className="odds-source-tabs" role="group" aria-label="Odds source">
-                    <button type="button" aria-pressed={oddsSource === 'manual'} className={oddsSource === 'manual' ? 'is-active' : ''} onClick={() => { touch(); setOddsSource('manual'); }}>Options</button>
-                    <button type="button" aria-pressed={oddsSource === 'prompt'} className={oddsSource === 'prompt' ? 'is-active' : ''} onClick={() => { touch(); setOddsSource('prompt'); }}>Prompt</button>
-                  </div>
                 </div>
-                {oddsSource === 'manual' && <>
-                  <div className="odds-presets" role="group" aria-label="Odds presets">
-                    {presets.map(preset => {
-                      const active = Number(minOdds) === preset.min && ((preset.max == null && maxOdds.trim() === '') || Number(maxOdds) === preset.max);
-                      return <button type="button" key={preset.label} aria-pressed={active} className={active ? 'is-active' : ''} onClick={() => applyPreset(preset.min, preset.max)}>{preset.label}</button>;
-                    })}
-                  </div>
                   <div className="ticket-odds-inputs">
                     <label>Min<input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} max={modeBand.maximum ?? MAX_TICKET_ODDS} value={minOdds} onChange={e => { touch(); setOddsSource('manual'); setMinOdds(e.target.value); }} /></label>
                     <span className="ticket-odds-sep" aria-hidden>–</span>
                     <label>Max<input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} max={modeBand.maximum ?? MAX_TICKET_ODDS} value={maxOdds} onChange={e => { touch(); setOddsSource('manual'); setMaxOdds(e.target.value); }} /></label>
                   </div>
-                </>}
               </div>
             )}
+
+            <MarketPicker selected={selectedMarketIds} onChange={changeMarkets} />
 
             <div className="settings-toggles">
               <label className="check-option"><input type="checkbox" checked={strict} onChange={e => { touch(); setStrict(e.target.checked); }} />Only requested markets</label>
               <label className="check-option"><input type="checkbox" checked={nearest} onChange={e => { touch(); setNearest(e.target.checked); }} />Nearest odds OK</label>
             </div>
-          </OptionsPopover>
+          </OptionsPopover>}
 
           <button
             type="button"

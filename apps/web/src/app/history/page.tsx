@@ -1,4 +1,5 @@
 'use client';
+import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -84,7 +85,6 @@ export default function HistoryPage() {
   const groups = (query.data?.pages.flat() ?? []).filter(g => `${g.title} ${g.publicId} ${g.originalBookingCode ?? ''} ${modeTag(g.riskMode) ?? ''}`.toLowerCase().includes(search.toLowerCase()));
   const selectable = mine ? groups.filter(g => g.isOwner).slice(0, 100) : [];
   const allSelected = selectable.length > 0 && selectable.every(g => selected.has(g.publicId));
-  const verifyTargets = selected.size ? [...selected] : groups.filter(g => g.isOwner).map(g => g.publicId);
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -126,7 +126,7 @@ export default function HistoryPage() {
       await Promise.all(ids.map(id => accountApi.save(id)));
       await refresh();
       toast('Collections restored.');
-    } catch (e) { toast((e as Error).message); }
+    } catch (e) { toast((e as Error).message, { sticky: true }); }
     finally { setPending(false); }
   }
 
@@ -138,12 +138,13 @@ export default function HistoryPage() {
       setSelected(new Set());
       await refresh();
       const removed = result.removed;
+      if (removed.length) track('collection_deleted', { count: removed.length });
       toast(
         `${removed.length} collection${removed.length === 1 ? '' : 's'} removed.`,
         { label: 'Undo', onClick: () => { void restore(removed); } },
       );
       return true;
-    } catch (e) { toast((e as Error).message); return false; }
+    } catch (e) { toast((e as Error).message, { sticky: true }); return false; }
     finally { setPending(false); }
   }
 
@@ -182,7 +183,7 @@ export default function HistoryPage() {
       toast(formatPlaySummary(result.summary));
     } catch (e) {
       play('error');
-      toast((e as Error).message);
+      toast((e as Error).message, { sticky: true });
     } finally {
       setVerifying(null);
     }
@@ -193,7 +194,7 @@ export default function HistoryPage() {
       <header className="library-header">
         <div>
           <p className="eyebrow">YOUR CODE LIBRARY</p>
-          <h1>Saved codes<span className="heading-dot">.</span></h1>
+          <h1>Codes<span className="heading-dot">.</span></h1>
           <p>Browse public collections, verify played tickets, and keep your own close.</p>
         </div>
         <Link href="/" className="outline-button">＋ Create codes</Link>
@@ -244,13 +245,6 @@ export default function HistoryPage() {
           </label>
           <span className="library-count">{groups.length} loaded</span>
           {mine && session.signedIn && <>
-            <button
-              className="outline-button"
-              disabled={pending || lookupBusy || !!verifying || !verifyTargets.length}
-              onClick={() => void verifyCollections(verifyTargets)}
-            >
-              {verifying === 'bulk' ? 'Verifying…' : selected.size ? `Verify selected (${selected.size})` : 'Verify played'}
-            </button>
             <button className="outline-button" disabled={pending || lookupBusy || !!verifying} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}>
               {selecting ? 'Done' : 'Select'}
             </button>
@@ -260,15 +254,17 @@ export default function HistoryPage() {
         {mine && session.signedIn && selecting && (
           <div className="library-selection">
             <label>
-              <input type="checkbox" checked={allSelected} disabled={pending || !selectable.length} onChange={() => setSelected(allSelected ? new Set() : new Set(selectable.map(g => g.publicId)))} />
+              <input type="checkbox" checked={allSelected} disabled={pending || !!verifying || !selectable.length} onChange={() => setSelected(allSelected ? new Set() : new Set(selectable.map(g => g.publicId)))} />
               Select loaded <span>({selected.size}/100)</span>
             </label>
-            <button className="library-delete" disabled={pending || !selected.size} onClick={() => void remove([...selected])}>
+            {selected.size > 0 && <button className="outline-button" disabled={pending || lookupBusy || !!verifying} onClick={() => void verifyCollections([...selected])}>{verifying === 'bulk' ? 'Checking…' : `Check results (${selected.size})`}</button>}
+            {selected.size > 0 && <button className="library-delete" disabled={pending || !!verifying || !selected.size} onClick={() => void remove([...selected])}>
               {pending ? 'Removing…' : `Delete selected (${selected.size})`}
-            </button>
+            </button>}
           </div>
         )}
 
+        {query.error && <section role="alert"><p>Collections could not refresh. Any loaded collections are still available.</p><button type="button" className="outline-button" onClick={() => void query.refetch()}>Retry collections</button></section>}
         {query.isLoading && <LogoLoader compact label="Finding your collections" />}
         {!query.isLoading && !query.error && !groups.length && (
           <div className="empty-state">
@@ -283,13 +279,13 @@ export default function HistoryPage() {
             const primary = mainTag(group);
             return (
               <li key={group.publicId} className={selected.has(group.publicId) ? 'is-selected' : ''}>
-                {mine && session.signedIn && selecting && (
+                {mine && session.signedIn && selecting && group.isOwner && (
                   <label className="library-checkbox">
                     <input
                       type="checkbox"
                       aria-label={`Select ${group.title}`}
                       checked={selected.has(group.publicId)}
-                      disabled={pending || (!selected.has(group.publicId) && selected.size >= 100)}
+                      disabled={pending || !!verifying || (!selected.has(group.publicId) && selected.size >= 100)}
                       onChange={() => toggle(group.publicId)}
                     />
                   </label>
@@ -306,21 +302,11 @@ export default function HistoryPage() {
                     <span aria-hidden>↗</span>
                   </div>
                 </Link>
-                <div className="library-creator">{group.creator ? <span>{group.creator.name}</span> : <span>Community collection</span>}</div>
+                <div className="library-creator">{group.creator ? <span>{group.isOwner ? 'You' : group.creator.name}</span> : <span>Community collection</span>}</div>
                 <div className="library-card-action">
                   <span>{group.isOwner ? 'Created by you' : 'Public collection'}</span>
                   <div className="library-card-tools">
-                    {mine && group.isOwner && (
-                      <button
-                        type="button"
-                        className="library-verify-btn"
-                        disabled={lookupBusy || !!verifying}
-                        onClick={() => void verifyOne(group.publicId)}
-                      >
-                        {verifying === group.publicId ? '…' : 'Verify'}
-                      </button>
-                    )}
-                    <CollectionMenu collection={group} onDelete={mine && group.isOwner ? () => remove([group.publicId], true) : undefined} />
+                    <CollectionMenu collection={group} onCheckResults={mine && group.isOwner ? () => verifyOne(group.publicId) : undefined} checking={lookupBusy || !!verifying} onDelete={mine && group.isOwner ? () => remove([group.publicId]) : undefined} />
                   </div>
                 </div>
               </li>

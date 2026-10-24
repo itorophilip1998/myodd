@@ -16,3 +16,15 @@ export function readChatRequest(instruction: string) {
     ?? [...instruction.matchAll(new RegExp(`\\b${token}\\s+(?:parts?|pieces?|groups?|codes?|slips?)\\b`, 'gi'))].at(-1)?.[1] : undefined;
   return { bookingCode, isSplit, splitInto: count ? words[count.toLowerCase()] ?? Number(count) : undefined };
 }
+
+/** Explicit output count; game/selection counts are deliberately excluded. */
+export function requestedTicketCount(instruction: string): number | undefined {
+  const words: Record<string, number> = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90, hundred:100 };
+  const units = 'one|two|three|four|five|six|seven|eight|nine';
+  const tens = `(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[ -](?:${units}))?`;
+  const token = `(?:[0-9]+|one hundred|${tens}|${Object.keys(words).join('|')})`;
+  const matches = [...instruction.matchAll(new RegExp(`\\b(${token})\\s+(?:(?!(?:games?|matches?|legs?|picks?|selections?|per|each|odds)\\b)[a-z-]+\\s+){0,3}(?:tickets?|codes?|slips?|bookings?|combinations?|versions?|parts?|pieces?|groups?)\\b`, 'gi'))];
+  const last = matches.at(-1)?.[1] ?? (readChatRequest(instruction).isSplit ? [...instruction.matchAll(new RegExp(`\\binto\\s+(${token})\\b`, 'gi'))].at(-1)?.[1] : undefined);
+  if (last) return /^\d+$/.test(last) ? Number(last) : last.toLowerCase().split(/[ -]+/).reduce((total, word) => total + (words[word] ?? 0), 0);
+  return readChatRequest(instruction).splitInto;
+}

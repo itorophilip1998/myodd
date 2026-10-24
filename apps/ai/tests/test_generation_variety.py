@@ -31,10 +31,10 @@ class GenerationVarietyTests(unittest.TestCase):
         self.assertEqual(len(tickets), 10)
         self.assertTrue(all(len(t['selections']) == 5 and 4 <= t['totalOdds'] <= 5 for t in tickets))
 
-    def test_fifty_tickets_and_games_are_supported_but_fifty_one_is_rejected(self):
-        config = Config(numberOfSlips=50, minimumSelections=50, maximumSelections=50)
-        self.assertEqual(config.numberOfSlips, 50)
-        for values in [{'numberOfSlips': 51}, {'maximumSelections': 51}]:
+    def test_ten_tickets_and_fifty_games_are_supported(self):
+        config = Config(numberOfSlips=10, minimumSelections=50, maximumSelections=50)
+        self.assertEqual(config.numberOfSlips, 10)
+        for values in [{'numberOfSlips': 11}, {'maximumSelections': 51}]:
             with self.assertRaises(ValueError):
                 Config(**values)
 
@@ -43,8 +43,25 @@ class GenerationVarietyTests(unittest.TestCase):
         config = parse_intent('Generate 10 tickets. Games per ticket: Random (1–50). Investor Mode', [], {'gamesPerTicket': 8})
         self.assertEqual((config.minimumSelections, config.maximumSelections), (1, 50))
 
+    def test_a_repeated_game_must_use_a_different_option(self):
+        pool = []
+        for event in range(4):
+            pool.append(selection(event, odds=1.45, probability=.7, outcome='home', market='1'))
+            pool.append(selection(event, odds=1.48, probability=.62, outcome='dc', market='10'))
+        config = Config(numberOfSlips=4, riskMode='INVESTOR', riskPreference='VERY_LOW',
+                        minimumOdds=2, maximumOdds=5, minimumSelections=2, maximumSelections=2)
+        tickets, _ = search(pool, config, [], rng=random.Random(3))
+        self.assertGreaterEqual(len(tickets), 2)
+        seen = set()
+        for ticket in tickets:
+            keys = {(s['eventId'], s['marketId'], s['outcomeId'], s.get('specifier') or '') for s in ticket['selections']}
+            self.assertFalse(keys & seen)
+            seen |= keys
+            events = [s['eventId'] for s in ticket['selections']]
+            self.assertEqual(len(events), len(set(events)))
+
     def test_typed_counts_and_exact_games_are_respected(self):
-        config = parse_rules('Create 50 tickets with exactly 35 games per ticket. Lagoslife Mode')
-        self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (50, 35, 35))
+        config = parse_rules('Create 10 tickets with exactly 35 games per ticket. Lagoslife Mode')
+        self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (10, 35, 35))
         default = parse_rules('Investor Mode')
         self.assertEqual((default.numberOfSlips, default.minimumSelections, default.maximumSelections), (10, 1, 50))

@@ -1,108 +1,56 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAccountSession } from './AccountSession';
-import { accountApi, api } from '@/lib/api';
+import { accountApi } from '@/lib/api';
 import { useToast } from './ToastProvider';
 
-export function SaveCollection({ publicId, saved, userSaved, isOwner, isPublic, autoPrompt = false }: {
-  publicId: string;
-  saved?: boolean;
-  userSaved?: boolean;
-  isOwner?: boolean;
-  isPublic?: boolean;
-  autoPrompt?: boolean;
+export function SaveCollection({ publicId, title: initialTitle = 'My Football Picks', saved, userSaved, isOwner, isPublic, autoPrompt = false }: {
+  publicId: string; title?: string; saved?: boolean; userSaved?: boolean; isOwner?: boolean; isPublic?: boolean; autoPrompt?: boolean;
 }) {
-  const account = useAccountSession();
-  const query = useQueryClient();
-  const toast = useToast();
-  const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<'save' | 'public' | null>(null);
-  const [error, setError] = useState('');
-  const [savedHere, setSavedHere] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const prompted = useRef(false);
-  const titleId = useId();
-  const bodyId = useId();
-  const promptKey = `myodd-save-prompt:${publicId}`;
-  const kept = !!(saved || userSaved || savedHere);
-
-  function rememberChoice() {
-    try { sessionStorage.setItem(promptKey, 'answered'); } catch {}
-  }
-  function dismiss() {
-    if (saving) return;
-    rememberChoice();
-    setStep(null);
-    setError('');
-  }
+  const account = useAccountSession(); const query = useQueryClient(); const toast = useToast();
+  const [open, setOpen] = useState(false); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
+  const [title, setTitle] = useState(initialTitle); const [publish, setPublish] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null); const id = useId(); const prompted = useRef(false);
+  const draftKey = `myodd-save-draft:${publicId}`;
   useEffect(() => {
-    if (!autoPrompt || kept || prompted.current || !account.configured) return;
+    try { const raw = sessionStorage.getItem(draftKey); if (raw) { const draft = JSON.parse(raw); setTitle(typeof draft.title === 'string' ? draft.title : initialTitle); setPublish(draft.isPublic === true); setOpen(true); } } catch {}
+  }, [draftKey, initialTitle]);
+  useEffect(() => {
+    if (!autoPrompt || saved || userSaved || prompted.current) return;
     prompted.current = true;
-    try { if (sessionStorage.getItem(promptKey)) return; } catch {}
-    setStep('save');
-  }, [autoPrompt, kept, account.configured, promptKey]);
-  useEffect(() => {
-    if (step && !dialog.current?.open) dialog.current?.showModal();
-    if (!step && dialog.current?.open) dialog.current.close();
-    if (step) dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
-  }, [step]);
-
+    try { if (sessionStorage.getItem(`myodd-save-prompt:${publicId}`)) return; } catch {}
+    setOpen(true);
+  }, [autoPrompt, saved, userSaved, publicId]);
+  useEffect(() => { if (open && !dialog.current?.open) dialog.current?.showModal(); else if (!open && dialog.current?.open) dialog.current.close(); }, [open]);
+  function dismiss() { if (saving) return; setOpen(false); try { sessionStorage.removeItem(draftKey); sessionStorage.setItem(`myodd-save-prompt:${publicId}`, 'answered'); } catch {} }
   async function save() {
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
-      await accountApi.save(publicId);
-      setSavedHere(true);
-      rememberChoice();
-      setStep(isPublic ? null : 'public');
-      await query.invalidateQueries({ queryKey: ['group', publicId] });
-      await query.invalidateQueries({ queryKey: ['history'] });
-      toast('Collection saved');
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
+      await accountApi.save(publicId, { title: title.trim(), isPublic: publish });
+      track('collection_saved'); if (publish && !isPublic) track('collection_published');
+      setOpen(false); try { sessionStorage.removeItem(draftKey); } catch {}
+      await Promise.all([query.invalidateQueries({ queryKey: ['group', publicId] }), query.invalidateQueries({ queryKey: ['history'] }), query.invalidateQueries({ queryKey: ['public-collections'] })]);
+      toast(publish ? 'Collection saved and published' : 'Collection saved privately');
+    } catch (e) { setError((e as Error).message); } finally { setSaving(false); }
   }
-  async function publish() {
-    setSaving(true);
-    setError('');
-    try {
-      await api.editGroup(publicId, { isPublic: true });
-      setStep(null);
-      await query.invalidateQueries({ queryKey: ['group', publicId] });
-      await query.invalidateQueries({ queryKey: ['history'] });
-      toast('Collection is now public');
-    } catch (e) {
-      setError((e as Error).message);
-    } finally { setSaving(false); }
-  }
-  if (!account.configured) return null;
+  if (!account.configured || ((saved || userSaved) && !isOwner)) return null;
   return <>
-    {kept
-      ? <span className="collection-saved-pill">Saved{(isOwner || savedHere) && !isPublic ? ' · private' : ''}</span>
-      : <button type="button" className="outline-button" disabled={saving} onClick={() => { setError(''); setStep('save'); }}>Save</button>}
-    <dialog ref={dialog} className="collection-choice-dialog" aria-labelledby={titleId} aria-describedby={bodyId}
-      onCancel={e => { e.preventDefault(); dismiss(); }} onClick={e => { if (e.target === e.currentTarget) dismiss(); }}>
-      <div key={step} className="collection-choice-content">
-        <span className="collection-choice-icon" aria-hidden>{step === 'public' ? '↗' : '◇'}</span>
-        <p className="eyebrow">{step === 'public' ? 'SAVED PRIVATELY' : 'YOUR TICKETS ARE READY'}</p>
-        <h2 id={titleId}>{step === 'public' ? 'Make this collection public?' : 'Save this collection?'}</h2>
-        <p id={bodyId}>{step === 'public'
-          ? 'Let others find these tickets in Public codes. Your creator name and the collection’s tickets will be visible. You can make it private again later.'
-          : 'Keep these tickets in Saved codes so you can find and check them later. Saving keeps them private until you choose to make them public.'}</p>
-        {error && <p className="collection-choice-error" role="alert">{error}</p>}
-        <div className="collection-choice-actions">
-          <button type="button" className="outline-button" disabled={saving} onClick={dismiss}>{step === 'public' ? 'Keep private' : 'Not now'}</button>
-          {step === 'save' && !account.signedIn
-            ? <Link className="primary-button" href={`/sign-in?redirect_url=${encodeURIComponent(`/g/${publicId}`)}`}>Sign in to save</Link>
-            : <button type="button" className="primary-button" disabled={saving} onClick={() => void (step === 'public' ? publish() : save())}>
-                {saving ? step === 'public' ? 'Publishing…' : 'Saving…' : step === 'public' ? 'Make public' : 'Save privately'}
-              </button>}
+    <button type="button" className="outline-button" onClick={() => { setPublish(isPublic === true); setOpen(true); }}>{saved || userSaved ? 'Organize collection' : 'Save Collection'}</button>
+    <dialog ref={dialog} className="collection-choice-dialog" aria-labelledby={id} onCancel={e => { e.preventDefault(); dismiss(); }} onClick={e => { if (e.target === e.currentTarget) dismiss(); }}>
+      <form className="collection-choice-content" onSubmit={e => { e.preventDefault(); void save(); }}>
+        <h2 id={id}>Save Collection</h2>
+        <label>Collection title<input autoFocus required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></label>
+        <label className="settings-switch"><input type="checkbox" checked={publish} onChange={e => setPublish(e.target.checked)} />Make this collection public</label>
+        <p>Private unless you choose Public. All collections are deleted 24 hours after every match has a confirmed final result.</p>
+        {error && <p role="alert">{error}</p>}
+        <div className="collection-choice-actions"><button type="button" className="outline-button" disabled={saving} onClick={dismiss}>Cancel</button>
+          {account.signedIn ? <button className="primary-button" disabled={saving || !title.trim()}>{saving ? 'Saving…' : 'Save Collection'}</button>
+            : <Link className="primary-button" href={`/sign-in?redirect_url=${encodeURIComponent(`/g/${publicId}`)}`} onClick={() => { try { sessionStorage.setItem(draftKey, JSON.stringify({ title, isPublic: publish })); } catch {} }}>Sign in to save</Link>}
         </div>
-      </div>
+      </form>
     </dialog>
   </>;
 }

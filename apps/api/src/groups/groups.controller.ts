@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { collectionSaveSchema } from '@myodd/shared';
 import { Controller, Get, Post, Patch, Body, HttpCode, Param, Query, BadRequestException, Req, UseGuards } from '@nestjs/common';
 import { ClerkGuard, SignedInGuard, type AuthRequest } from '../auth/auth.guard';
 import { GroupsService } from './groups.service';
@@ -31,10 +32,13 @@ export class GroupsController {
 
   @Patch('groups/:groupId') @UseGuards(SignedInGuard)
   async edit(@Param('groupId') id: string, @Req() req: AuthRequest, @Body() body: unknown) {
-    const parsed = z.object({ title: z.string().trim().min(1).max(120).optional(), isPublic: z.boolean().optional() }).strict().refine(data => data.title !== undefined || data.isPublic !== undefined).safeParse(body);
+    const parsed = collectionSaveSchema.refine(data => data.title !== undefined || data.isPublic !== undefined).safeParse(body);
     if (!parsed.success) throw new BadRequestException('Provide a title or visibility');
     return this.groups.edit(id, req.account!.id, parsed.data);
   }
+
+  @Get('groups/sitemap') sitemap() { return this.groups.sitemap(); }
+  @Get('groups/:groupId/public-metadata') publicMetadata(@Param('groupId') id: string) { return this.groups.publicMetadata(id); }
 
   @Get('groups/:groupId')
   async getGroup(@Param('groupId') groupId: string, @Req() req: AuthRequest) {

@@ -23,6 +23,7 @@ export class SportyBetClient {
   private readonly cacheTtlMs: number;
   private lastRequestAt = 0;
   private inFlight = 0;
+  private readonly reads = new Map<string, Promise<unknown>>();
   private readonly queue: Array<() => void> = [];
 
   constructor(private readonly redis: RedisService) {
@@ -32,7 +33,7 @@ export class SportyBetClient {
     this.timeoutMs = Number(process.env.SPORTYBET_TIMEOUT_MS ?? 15000);
     this.minIntervalMs = Number(process.env.SPORTYBET_MIN_INTERVAL_MS ?? 250);
     this.maxConcurrency = Number(process.env.SPORTYBET_MAX_CONCURRENCY ?? 4);
-    this.cacheTtlMs = Number(process.env.SPORTYBET_CACHE_TTL_MS ?? 90000);
+    this.cacheTtlMs = Number(process.env.SPORTYBET_CACHE_TTL_MS ?? 30000);
   }
 
   get regionCode() {
@@ -43,12 +44,22 @@ export class SportyBetClient {
     return Math.max(1, Math.floor(this.cacheTtlMs / 1000));
   }
 
-  async get<T>(
+  async get<T>(path: string, options?: { cacheKey?: string; retries?: number }): Promise<T> {
+    const key = `${options?.cacheKey ?? 'fresh'}:${path.replace(/([?&])_t=[^&]+/g, '$1')}`;
+    const existing = this.reads.get(key);
+    if (existing) return existing as Promise<T>;
+    const pending = this.read<T>(path, options);
+    this.reads.set(key, pending);
+    try { return await pending; } finally { if (this.reads.get(key) === pending) this.reads.delete(key); }
+  }
+
+  private async read<T>(
     path: string,
     options?: { cacheKey?: string; retries?: number },
   ): Promise<T> {
     if (options?.cacheKey) {
-      const cached = await this.redis.getJson<T>(options.cacheKey);
+      const cached = await this.redis.getJson<T & { __missing?: boolean }>(options.cacheKey).catch(() => null);
+      if (cached?.__missing) throw new SportyBetHttpError('Booking code unavailable', 'NOT_FOUND', 404);
       if (cached) return cached;
     }
 
@@ -63,10 +74,11 @@ export class SportyBetClient {
             options.cacheKey,
             data,
             this.cacheTtlSeconds,
-          );
+          ).catch(() => undefined);
         }
         return data;
       } catch (err) {
+        if (options?.cacheKey && err instanceof SportyBetHttpError && ['NOT_FOUND', 'INVALID_BOOKING_CODE'].includes(err.code)) await this.redis.setJson(options.cacheKey, { __missing: true }, 60).catch(() => undefined);
         attempt += 1;
         const retryable =
           err instanceof SportyBetHttpError &&

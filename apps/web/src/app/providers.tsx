@@ -10,7 +10,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { refetchOnWindowFocus: false, retry: 1 },
+          queries: { refetchOnWindowFocus: false, staleTime: 300_000, gcTime: 1800_000, retry: (count, error) => count < 1 && ![400, 401, 403, 404, 409, 422].includes((error as Error & { status?: number }).status ?? 0) },
         },
       }),
   );
