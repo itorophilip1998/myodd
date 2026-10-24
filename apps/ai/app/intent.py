@@ -130,7 +130,7 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
             config = parse_chat_completions(instruction, available_markets, model=model)
         except IntentProviderError as exc:
             reason = str(exc).casefold()
-            transient = 'rate limit' in reason or 'could not reach' in reason or bool(re.search(r'HTTP 5\d\d', reason))
+            transient = 'rate limit' in reason or 'could not reach' in reason or bool(re.search(r'http 5\d\d', reason))
             missing_key = 'api_key is required' in reason
             if not local_fallback_supported(instruction) or not (transient or missing_key):
                 raise

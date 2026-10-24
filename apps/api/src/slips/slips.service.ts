@@ -126,13 +126,13 @@ export class SlipsService implements OnModuleInit {
       const band = MODE_ODDS.INVESTOR;
       const notices = [...config.unhandledRequests];
       const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
-      if (input.selectedMarketIds?.length || config.markets.length || config.marketRules.length || config.marketQueries.length || config.marketPolicy === 'only') {
+      if (input.selectedMarketIds?.length) {
         note('Investor Mode chooses the markets. Requested markets were not applied.');
       }
-      if (input.ticketCount || input.gamesPerTicket || config.numberOfSlips !== 10 || config.minimumSelections !== 1 || config.maximumSelections !== 50) {
+      if (input.ticketCount || input.gamesPerTicket) {
         note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.');
       }
-      if (input.minimumOdds != null || input.maximumOdds !== undefined || config.minimumOdds !== band.minimum || config.maximumOdds !== band.maximum) {
+      if (input.minimumOdds != null || input.maximumOdds !== undefined) {
         note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.');
       }
       return {

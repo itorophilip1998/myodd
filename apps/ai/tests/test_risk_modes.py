@@ -92,3 +92,31 @@ class RiskModeTests(unittest.TestCase):
         self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (10, 1, 50))
         self.assertEqual(config.markets, [])
         self.assertFalse(config.allowOddsAdjustment)
+        self.assertTrue(any('fixed ticket odds' in note for note in config.unhandledRequests))
+        self.assertTrue(any('Requested markets' in note for note in config.unhandledRequests))
+        self.assertTrue(any('Requested counts' in note for note in config.unhandledRequests))
+
+    def test_investor_system_copy_is_not_a_user_request(self):
+        prompt = (
+            'Create tickets using my selected settings.\n'
+            'Final request settings (take precedence): Investor Mode system ticket. '
+            'Choose the markets, ticket count, and games per ticket. '
+            'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. '
+            'Ignore requested markets, odds, and counts.'
+        )
+        config = parse_rules(prompt)
+        self.assertEqual((config.riskMode, config.minimumOdds, config.maximumOdds, config.numberOfSlips), ('INVESTOR', 2, 5, 10))
+        self.assertEqual((config.minimumSelections, config.maximumSelections, config.markets), (1, 50, []))
+        self.assertEqual(config.unhandledRequests, [])
+
+    @patch('app.intent._parse_intent', return_value=Config(riskMode='INVESTOR', minimumOdds=2, maximumOdds=5))
+    def test_saved_counts_do_not_warn_on_a_plain_investor_request(self, _):
+        prompt = (
+            'Create tickets for today.\n'
+            'Final request settings (take precedence): Investor Mode system ticket. '
+            'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.'
+        )
+        result = parse_intent(prompt, [], {'ticketCount': 4, 'gamesPerTicket': 6})
+        self.assertEqual((result.numberOfSlips, result.minimumSelections, result.maximumSelections), (10, 1, 50))
+        self.assertEqual((result.minimumOdds, result.maximumOdds), (2, 5))
+        self.assertFalse(any('Requested' in note for note in result.unhandledRequests))

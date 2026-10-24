@@ -1,6 +1,7 @@
 """Named mode odds policies are enforced locally after every language-model interpretation."""
 import re
-from .odds_format import extract_odds_bounds, has_explicit_odds_request, has_safer_slang
+from .generation_limits import requested_ticket_count
+from .odds_format import extract_games_per_ticket, extract_odds_bounds, has_explicit_odds_request, has_safer_slang
 from .schemas import Config
 
 class ModeConstraintError(ValueError):
@@ -14,6 +15,19 @@ MODES = (
 )
 
 
+def _user_instruction(instruction: str) -> str:
+    """The appended settings block is product copy, not something the user asked for."""
+    return re.split(r'\n\s*final request settings\b', instruction, maxsplit=1, flags=re.I)[0]
+
+
+_MARKET_REQUEST = re.compile(
+    r'double\s*chance|\b[1x]2\b|\bx2\b|\b1x\b|over\s*\d|under\s*\d|btts|both\s*teams|'
+    r'straight\s*wins?|home\s*win|away\s*win|moneyline|favourites?|favorites?|\bdraws?\b|'
+    r'markets?\s+only|only\s+(?:use|my)|these markets',
+    re.I,
+)
+
+
 def lock_investor_system(config: Config, instruction: str) -> Config:
     """Investor Mode is a system ticket. The user does not set odds, markets, or counts."""
     notices = list(config.unhandledRequests)
@@ -22,13 +36,16 @@ def lock_investor_system(config: Config, instruction: str) -> Config:
         if message not in notices:
             notices.append(message)
 
-    if has_explicit_odds_request(instruction) and (config.minimumOdds != 2 or config.maximumOdds != 5):
+    user = _user_instruction(instruction)
+    low, high = extract_odds_bounds(user)
+    if has_explicit_odds_request(user) and not (low == 2 and high == 5):
         note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.')
-    if config.markets or config.marketRules or config.marketQueries or config.marketPolicy == 'only':
+    if _MARKET_REQUEST.search(user):
         note('Investor Mode chooses the markets. Requested markets were not applied.')
-    if config.numberOfSlips != 10 or config.minimumSelections != 1 or config.maximumSelections != 50:
+    tickets = requested_ticket_count(user)
+    if (tickets is not None and tickets != 10) or extract_games_per_ticket(user) is not None:
         note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.')
-    if config.allowOddsAdjustment:
+    if re.search(r'nearest|closest|adjust (?:the )?odds|relax (?:the )?odds', user, re.I):
         note('Investor Mode does not move odds to the nearest range.')
     result = config.model_copy(update={
         'riskMode': 'INVESTOR', 'riskPreference': 'VERY_LOW', 'minimumOdds': 2., 'maximumOdds': 5.,
