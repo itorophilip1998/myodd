@@ -27,6 +27,28 @@ test('Create generates with standalone modes and opens the result page', async (
   await expect(page.getByRole('heading', { name: 'Partial success' })).toBeVisible();
   expect(payload.riskMode).toBe('GAMBLER'); expect(payload.ticketCount).toBe(5); expect(payload.requestId).toMatch(/^[a-f0-9-]{36}$/);
 });
+test('Investor Mode sends a system ticket for the selected match day', async ({ page }) => {
+  await mockApi(page);
+  let payload: Record<string, unknown> = {};
+  await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /^Options/ })).toHaveCount(0);
+  await expect(page.getByTitle('Match days')).toBeVisible();
+  await page.locator('textarea').fill('5 tickets between 4 and 5 odds, double chance, exactly 10 games');
+  await page.locator('textarea').press('ControlOrMeta+Enter');
+  await expect(page).toHaveURL(/\/result\/test-group/);
+  expect(payload.riskMode).toBe('INVESTOR');
+  expect(payload.ticketCount).toBeUndefined();
+  expect(payload.gamesPerTicket).toBeUndefined();
+  expect(payload.minimumOdds).toBeUndefined();
+  expect(payload.maximumOdds).toBeUndefined();
+  expect(payload.selectedMarketIds).toEqual([]);
+  expect(payload.operation).toBe('generate');
+  expect(payload.matchDate).toEqual(expect.any(String));
+  expect(String(payload.instruction)).toContain('Investor Mode system ticket');
+  expect(String(payload.instruction)).not.toContain('Generate 5 tickets');
+  expect(String(payload.instruction)).not.toContain('Exactly 10 games');
+});
 test('copying a code does not open details, and each card has one result badge', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']); await mockApi(page);
   await page.goto('/result/test-group?job=test-job');
@@ -69,9 +91,12 @@ test('settings have no theme controls and ignore old saved themes and OS appeara
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('myodd-ui-settings-v1') || '{}').theme)).toBeUndefined();
 });
 test('market selection survives navigation', async ({ page }) => {
-  await mockApi(page); await page.goto('/generate'); await page.getByRole('button', { name: /^Options/ }).click(); await page.getByRole('button', { name: /^Markets/ }).click();
+  await mockApi(page); await page.goto('/generate');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
+  await page.getByRole('button', { name: /^Options/ }).click(); await page.getByRole('button', { name: /^Markets/ }).click();
   await page.getByLabel('Over 1.5', { exact: true }).check();
   await page.goto('/settings'); await page.goto('/generate');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
   await page.getByRole('button', { name: /^Options/ }).click(); await page.getByRole('button', { name: /^Markets/ }).click(); await expect(page.getByLabel('Over 1.5', { exact: true })).toBeChecked();
 });
 test('unified save uses one request with editable title and optional public visibility', async ({ page }) => {
@@ -126,6 +151,12 @@ test('restored navigation, footer version, and compact options match each mode',
   await expect(page.locator('.site-footer > :last-child')).toHaveClass('footer-version');
   for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100.01', String(MAX_TICKET_ODDS)]]) {
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    if (name === 'Investor Mode') {
+      await expect(page.getByRole('button', { name: /^Options/ })).toHaveCount(0);
+      await expect(page.getByTitle('Match days')).toBeVisible();
+      await expect(page.locator('.applied-settings')).toContainText('system picks markets, tickets, and games');
+      continue;
+    }
     await page.getByRole('button', { name: /^Options/ }).click();
     const options = page.getByRole('dialog', { name: 'Generation options' });
     await expect(options.getByText('Matches', { exact: true })).toHaveCount(0);
@@ -150,7 +181,9 @@ test('markets load only when expanded, with searchable grouped rows', async ({ p
   await page.setViewportSize({ width: 375, height: 800 }); await mockApi(page);
   let reads = 0;
   await page.route('**/api/slips/markets', route => { reads++; return route.fulfill({ json: { version: 1, options: Array.from({ length: 18 }, (_, i) => ({ id: `test-${i}`, label: `Over ${i}.5`, category: i < 9 ? 'Total Goals' : 'First Half', available: i !== 2 })) } }); });
-  await page.goto('/'); await page.getByRole('button', { name: /^Options/ }).click();
+  await page.goto('/');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
+  await page.getByRole('button', { name: /^Options/ }).click();
   await expect(page.getByRole('button', { name: /^Markets/ })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('searchbox', { name: 'Search markets' })).toHaveCount(0); expect(reads).toBe(0);
   await page.getByRole('button', { name: /^Markets/ }).click();
@@ -194,7 +227,9 @@ for (const width of [320, 1280]) {
 test('Create rejects more than ten tickets and retains fifty-game controls', async ({ page }) => {
   await mockApi(page); let submitted = false;
   await page.route('**/api/slips/generate-from-prompt', route => { submitted = true; return route.abort(); });
-  await page.goto('/'); await page.getByRole('button', { name: /^Options/ }).click();
+  await page.goto('/');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
+  await page.getByRole('button', { name: /^Options/ }).click();
   await expect(page.getByLabel('Total tickets').locator('option')).toHaveCount(11);
   await expect(page.getByLabel('Games per ticket', { exact: true }).locator('option')).toHaveCount(51);
   await page.getByRole('button', { name: 'Close options' }).click();
@@ -336,7 +371,9 @@ test('fresh prompts do not inherit hidden original-only settings without a sourc
   await mockApi(page); let payload: any;
   await page.addInitScript(() => localStorage.setItem('myodd-ui-settings-v1', JSON.stringify({ defaultsVersion: 3, defaultScope: 'original_only' })));
   await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
-  await page.goto('/'); await page.locator('textarea').fill('Create two tickets'); await page.locator('textarea').press('ControlOrMeta+Enter');
+  await page.goto('/');
+  await page.getByRole('button', { name: /Gambler Mode Medium risk/ }).click();
+  await page.locator('textarea').fill('Create two tickets'); await page.locator('textarea').press('ControlOrMeta+Enter');
   await expect(page).toHaveURL(/result/); expect(payload.bookingCode).toBeUndefined(); expect(payload.instruction).not.toContain('Only use the original matches');
   expect(payload.ticketCount).toBe(2);
 });

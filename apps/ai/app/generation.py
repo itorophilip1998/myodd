@@ -12,6 +12,13 @@ def fingerprint(selections):
     return hashlib.sha256('\n'.join(sorted(f'{s.eventId}|{s.marketId}|{s.outcomeId}|{s.specifier}' for s in selections)).encode()).hexdigest()
 
 
+def selection_key(selection):
+    """Identity of one pick. The same game may recur only with a different key."""
+    if isinstance(selection, dict):
+        return (selection['eventId'], selection['marketId'], selection['outcomeId'], selection.get('specifier') or '')
+    return (selection.eventId, selection.marketId, selection.outcomeId, selection.specifier or '')
+
+
 def match_key(selection):
     """Normalize a fixture so the same game cannot appear twice under different event IDs."""
     home = ' '.join((selection.homeTeam or '').casefold().split())
@@ -85,28 +92,33 @@ def event_choices(pool, config):
     return events
 
 
-def varied_candidates(candidates, config, rng, limit, ceiling):
-    """Spread tickets across randomized targets; rank quality within each target."""
+def varied_candidates(candidates, config, rng, limit, ceiling, repeatable=()):
+    """Spread tickets across randomized targets; rank quality within each target.
+
+    A pick (event, market, outcome, line) is used on at most one ticket.
+    `repeatable` keys, such as pinned original selections, may appear again.
+    """
     remaining = list(candidates)
     count = min(limit, len(remaining))
     if not count:
         return []
+    repeatable = set(repeatable)
     low, high = math.log(config.minimumOdds), math.log(max(config.minimumOdds, ceiling))
     targets = [low + (index + rng.random()) / count * (high - low) for index in range(count)]
     rng.shuffle(targets)
     picked = []
     used_keys, used_events = set(), set()
-    def keys(candidate):
-        return {(s['eventId'], s['marketId'], s['outcomeId'], s.get('specifier', '')) for s in candidate['selections']}
+    def fresh(candidate):
+        return {selection_key(s) for s in candidate['selections']} - repeatable
     for target in targets:
-        compatible = [candidate for candidate in remaining if config.preserveOriginalSelections or not (keys(candidate) & used_keys)]
+        compatible = [candidate for candidate in remaining if not (fresh(candidate) & used_keys)]
         if not compatible:
             break
         candidate = max(compatible, key=lambda c: (
             -len({s['eventId'] for s in c['selections']} & used_events), c['_preferred'],
             -abs(math.log(c['totalOdds']) - target), c['_original'], c['_rank']))
         picked.append(candidate)
-        used_keys.update(keys(candidate))
+        used_keys.update(fresh(candidate))
         used_events.update(s['eventId'] for s in candidate['selections'])
         remaining.remove(candidate)
     return picked
@@ -198,7 +210,8 @@ def search(pool, config, original, allow_nearest=False, rng=None):
         if math.isfinite(odds) and config.minimumOdds <= round(odds, 2) and (config.maximumOdds is None or round(odds, 2) <= config.maximumOdds):
             results[key] = candidate
             if len(results) > max(100, config.numberOfSlips * 12):
-                retained = varied_candidates(results.values(), config, rng, max(50, config.numberOfSlips * 6), ceiling)
+                retained = varied_candidates(results.values(), config, rng, max(50, config.numberOfSlips * 6), ceiling,
+                                             original_keys if config.preserveOriginalSelections else ())
                 results = {c['fingerprint']: c for c in retained}
         elif allow_nearest:
             candidate['_distance'] = max(math.log(config.minimumOdds / odds), math.log(odds / config.maximumOdds) if config.maximumOdds is not None else 0, 0)
@@ -206,9 +219,21 @@ def search(pool, config, original, allow_nearest=False, rng=None):
                 nearest[key] = candidate
                 if len(nearest) > config.numberOfSlips * 4:
                     del nearest[max(nearest, key=lambda k: nearest[k]['_distance'])]
-    ranked = varied_candidates(results.values(), config, rng, config.numberOfSlips, ceiling)
+    repeatable = original_keys if config.preserveOriginalSelections else ()
+    ranked = varied_candidates(results.values(), config, rng, config.numberOfSlips, ceiling, repeatable)
     if allow_nearest and len(ranked) < config.numberOfSlips:
-        ranked += sorted(nearest.values(), key=lambda c: (c['_distance'], -c['_rank']))[:config.numberOfSlips - len(ranked)]
+        repeatable_keys = set(repeatable)
+        used = set()
+        for ticket in ranked:
+            used.update({selection_key(s) for s in ticket['selections']} - repeatable_keys)
+        for candidate in sorted(nearest.values(), key=lambda c: (c['_distance'], -c['_rank'])):
+            fresh = {selection_key(s) for s in candidate['selections']} - repeatable_keys
+            if fresh & used:
+                continue
+            ranked.append(candidate)
+            used.update(fresh)
+            if len(ranked) >= config.numberOfSlips:
+                break
     ranked.sort(key=lambda c: (c['_preferred'], c['_original'], c['_rank']), reverse=True)
     return ranked[:config.numberOfSlips], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
 

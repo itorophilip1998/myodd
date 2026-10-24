@@ -90,6 +90,10 @@ _intent_cache: dict[tuple, tuple[float, Config]] = {}
 
 def local_fallback_supported(instruction: str) -> bool:
     text = instruction.casefold()
+    # Investor Mode drops user odds, markets, and counts, so extra wording is safe to ignore.
+    named = [(m.start(), mode) for pattern, mode, *_ in MODES for m in re.finditer(pattern, text, re.I)]
+    if named and max(named)[1] == 'INVESTOR':
+        return True
     numeric = bool(re.search(r'(?:create|generate|give me)\s+\d+', text) and re.search(r'between\s+\d+(?:\.\d+)?\s*(?:and|to|-|–)\s*\d+', text))
     numeric = numeric or bool(re.search(r'\b(?:split|spilt|splate|divide|partition)\b', text) and re.search(r'\binto\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', text))
     # Simple mode buttons and count controls remain usable during provider outages.
@@ -125,11 +129,15 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
         try:
             config = parse_chat_completions(instruction, available_markets, model=model)
         except IntentProviderError as exc:
-            transient = 'rate limit' in str(exc).casefold() or 'could not reach' in str(exc).casefold() or bool(re.search(r'HTTP 5\d\d', str(exc)))
-            if not transient or not local_fallback_supported(instruction):
+            reason = str(exc).casefold()
+            transient = 'rate limit' in reason or 'could not reach' in reason or bool(re.search(r'http 5\d\d', reason))
+            missing_key = 'api_key is required' in reason
+            if not local_fallback_supported(instruction) or not (transient or missing_key):
                 raise
             config = parse_rules(instruction)
             config.unhandledRequests.append(
+                f'{settings.label} has no API key; this request was interpreted by the local parser.'
+                if missing_key else
                 f'{settings.label} was temporarily unavailable; this request was interpreted by the local parser. Review the settings shown below.'
             )
         if len(_intent_cache) >= 128:
