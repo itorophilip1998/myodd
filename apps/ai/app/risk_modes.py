@@ -14,7 +14,32 @@ MODES = (
 )
 
 
-def apply_named_mode(config: Config, instruction: str) -> Config:
+def lock_investor_system(config: Config, instruction: str) -> Config:
+    """Investor Mode is a system ticket. The user does not set odds, markets, or counts."""
+    notices = list(config.unhandledRequests)
+
+    def note(message: str) -> None:
+        if message not in notices:
+            notices.append(message)
+
+    if has_explicit_odds_request(instruction) and (config.minimumOdds != 2 or config.maximumOdds != 5):
+        note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.')
+    if config.markets or config.marketRules or config.marketQueries or config.marketPolicy == 'only':
+        note('Investor Mode chooses the markets. Requested markets were not applied.')
+    if config.numberOfSlips != 10 or config.minimumSelections != 1 or config.maximumSelections != 50:
+        note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.')
+    if config.allowOddsAdjustment:
+        note('Investor Mode does not move odds to the nearest range.')
+    result = config.model_copy(update={
+        'riskMode': 'INVESTOR', 'riskPreference': 'VERY_LOW', 'minimumOdds': 2., 'maximumOdds': 5.,
+        'allowOddsAdjustment': False, 'numberOfSlips': 10, 'minimumSelections': 1, 'maximumSelections': 50,
+        'markets': [], 'marketQueries': [], 'marketRules': [], 'relatedMarketRules': [], 'marketPolicy': 'prefer',
+        'unhandledRequests': notices,
+    })
+    return Config.model_validate(result.model_dump())
+
+
+def apply_named_mode(config: Config, instruction: str, *, lock_investor: bool = True) -> Config:
     matches = [(m.start(), mode, preference, low, high) for pattern, mode, preference, low, high in MODES for m in re.finditer(pattern, instruction, re.I)]
     if not matches:
         # A provider may return a named mode even when the input uses an abbreviation.
@@ -24,6 +49,9 @@ def apply_named_mode(config: Config, instruction: str) -> Config:
         mode, preference, low, high = found
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
+    # Lock only when the instruction names Investor Mode. An inferred label keeps the requested odds and counts.
+    if mode == 'INVESTOR' and lock_investor and matches:
+        return lock_investor_system(config, instruction)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
     parsed_low, parsed_high = extract_odds_bounds(instruction)
@@ -47,7 +75,7 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
     if config.riskMode or any(re.search(pattern, instruction, re.I) for pattern, *_ in MODES):
         return config
     if has_safer_slang(instruction):
-        return apply_named_mode(config, f'{instruction}\nInvestor Mode')
+        return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_investor=False)
     if has_explicit_odds_request(instruction):
         low, high = extract_odds_bounds(instruction)
         if low is not None and high is not None:
@@ -56,4 +84,4 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
                     return config.model_copy(update={'riskMode': mode, 'riskPreference': preference, 'minimumOdds': low, 'maximumOdds': high})
         return config.model_copy(update={'minimumOdds': low if low is not None else config.minimumOdds,
                                          'maximumOdds': high if high is not None else config.maximumOdds})
-    return apply_named_mode(config, f'{instruction}\nInvestor Mode')
+    return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_investor=False)

@@ -54,7 +54,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         self.assertEqual(strict['candidates'], [])
 
     def test_nearest_odds_require_explicit_permission_and_are_reported(self):
-        pool = [selection(i) for i in range(3)]
+        pool = [selection(i) for i in range(4)]
         config = Config(numberOfSlips=2, minimumOdds=10, maximumOdds=20, maximumSelections=2)
         self.assertEqual(generate_report(pool, config, [])['candidates'], [])
         report = generate_report(pool, config.model_copy(update={'allowOddsAdjustment': True}), [])

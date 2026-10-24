@@ -33,6 +33,8 @@ Hard ticket bands and safer per-leg odds (see `MODE_ODDS` / `MODE_SELECTION_ODDS
 
 Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
 
+Investor Mode is a system ticket. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The model chooses those inside the fixed band: combined odds 2–5, each selection 1.10–1.50, up to 10 tickets, and a game count that fits the band. Prompt text and saved defaults do not move that band or choose the markets. See [investor-system-mode.md](./investor-system-mode.md).
+
 ## Fixture scope
 
 - Default adaptive: prefer original matches, expand when needed.
@@ -42,6 +44,7 @@ Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-
 ## Constraints
 
 - Football, pre-match; one selection per event.
+- Across a collection, one pick (event, market, outcome, and line) is used on at most one ticket. The same match may appear again only with a different option. Pinned original selections may be shared. A shortage returns fewer tickets instead of a repeated option.
 - Ticket count and games-per-ticket limits enforced in UI + API.
 - Nearest-odds adjustment only when explicitly allowed; cannot escape a named mode band.
 - myOdd never stakes; it only creates anonymous booking/share codes.

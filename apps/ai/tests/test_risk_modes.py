@@ -7,16 +7,21 @@ from test_flexible_generation import selection
 
 class RiskModeTests(unittest.TestCase):
     def test_named_modes_enforce_per_ticket_odds_bands(self):
-        for name, preference, low, high in [('Investor Mode', 'VERY_LOW', 2, 5), ('Investor modes', 'VERY_LOW', 2, 5), ('Gamler Mode', 'MODERATE', 5.01, 20), ('Gambler Mode', 'MODERATE', 5.01, 20), ('Japa Mode', 'HIGHER', 20.01, 100), ('Lagoslife Mode', 'VERY_HIGH', 100.01, None)]:
+        for name, preference, low, high, slips in [('Investor Mode', 'VERY_LOW', 2, 5, 10), ('Investor modes', 'VERY_LOW', 2, 5, 10), ('Gamler Mode', 'MODERATE', 5.01, 20, 4), ('Gambler Mode', 'MODERATE', 5.01, 20, 4), ('Japa Mode', 'HIGHER', 20.01, 100, 4), ('Lagoslife Mode', 'VERY_HIGH', 100.01, None, 4)]:
             with self.subTest(mode=name):
                 config = parse_rules(f'Create 4 codes. Exclude Chelsea. {name}')
                 self.assertEqual(config.riskPreference, preference)
-                self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (low, high, 4))
+                self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (low, high, slips))
                 self.assertIn('Chelsea', config.excludedTeams)
+                if name.startswith('Investor'):
+                    self.assertEqual((config.minimumSelections, config.maximumSelections, config.markets), (1, 50, []))
     def test_conflicting_typed_mode_range_is_explained(self):
         from app.risk_modes import ModeConstraintError
         with self.assertRaises(ModeConstraintError):
-            parse_rules('Investor Mode between 100 and 500 odds')
+            parse_rules('Gambler Mode between 100 and 500 odds')
+        investor = parse_rules('Investor Mode between 100 and 500 odds')
+        self.assertEqual((investor.minimumOdds, investor.maximumOdds), (2, 5))
+        self.assertTrue(any('fixed ticket odds' in note for note in investor.unhandledRequests))
     def test_lagoslife_has_no_artificial_million_odds_ceiling(self):
         config = parse_rules('Lagoslife Mode')
         # Per-leg Lagoslife cap is 2.00; high ticket odds come from many safe legs.
@@ -80,8 +85,10 @@ class RiskModeTests(unittest.TestCase):
         self.assertTrue(all(1.1 <= s['odds'] <= 1.5 for s in candidate['selections']))
         self.assertTrue(2 <= candidate['totalOdds'] <= 5)
 
-    def test_shorthand_odds_and_games_are_honored_under_investor(self):
-        prompt = 'please give me only 4- 5 odds your best options make it 10 games not bellow 4 odds please\nFinal request settings (take precedence): Risk mode: Investor Mode.'
+    def test_investor_ignores_requested_odds_games_and_markets(self):
+        prompt = 'please give me only 4- 5 odds double chance make it 10 games not bellow 4 odds please\nFinal request settings (take precedence): Risk mode: Investor Mode.'
         config = parse_rules(prompt)
-        self.assertEqual((config.riskMode, config.minimumOdds, config.maximumOdds), ('INVESTOR', 4, 5))
-        self.assertEqual((config.minimumSelections, config.maximumSelections), (10, 10))
+        self.assertEqual((config.riskMode, config.riskPreference, config.minimumOdds, config.maximumOdds), ('INVESTOR', 'VERY_LOW', 2, 5))
+        self.assertEqual((config.numberOfSlips, config.minimumSelections, config.maximumSelections), (10, 1, 50))
+        self.assertEqual(config.markets, [])
+        self.assertFalse(config.allowOddsAdjustment)

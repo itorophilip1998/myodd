@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -117,7 +117,42 @@ export class SlipsService implements OnModuleInit {
     return { version: MARKET_REGISTRY_VERSION, options: [...options, ...observed.values()] };
   }
 
+  private investorSystem(input: GenerateRequest) {
+    return input.riskMode === 'INVESTOR' && !input.splitInto && !input.pinnedSelections?.length;
+  }
+
   private explicitControls(config: GenerationConfig, input: GenerateRequest, fixtures: import('@myodd/shared').BookmakerFixture[]): GenerationConfig {
+    if (this.investorSystem(input)) {
+      const band = MODE_ODDS.INVESTOR;
+      const notices = [...config.unhandledRequests];
+      const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
+      if (input.selectedMarketIds?.length || config.markets.length || config.marketRules.length || config.marketQueries.length || config.marketPolicy === 'only') {
+        note('Investor Mode chooses the markets. Requested markets were not applied.');
+      }
+      if (input.ticketCount || input.gamesPerTicket || config.numberOfSlips !== 10 || config.minimumSelections !== 1 || config.maximumSelections !== 50) {
+        note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.');
+      }
+      if (input.minimumOdds != null || input.maximumOdds !== undefined || config.minimumOdds !== band.minimum || config.maximumOdds !== band.maximum) {
+        note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.');
+      }
+      return {
+        ...config,
+        riskMode: 'INVESTOR',
+        riskPreference: RiskPreference.VERY_LOW,
+        minimumOdds: band.minimum,
+        maximumOdds: band.maximum,
+        allowOddsAdjustment: false,
+        numberOfSlips: 10,
+        minimumSelections: 1,
+        maximumSelections: 50,
+        markets: [],
+        marketQueries: [],
+        marketRules: [],
+        relatedMarketRules: [],
+        marketPolicy: 'prefer',
+        unhandledRequests: notices,
+      };
+    }
     if (input.riskMode) {
       const band = MODE_ODDS[input.riskMode];
       const notices = config.riskMode && config.riskMode !== input.riskMode ? ['The explicit mode replaced the conflicting prompt mode.'] : [];
@@ -147,8 +182,12 @@ export class SlipsService implements OnModuleInit {
 
   async startGeneration(req: GenerateRequest) {
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
+    if (req.riskMode === 'INVESTOR' && req.operation !== 'split' && !req.pinnedSelections?.length) {
+      req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
+    }
+    const investorSystem = req.riskMode === 'INVESTOR' && req.operation === 'generate' && !req.pinnedSelections?.length;
     const requestedCount = requestedTicketCount(req.instruction);
-    if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
+    if (!investorSystem && ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10)) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
@@ -182,7 +221,7 @@ export class SlipsService implements OnModuleInit {
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
         expiresAt: codeExpiry(new Date()),
       } });
-      const count = req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
+      const count = investorSystem ? 10 : req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
       const job = await tx.generationJob.create({ data: { groupId: group.id, requestKey, requestId: req.requestId, payloadHash, requestedCount: Math.min(10, Math.max(1, count)) } });
       await tx.trainingEvent.create({ data: { eventKey: `${job.id}:request`, groupId: group.id, jobId: job.id, profileId: req.profileId,
         kind: 'REQUEST_ACCEPTED', payload: { ...req, engineVersion: 'myodd-v5', acceptedAt: new Date().toISOString() } as Prisma.InputJsonValue } });
@@ -247,12 +286,14 @@ export class SlipsService implements OnModuleInit {
     const modelInfo = await this.ai.modelInfo();
     await this.audit(input, 'MODEL_CONFIGURATION', modelInfo);
     await this.stage(input, 'PLANNING', `Understanding your requested markets across ${fixtures.length} loaded games`);
-    const oddsSettings = input.minimumOdds != null || input.maximumOdds !== undefined
+    const investorSystem = this.investorSystem(input);
+    const oddsSettings = !investorSystem && (input.minimumOdds != null || input.maximumOdds !== undefined)
       ? `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds == null ? 'no upper limit' : input.maximumOdds}.`
       : '';
     const countSettings = [
-      input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
-      input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
+      investorSystem ? 'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
+      !investorSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
+      !investorSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
       oddsSettings,
       !input.splitInto ? `Match day: ${matchDay.matchDate} (${matchDay.label}). Only games kicking off between ${matchDay.kickoffAfter} and ${matchDay.kickoffBefore}.` : '',
     ].filter(Boolean).join(' ');
@@ -272,9 +313,9 @@ export class SlipsService implements OnModuleInit {
         minimumOdds: explicitOdds || config.riskMode ? config.minimumOdds : 1.1, maximumOdds: explicitOdds || config.riskMode ? config.maximumOdds : null,
       };
     }
-    if (input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
-    if (!input.splitInto) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
-    if (input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
+    if (!investorSystem && input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
+    if (!input.splitInto && !investorSystem) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
+    if (!investorSystem && input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
     // Prediction book: keep the exact pinned outcomes; do not let mode odds bands reject them.
     if (input.pinnedSelections?.length && !input.splitInto) {
       const legs = input.gamesPerTicket ?? input.pinnedSelections.length;
@@ -290,7 +331,7 @@ export class SlipsService implements OnModuleInit {
       };
     }
     // UI ticket-odds range is authoritative and always clamped into the selected mode band.
-    if (!input.splitInto && !input.pinnedSelections?.length && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
+    if (!investorSystem && !input.splitInto && !input.pinnedSelections?.length && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
       const clamped = clampOddsToMode(
         input.minimumOdds ?? config.minimumOdds,
         input.maximumOdds === undefined ? config.maximumOdds : input.maximumOdds,

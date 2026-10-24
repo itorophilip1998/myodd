@@ -26,6 +26,7 @@ export function generationOutcome(job: { id: string; requestId?: string | null; 
   const failures = errors.success ? [...errors.data] : [];
   if (terminal && job.status === 'FAILED' && job.error && !failures.length) failures.push({ code: 'UNEXPECTED_ERROR', message: job.error, retryable: true });
   const shortage = Math.max(0, requested - job.total);
-  if (terminal && shortage) failures.push({ code: 'SHORTAGE', message: `${shortage} tickets could not be planned within the requested constraints and diversification limits.`, retryable: false });
+  const failedBeforePlanning = job.status === 'FAILED' && job.total === 0 && !!job.error;
+  if (terminal && shortage && !failedBeforePlanning) failures.push({ code: 'SHORTAGE', message: `${shortage} tickets could not be planned within the requested constraints and diversification limits.`, retryable: false });
   return { requestId: job.requestId ?? job.id, status: !terminal ? 'loading' : generated === requested && generated > 0 ? 'success' : generated > 0 ? 'partial_success' : failures.some(failure => failure.code !== 'SHORTAGE') ? 'failed' : 'empty', requested, generated, failed: terminal ? requested - generated : job.failedCount, errors: failures };
 }
