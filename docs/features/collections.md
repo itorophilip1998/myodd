@@ -41,6 +41,7 @@ Access rules: `apps/api/src/groups/group-access.ts`.
 - Collection menu: edit tickets (new generation), rename, make private/public, delete.
 - Delete retracts public visibility but retains training/journal history.
 - Share uses app links (`/g/...`) plus SportyBet share URLs for individual codes.
+- Tickets in one collection do not repeat the same pick. A match can appear on another ticket only with a different market or outcome.
 
 ## Play / cut labels
 

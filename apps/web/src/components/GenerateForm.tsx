@@ -76,7 +76,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   ));
   const parsedChat = readChatRequest(instruction);
   const effectiveSplit = splitEnabled ? Number(splitCount) : parsedChat.splitInto;
-  const wantsSplit = splitEnabled || (operation === 'auto' && parsedChat.isSplit);
   const edited = useRef(false);
   const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
   const [bookOpen, setBookOpen] = useState(false);
@@ -87,6 +86,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
+  const systemInvestor = modeBand.key === 'INVESTOR' && predictionBook.length === 0;
+  const wantsSplit = !systemInvestor && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
   const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
   const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
   const [maxOdds, setMaxOdds] = useState(() => {
@@ -182,6 +183,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   function chooseMode(name: string) {
     touch();
     setMode(name);
+    if (modeKeyFromLabel(name) === 'INVESTOR') setOperation('generate');
     const band = bandForMode(name);
     setMinOdds(String(band.minimum));
     setMaxOdds(band.maximum == null ? '' : String(band.maximum));
@@ -212,6 +214,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   }
 
   const appliedSummary = useMemo(() => {
+    if (systemInvestor) {
+      const dayBit = matchWindow.matchDate === matchWindow.matchDateEnd
+        ? matchWindow.label
+        : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
+      return `Applied: Investor Mode · system picks markets, tickets, and games · ticket 2–5 · each game 1.10–1.50 · ${dayBit}`;
+    }
     if (wantsSplit) {
       return `Applied: Split into ${effectiveSplit || '?'} · ${mode}`;
     }
@@ -236,7 +244,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
     const overrideNote = optionsOdds || ticketCount ? ' · Options win when set' : '';
     return `Applied: ${mode || 'Auto'} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
-  }, [wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
+  }, [systemInvestor, wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
 
   async function onImportFile(file: File | undefined) {
     if (!file) return;
@@ -266,7 +274,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const uiTickets = !wantsSplit && ticketCount ? Number(ticketCount) : undefined;
     const rawMin = oddsSource === 'manual' ? Number(minOdds) : null;
     const rawMax = oddsSource === 'manual' ? (maxOdds.trim() === '' ? null : Number(maxOdds)) : null;
-    const guard = generateGuardrailMessage({
+    const guard = systemInvestor ? null : generateGuardrailMessage({
       wantsSplit,
       instruction,
       ticketCount: uiTickets,
@@ -295,7 +303,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         ? `Match day: ${matchWindow.label} (${matchWindow.matchDate}).`
         : `Match days: ${matchWindow.matchDate} to ${matchWindow.matchDateEnd}.`)
       : '';
-    const settingsLine = [
+    const settingsLine = (systemInvestor ? [
+      effectiveCode ? `Source code: ${effectiveCode}.` : '',
+      'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ignore requested markets, odds, ticket counts, and game counts.',
+      'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.',
+      dateLine,
+    ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
@@ -304,27 +317,26 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       scope === 'original_only' && (effectiveCode || predictionBook.length) ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
-
       oddsLabel,
       dateLine,
       `Ticket odds must not exceed ${MAX_TICKET_ODDS}.`,
-    ].filter(Boolean).join(' ');
+    ]).filter(Boolean).join(' ');
     const basePrompt = instruction.trim() || (predictionBook.length ? predictionBookPrompt(predictionBook) : '') || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
     const prompt = dateLine && !/match day/i.test(basePrompt) ? `${basePrompt}\n${dateLine}` : basePrompt;
     try {
       const hasBook = predictionBook.length > 0;
       const payload = {
         riskMode: mode ? modeBand.key : null,
-        selectedMarketIds,
+        selectedMarketIds: systemInvestor ? [] : selectedMarketIds,
         bookingCode: effectiveCode || undefined,
-        ticketCount: uiTickets ?? (hasBook ? 1 : undefined),
-        gamesPerTicket: hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
+        ticketCount: systemInvestor ? undefined : uiTickets ?? (hasBook ? 1 : undefined),
+        gamesPerTicket: systemInvestor ? undefined : hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
         operation: wantsSplit ? 'split' as const : 'generate' as const,
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
         matchDateEnd: wantsSplit ? undefined : matchWindow.matchDateEnd,
-        minimumOdds: hasBook ? undefined : odds?.minimum,
-        maximumOdds: hasBook ? undefined : (odds ? (odds.maximum ?? MAX_TICKET_ODDS) : undefined),
+        minimumOdds: systemInvestor || hasBook ? undefined : odds?.minimum,
+        maximumOdds: systemInvestor || hasBook ? undefined : (odds ? (odds.maximum ?? MAX_TICKET_ODDS) : undefined),
         instruction: prompt + (settingsLine ? `\nFinal request settings (take precedence): ${settingsLine}` : ''),
         pinnedSelections: hasBook
           ? predictionBook.map((pick) => ({
@@ -457,7 +469,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         onKeyDown={shortcut}
         maxLength={MAX_PROMPT}
         rows={2}
-        placeholder={'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
+        placeholder={systemInvestor ? 'Optional note. Investor Mode picks the markets, tickets, and games.' : 'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
       />
       {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && (
         <p className="parsed-code-hint" title={`Using ${parsedChat.bookingCode} from your message`}>Using {parsedChat.bookingCode}</p>
@@ -480,7 +492,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
             />
           )}
 
-          <OptionsPopover
+          {!systemInvestor && <OptionsPopover
             summary={optionsSummary}
             open={optionsOpen}
             onOpenChange={open => { setOptionsOpen(open); }}
@@ -532,7 +544,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               <label className="check-option"><input type="checkbox" checked={strict} onChange={e => { touch(); setStrict(e.target.checked); }} />Only requested markets</label>
               <label className="check-option"><input type="checkbox" checked={nearest} onChange={e => { touch(); setNearest(e.target.checked); }} />Nearest odds OK</label>
             </div>
-          </OptionsPopover>
+          </OptionsPopover>}
 
           <button
             type="button"

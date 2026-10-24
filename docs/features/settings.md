@@ -15,6 +15,7 @@ Device-local UI preferences with authenticated account synchronization, includin
 
 - `SettingsProvider` wraps the app (see `providers.tsx`) and persists UI settings in local storage (`myodd-ui-settings-v1`).
 - Controls include sound toggles and defaults aligned with generation guardrails (`MAX_TICKETS`, games-per-ticket caps).
+- Those generation defaults apply when Create opens. Gambler, Japa, and Lagoslife can still override them for one run. Investor Mode does not use them; it builds a system ticket for the selected match day.
 - Signed-in “remember these settings” from generation flows uses server `LearningProfile` (see [learning.md](./learning.md)).
 - Toasts / dictation hooks can play UI sounds via the same provider.
 
