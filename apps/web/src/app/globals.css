@@ -182,7 +182,9 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .code-scroll { max-height: 72vh; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 12px 2px; }
 
 .code-card { background: #17221c; border: 1px solid #ffffff12; border-radius: 15px; padding: 19px; position: relative; }
-.code-card:hover { border-color: #c6f28c44; }
+.code-card:hover, .code-grid .code-card.is-active-ticket { border-color: #c6f28c77; }
+.code-grid .code-card.is-active-ticket { background: #1d2c21; box-shadow: 0 0 0 1px #c6f28c22; }
+.code-card.is-active-ticket .booking-code { color: var(--accent); }
 .code-card-main {
   display: block; width: 100%; text-align: left; padding: 0; margin: 0;
   border: 0; background: transparent; color: inherit; cursor: pointer;

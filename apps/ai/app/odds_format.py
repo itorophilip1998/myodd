@@ -43,7 +43,7 @@ def parse_odds_token(raw: str) -> float | None:
 
 
 def odds_token_pattern() -> str:
-    return r'(\d+(?:\.\d+)?\s*(?:ks?|ms?|b|t|q)?)'
+    return r'(\d+(?:\.\d+)?\s*(?:ks?|ms?|b|t|q)?)\b'
 
 
 def extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:

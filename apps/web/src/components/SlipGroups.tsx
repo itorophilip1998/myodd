@@ -377,6 +377,15 @@ export function SlipGroups({
   const [checkingTicket, setCheckingTicket] = useState<string | null>(null);
   const [loadingTicket, setLoadingTicket] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [activeTicket, setActiveTicket] = useState<string | null>(null);
+  const activeTicketKey = `myodd-active-ticket:${groupPublicId}`;
+  useEffect(() => {
+    try { setActiveTicket(sessionStorage.getItem(activeTicketKey)); } catch { setActiveTicket(null); }
+  }, [activeTicketKey]);
+  function activateTicket(id: string) {
+    setActiveTicket(id);
+    try { sessionStorage.setItem(activeTicketKey, id); } catch {}
+  }
   const [picksFor, setPicksFor] = useState<GeneratedSlip | null>(null);
   const [shareFor, setShareFor] = useState<GeneratedSlip | null>(null);
   const [playFilter, setPlayFilter] = useState<'DONE' | 'LIVE' | 'OPEN' | null>(null);
@@ -482,6 +491,7 @@ export function SlipGroups({
   }
 
   async function loadOne(slip: GeneratedSlip) {
+    activateTicket(slip.id);
     setLoadingTicket(slip.bookingCode);
     play('submit');
     try {
@@ -536,7 +546,7 @@ export function SlipGroups({
       const ticketModeKey = (slip.riskMode ?? riskMode ?? '').toLowerCase();
       const gamesLabel = `${slip.selectionCount} ${slip.selectionCount === 1 ? 'game' : 'games'}`;
       return (
-        <li key={slip.id} className={`code-card ${expired(slip) || slip.displayStatus === 'UNAVAILABLE' ? 'is-expired' : ''} ${isDoneSlip(slip.playStatus) ? 'is-played' : ''} ${slip.playStatus === 'LIVE' ? 'is-live' : ''} ${menuFor === slip.id ? 'is-menu-open' : ''}`}>
+        <li key={slip.id} onClickCapture={() => activateTicket(slip.id)} onFocusCapture={() => activateTicket(slip.id)} data-active={activeTicket === slip.id ? 'true' : undefined} className={`code-card ${activeTicket === slip.id ? 'is-active-ticket' : ''} ${expired(slip) || slip.displayStatus === 'UNAVAILABLE' ? 'is-expired' : ''} ${isDoneSlip(slip.playStatus) ? 'is-played' : ''} ${slip.playStatus === 'LIVE' ? 'is-live' : ''} ${menuFor === slip.id ? 'is-menu-open' : ''}`}>
           <div className="code-card-main">
             <div className="card-top">
               <span className="card-index">{String(index + 1).padStart(2, '0')}</span>
@@ -561,7 +571,7 @@ export function SlipGroups({
             </div>
             <TicketMenu
               open={menuFor === slip.id}
-              onOpenChange={open => setMenuFor(open ? slip.id : null)}
+              onOpenChange={open => { if (open) activateTicket(slip.id); setMenuFor(open ? slip.id : null); }}
               onViewPicks={() => { play('click'); setPicksFor(slip); }}
               onVerify={allowPlayCheck ? () => void checkTicket(slip.bookingCode) : undefined}
               onEdit={onEdit ? () => onEdit(slip.bookingCode) : undefined}
