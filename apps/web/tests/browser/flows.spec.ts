@@ -148,7 +148,7 @@ test('restored navigation, footer version, and compact options match each mode',
   await mockApi(page); await page.goto('/');
   await expect(page.locator('.app-nav-desktop a')).toHaveText(['Create', 'Predictions', 'Codes']);
   await expect(page.locator('.site-footer > :last-child')).toHaveClass('footer-version');
-  for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100', null]]) {
+  for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100', null]] as const) {
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
     if (name === 'Investor Mode') {
       await expect(page.getByRole('button', { name: /^Options/ })).toHaveCount(0);
@@ -249,7 +249,7 @@ test('generation shows progress before one concise terminal empty result', async
   let running = true;
   const currentJob = () => ({ ...job, status: running ? 'RUNNING' : 'FAILED', stage: running ? 'GENERATING' : 'FAILED', stageDetail: raw, error: raw, outcome: { ...outcome, status: 'empty', generated: 0, failed: 10, errors: [{ code: 'SHORTAGE', message: raw, retryable: false }] } });
   await page.route('**/api/jobs/**', route => route.fulfill({ json: currentJob() }));
-  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: currentJob(), generationReport: { notices: [raw] } } }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: currentJob(), generationReport: { notices: [raw], diagnostics: { eligibleEvents: 0 } } } }));
   await page.goto('/result/test-group?job=test-job');
   await expect(page.getByText(/search budget|original matches have eligible/)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Unable to create codes' })).toHaveCount(0);
@@ -461,4 +461,47 @@ test('Lagoslife expands compact prompt odds before submitting', async ({ page })
   await page.locator('textarea').press('ControlOrMeta+Enter');
   await expect(page).toHaveURL(/\/result\/test-group/, { timeout: 15000 });
   expect(payload.minimumOdds).toBe(100); expect(payload.maximumOdds).toBe(5000000);
+});
+
+
+test('exact-odds shortage explains the constraint instead of claiming matches are missing', async ({ page }) => {
+  await mockApi(page);
+  const failed = { ...job, status: 'FAILED', outcome: { ...outcome, status: 'empty', generated: 0, failed: 10, errors: [{ code: 'SHORTAGE', message: 'No candidates within search budget.', retryable: false }] } };
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: failed }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: failed, generationReport: { notices: [], diagnostics: { eligibleEvents: 101 }, effectiveConfig: { minimumOdds: 10000, maximumOdds: 10000 } } } }));
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByText('No tickets were found at exactly 10,000 odds. Use a wider odds range or adjust your options.')).toBeVisible();
+  await expect(page.getByText(/No eligible matches/)).toHaveCount(0);
+});
+
+test('ticket stays active after menu dismissal, loading and reload until another ticket is selected', async ({ page }, testInfo) => {
+  await mockApi(page);
+  const tickets = [slip, { ...slip, id: 'second-slip', bookingCode: 'TEST456' }];
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: tickets } }));
+  await page.route('**/api/codes/TEST123/verify', route => route.fulfill({ json: { codes: ['TEST123'], unavailable: 0 } }));
+  await page.addInitScript(() => { window.open = (() => ({ opener: null, close() {} })) as unknown as typeof window.open; });
+  await page.goto('/result/test-group?job=test-job');
+  const first = page.locator('.code-card').nth(0); const second = page.locator('.code-card').nth(1);
+  await expect(first).toBeVisible();
+  const inactiveBackground = await first.evaluate(el => getComputedStyle(el).backgroundColor);
+  await first.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await page.keyboard.press('Escape');
+  await second.hover();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await expect(second).not.toHaveClass(/is-active-ticket/);
+  await first.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Load ticket', exact: true }).click();
+  await expect(page.getByText('Opening SportyBet…')).toBeVisible();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await page.reload();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await second.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await expect(second).toHaveClass(/is-active-ticket/);
+  await expect(first).not.toHaveClass(/is-active-ticket/);
+  await expect(page.locator('.code-card.is-active-ticket')).toHaveCount(1);
+  await expect(second).not.toHaveCSS('background-color', inactiveBackground);
+  await page.keyboard.press('Escape');
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: testInfo.outputPath('active-ticket.png'), fullPage: true });
 });
