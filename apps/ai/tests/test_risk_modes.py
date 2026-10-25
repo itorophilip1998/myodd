@@ -7,7 +7,7 @@ from test_flexible_generation import selection
 
 class RiskModeTests(unittest.TestCase):
     def test_named_modes_enforce_per_ticket_odds_bands(self):
-        for name, preference, low, high, slips in [('Investor Mode', 'VERY_LOW', 2, 5, 10), ('Investor modes', 'VERY_LOW', 2, 5, 10), ('Gamler Mode', 'MODERATE', 5.01, 20, 4), ('Gambler Mode', 'MODERATE', 5.01, 20, 4), ('Japa Mode', 'HIGHER', 20.01, 100, 4), ('Lagoslife Mode', 'VERY_HIGH', 100.01, None, 4)]:
+        for name, preference, low, high, slips in [('Investor Mode', 'VERY_LOW', 2, 5, 10), ('Investor modes', 'VERY_LOW', 2, 5, 10), ('Gamler Mode', 'MODERATE', 5.01, 20, 4), ('Gambler Mode', 'MODERATE', 5.01, 20, 4), ('Japa Mode', 'HIGHER', 20.01, 100, 4), ('Lagoslife Mode', 'VERY_HIGH', 100, None, 4)]:
             with self.subTest(mode=name):
                 config = parse_rules(f'Create 4 codes. Exclude Chelsea. {name}')
                 self.assertEqual(config.riskPreference, preference)
@@ -120,3 +120,22 @@ class RiskModeTests(unittest.TestCase):
         self.assertEqual((result.numberOfSlips, result.minimumSelections, result.maximumSelections), (10, 1, 50))
         self.assertEqual((result.minimumOdds, result.maximumOdds), (2, 5))
         self.assertFalse(any('Requested' in note for note in result.unhandledRequests))
+
+
+class LagoslifeUnlimitedTests(unittest.TestCase):
+    def test_custom_large_ranges_and_open_maximum(self):
+        for prompt in ['Lagoslife Mode from 100 to 5m odds', 'Lagoslife Mode between 100 and 5,000,000 odds']:
+            with self.subTest(prompt=prompt):
+                config = parse_rules(prompt)
+                self.assertEqual((config.minimumOdds, config.maximumOdds), (100, 5_000_000))
+        for prompt, minimum in [('Lagoslife Mode', 100), ('Lagoslife Mode at least 500 odds. No maximum ticket odds.', 500)]:
+            config = parse_rules(prompt)
+            self.assertEqual((config.minimumOdds, config.maximumOdds), (minimum, None))
+
+    def test_generates_above_five_million_without_a_product_cap(self):
+        config = parse_rules('Lagoslife Mode')
+        config.numberOfSlips = 1
+        config.minimumSelections = config.maximumSelections = 30
+        pool = [selection(event, odds=2.0, probability=.45) for event in range(30)]
+        candidate = generate_report(pool, config, [])['candidates'][0]
+        self.assertGreater(candidate['totalOdds'], 5_000_000)

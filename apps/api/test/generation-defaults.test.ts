@@ -54,7 +54,7 @@ it('rejects numeric and written oversized prompts before persistence or provider
   expect(transaction).not.toHaveBeenCalled(); expect(queue.add).not.toHaveBeenCalled(); expect(provider.getBooking).not.toHaveBeenCalled();
   const investor = new SlipsService({} as any, provider as any, {} as any, {} as any, { $transaction: transaction } as any, {} as any, queue as any);
   transaction.mockResolvedValue({ group: { id: 'g', publicId: 'p' }, job: { id: 'j', status: 'RUNNING' } });
-  await expect(investor.startGeneration({ instruction: 'Create 11 tickets with double chance and 4 odds', riskMode: 'INVESTOR' })).resolves.toMatchObject({ groupId: 'g' });
+  await expect(investor.startGeneration({ instruction: 'Create 11 tickets with double chance and 4 odds', riskMode: 'INVESTOR' })).rejects.toThrow('You can generate up to 10 tickets at a time.');
   expect(requestedTicketCount('50 games per ticket')).toBeUndefined();
   for (const n of [1, 10]) expect(requestedTicketCount(`Create ${n} tickets with 50 games per ticket`)).toBe(n);
 });

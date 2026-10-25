@@ -39,7 +39,7 @@ export function generateGuardrailMessage(input: {
     if (rawMaxOdds != null && !Number.isFinite(rawMaxOdds)) {
       return 'Enter a valid Min and Max odds range.';
     }
-    if (rawMinOdds > MAX_TICKET_ODDS || (rawMaxOdds != null && rawMaxOdds > MAX_TICKET_ODDS)) {
+    if (input.mode !== 'LAGOS_LIFE' && (rawMinOdds > MAX_TICKET_ODDS || (rawMaxOdds != null && rawMaxOdds > MAX_TICKET_ODDS))) {
       return `Ticket odds cannot exceed ${MAX_TICKET_ODDS}. Lower the odds before generating.`;
     }
     if (rawMaxOdds != null && rawMinOdds > rawMaxOdds) {
@@ -48,7 +48,7 @@ export function generateGuardrailMessage(input: {
   } else {
     const fromPrompt = previewOddsFromPrompt(instruction);
     if (fromPrompt) {
-      if (fromPrompt.minimum > MAX_TICKET_ODDS || (fromPrompt.maximum != null && fromPrompt.maximum > MAX_TICKET_ODDS)) {
+      if (input.mode !== 'LAGOS_LIFE' && (fromPrompt.minimum > MAX_TICKET_ODDS || (fromPrompt.maximum != null && fromPrompt.maximum > MAX_TICKET_ODDS))) {
         return `Ticket odds cannot exceed ${MAX_TICKET_ODDS}. Lower the odds in your prompt before generating.`;
       }
     }

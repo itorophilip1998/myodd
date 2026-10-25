@@ -140,7 +140,7 @@ class LlmOrchestratorTests(unittest.TestCase):
         post.return_value = httpx.Response(502)
         result = parse_intent('Create a ticket using Lagoslife Mode. Upcoming games are allowed.\nFinal request settings (take precedence): Generate 1 tickets. Exactly 4 games per ticket.')
         self.assertEqual((result.riskMode, result.numberOfSlips, result.minimumSelections, result.maximumSelections), ('LAGOS_LIFE', 1, 4, 4))
-        self.assertEqual(result.minimumOdds, 100.01)
+        self.assertEqual(result.minimumOdds, 100)
         self.assertIsNone(result.maximumOdds)
         self.assertTrue(any('local parser' in note for note in result.unhandledRequests))
 

@@ -52,13 +52,13 @@ def extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:
     Understands ``between 4 and 5``, ``4-5 odds``, ``only 4–5 odds``,
     ``not below 4``, ``at least 4 odds``, ``not above 5``, etc.
     """
-    text = instruction
+    text = re.sub(r'\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b', lambda m: m[0].replace(',', ''), instruction)
     token = odds_token_pattern()
     low: float | None = None
     high: float | None = None
 
     ranges = list(re.finditer(
-        rf'(?:between\s+{token}\s*(?:and|to|-|–)\s*{token}|(?:only\s+)?{token}\s*[-–]\s*{token}\s*odds)',
+        rf'(?:\b(?:between|from)\s+{token}\s*(?:and|to|-|–)\s*{token}|(?:only\s+)?{token}\s*[-–]\s*{token}\s*odds)',
         text, re.I))
     for match in ranges:
         # Skip "1-10 draws/minutes/games" style spans that are not odds bands.
@@ -73,7 +73,7 @@ def extract_odds_bounds(instruction: str) -> tuple[float | None, float | None]:
         low, high = sorted((a, b))
 
     floor = re.search(
-        rf'(?:not\s+(?:be?low|bellow|under|less\s+than)|(?:at\s+least|minimum|min)\s+(?:odds\s+)?){token}(?:\s*odds)?',
+        rf'(?:not\s+(?:be?low|bellow|under|less\s+than)|(?:at\s+least|minimum|min|from)\s+(?:odds\s+)?){token}(?:\s*odds)?',
         text, re.I)
     if floor:
         value = parse_odds_token(floor[1])

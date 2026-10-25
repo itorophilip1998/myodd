@@ -18,5 +18,5 @@ export function analyticsPath(path: string) {
   if (path.startsWith('/result/')) return '/result/generation';
   if (path.startsWith('/sign-in')) return '/sign-in';
   if (path.startsWith('/sign-up')) return '/sign-up';
-  return ['/', '/generate', '/history', '/settings', '/live', '/predictions', '/terms', '/privacy'].includes(path) ? path : '/other';
+  return ['/', '/generate', '/history', '/settings', '/predictions', '/terms', '/privacy'].includes(path) ? path : '/other';
 }

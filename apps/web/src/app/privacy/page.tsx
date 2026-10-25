@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { LegalPage } from '@/components/LegalPage';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/privacy' },
   title: 'Privacy Policy · myOdd',
   description: 'Privacy Policy for myOdd — how we handle account and product data.',
 };

@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { siteUrl } from '@/lib/public-seo';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
-  const pages: MetadataRoute.Sitemap = ['/', '/live', '/predictions', '/terms', '/privacy'].map(path => ({ url: new URL(path, base).href }));
+  const pages: MetadataRoute.Sitemap = ['/', '/predictions', '/terms', '/privacy'].map(path => ({ url: new URL(path, base).href }));
   try {
     const response = await fetch(`${process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3001'}/api/groups/sitemap`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
     if (response.ok) {

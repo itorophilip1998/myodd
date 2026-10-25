@@ -1,7 +1,5 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { MARKET_REGISTRY } from '@myodd/shared';
 
 export function MarketPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
@@ -9,22 +7,21 @@ export function MarketPicker({ selected, onChange }: { selected: string[]; onCha
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const content = useRef<HTMLDivElement>(null);
-  const query = useQuery({ queryKey: ['market-capabilities'], queryFn: () => api.markets(), staleTime: 30_000, enabled: expanded });
   useEffect(() => {
     if (expanded) content.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-  }, [expanded, query.data]);
-  const options = query.data?.options ?? MARKET_REGISTRY.map(item => ({ ...item, available: false }));
+  }, [expanded]);
+  // Ship the catalog with the app; current availability is checked during generation.
+  const options = MARKET_REGISTRY.map(item => ({ ...item, available: true }));
   const categories = [...new Set(options.map(item => item.category))];
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id].slice(0, 100));
   return <section className="market-picker" aria-label="Markets">
     <button type="button" className="market-expand" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(value => !value)}><span><strong>Markets</strong><small>{selected.length ? `${selected.length} selected` : 'Optional · use your prompt by default'}</small></span><span aria-hidden>{expanded ? '−' : '+'}</span></button>
     {expanded && <div ref={content} id={id} className="market-picker-content">
+    <p className="market-catalog-note">Choose markets instantly. Availability is checked when generating tickets.</p>
     <input type="search" aria-label="Search markets" placeholder="Search markets" value={search} onChange={e => setSearch(e.target.value)} />
-    {query.isPending && <p role="status">Checking provider markets…</p>}
-    {query.isError && <p role="alert">Market availability could not load. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
     <div className="market-chips">{selected.map(id => <button type="button" key={id} onClick={() => toggle(id)} aria-label={`Remove ${options.find(item => item.id === id)?.label ?? 'unavailable market'}`}>{options.find(item => item.id === id)?.label ?? 'Unavailable market'} ×</button>)}</div>
     {!!selected.length && <button type="button" onClick={() => onChange([])}>Clear all</button>}
-    {!query.isPending && !query.isError && !options.some(item => `${item.label} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase())) && <p role="status">No matching markets. Try another search.</p>}
+    {!options.some(item => `${item.label} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase())) && <p role="status">No matching markets. Try another search.</p>}
     <div className="market-options" role="region" aria-label="Market choices" tabIndex={0}>{categories.map(category => {
       const items = options.filter(item => item.category === category && `${item.label} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase()));
       if (!items.length) return null;

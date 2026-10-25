@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -156,7 +156,8 @@ export class SlipsService implements OnModuleInit {
     if (input.riskMode) {
       const band = MODE_ODDS[input.riskMode];
       const notices = config.riskMode && config.riskMode !== input.riskMode ? ['The explicit mode replaced the conflicting prompt mode.'] : [];
-      config = { ...config, riskMode: input.riskMode, minimumOdds: input.minimumOdds ?? band.minimum, maximumOdds: input.maximumOdds === undefined ? band.maximum : input.maximumOdds, unhandledRequests: [...config.unhandledRequests, ...notices] };
+      const promptOdds = input.riskMode === 'LAGOS_LIFE' ? previewOddsFromPrompt(input.instruction) : null;
+      config = { ...config, riskMode: input.riskMode, minimumOdds: input.minimumOdds ?? promptOdds?.minimum ?? band.minimum, maximumOdds: input.maximumOdds === undefined ? (promptOdds ? promptOdds.maximum : band.maximum) : input.maximumOdds, unhandledRequests: [...config.unhandledRequests, ...notices] };
     }
     if (input.selectedMarketIds?.length) {
       const ids = input.selectedMarketIds.filter(id => !id.startsWith('provider:'));
@@ -181,13 +182,13 @@ export class SlipsService implements OnModuleInit {
   }
 
   async startGeneration(req: GenerateRequest) {
+    const requestedCount = requestedTicketCount(req.instruction);
+    if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
     if (req.riskMode === 'INVESTOR' && req.operation !== 'split' && !req.pinnedSelections?.length) {
       req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
     }
     const investorSystem = req.riskMode === 'INVESTOR' && req.operation === 'generate' && !req.pinnedSelections?.length;
-    const requestedCount = requestedTicketCount(req.instruction);
-    if (!investorSystem && ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10)) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
@@ -288,7 +289,7 @@ export class SlipsService implements OnModuleInit {
     await this.stage(input, 'PLANNING', `Understanding your requested markets across ${fixtures.length} loaded games`);
     const investorSystem = this.investorSystem(input);
     const oddsSettings = !investorSystem && (input.minimumOdds != null || input.maximumOdds !== undefined)
-      ? `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds == null ? 'no upper limit' : input.maximumOdds}.`
+      ? (input.maximumOdds == null ? `Ticket odds at least ${input.minimumOdds ?? 1.1}. No maximum ticket odds.` : `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds}.`)
       : '';
     const countSettings = [
       investorSystem ? 'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
