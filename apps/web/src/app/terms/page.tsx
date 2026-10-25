@@ -1,12 +1,9 @@
+import { publicMetadata } from '@/lib/public-seo';
 import type { Metadata } from 'next';
 import { MODE_ODDS } from '@myodd/shared';
 import { LegalPage } from '@/components/LegalPage';
 
-export const metadata: Metadata = {
-  alternates: { canonical: '/terms' },
-  title: 'Terms of Service · myOdd',
-  description: 'Terms of Service for myOdd — SportyBet slip generation and prediction tools.',
-};
+export const metadata: Metadata = publicMetadata('/terms', 'Terms of Service · MyOdd', 'Terms of Service for MyOdd — SportyBet booking-code generation and football tools.');
 
 export default function TermsPage() {
   return (

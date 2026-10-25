@@ -1,4 +1,4 @@
-import { siteUrl } from '@/lib/public-seo';
+import { siteUrl, publicMetadata, HOME_TITLE, HOME_DESCRIPTION, GOOGLE_VERIFICATION } from '@/lib/public-seo';
 import { AccountSession, GuestSession } from '@/components/AccountSession';
 import { clerkRuntimeConfig } from '@/lib/clerk-config';
 import { ClerkProvider } from '@clerk/nextjs';
@@ -12,11 +12,10 @@ import { ResponsibleFooter } from '@/components/ResponsibleFooter';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
+  ...publicMetadata('/', HOME_TITLE, HOME_DESCRIPTION),
   metadataBase: siteUrl(),
-  openGraph: { title: 'myOdd — football booking codes', description: 'Create and manage football booking collections. 18+ | Gamble responsibly.', images: ['/icon.png'] },
-  title: 'myOdd — smarter SportyBet slip variations',
-  description:
-    'Paste a SportyBet code or describe what you want. myOdd ranks selections from live odds and generates shareable booking codes. 18+ | Gamble responsibly.',
+  verification: { google: process.env.GOOGLE_SITE_VERIFICATION || GOOGLE_VERIFICATION },
+  icons: { icon: '/icon.png', apple: '/apple-icon.png' },
 };
 
 export default function RootLayout({

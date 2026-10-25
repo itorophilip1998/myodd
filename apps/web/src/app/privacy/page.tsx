@@ -1,11 +1,8 @@
+import { publicMetadata } from '@/lib/public-seo';
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/LegalPage';
 
-export const metadata: Metadata = {
-  alternates: { canonical: '/privacy' },
-  title: 'Privacy Policy · myOdd',
-  description: 'Privacy Policy for myOdd — how we handle account and product data.',
-};
+export const metadata: Metadata = publicMetadata('/privacy', 'Privacy Policy · MyOdd', 'How MyOdd handles account data, optional analytics, and privacy preferences.');
 
 export default function PrivacyPage() {
   return (
