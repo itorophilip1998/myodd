@@ -11,7 +11,7 @@ MODES = (
     (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 2., 5.),
     (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 5.01, 20.),
     (r'\bjapa\s+modes?\b', 'JAPA', 'HIGHER', 20.01, 100.),
-    (r'\blagos[\s-]*(?:li(?:f|v)es?|life)(?:\s+modes?)?\b', 'LAGOS_LIFE', 'VERY_HIGH', 100.01, None),
+    (r'\blagos[\s-]*(?:li(?:f|v)es?|life)(?:\s+modes?)?\b', 'LAGOS_LIFE', 'VERY_HIGH', 100, None),
 )
 
 
@@ -76,6 +76,8 @@ def apply_named_mode(config: Config, instruction: str, *, lock_investor: bool = 
         target_low = parsed_low
     if parsed_high is not None:
         target_high = parsed_high
+    elif high is None and parsed_low is not None:
+        target_high = None
     minimum = max(low, target_low) if explicit else low
     maximum = min(high, target_high) if explicit and high is not None and target_high is not None else (target_high if explicit and high is None else high)
     if maximum is not None and minimum > maximum and re.search(r'final request settings[\s\S]*risk mode:', instruction, re.I):

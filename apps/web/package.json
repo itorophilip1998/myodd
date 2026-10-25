@@ -1,13 +1,14 @@
 {
   "name": "@myodd/web",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:analytics": "node tests/analytics-smoke.cjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.17",

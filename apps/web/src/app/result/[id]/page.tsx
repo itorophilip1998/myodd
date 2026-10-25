@@ -53,7 +53,7 @@ function ResultInner() {
   return <main className="workspace result-workspace">
     {reconnecting && <section role="status" className="result-connection"><p>{group?.slips.length ? 'Reconnecting to updates. Your saved codes are below.' : 'Reconnecting to your generation. We’ll resume automatically.'}</p><button type="button" className="outline-button" disabled={groupQuery.isFetching} onClick={reconnect}>Reconnect now</button></section>}
     {!group && (reconnecting ? <LogoLoader label="Reconnecting to your generation" /> : <ProgressQuest job={job ?? { status: 'PENDING', stage: 'QUEUED', progress: 0, total: 0, failedCount: 0 }} />)}
-    {awaitingTickets && !loading && <LogoLoader compact label="Loading your saved codes" />}
+    {awaitingTickets && !loading && !group?.slips.length && <LogoLoader compact label="Loading your saved codes" />}
     {group && <CodeWorkspace key={group.publicId} group={{ ...group, job: job ?? group.job }} busy={loading || awaitingTickets} promptToSave={!!jobId} />}
   </main>;
 }

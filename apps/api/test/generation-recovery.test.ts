@@ -64,3 +64,15 @@ it('preserves typed missing-source errors through the HTTP boundary', async () =
   new AppExceptionFilter().catch(new BadRequestException({ code: 'SOURCE_REQUIRED', message: 'Paste a source booking code to reuse its original matches.' }), { switchToHttp: () => ({ getResponse: () => response }) } as any);
   expect(response.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'SOURCE_REQUIRED', statusCode: 400 }));
 });
+
+
+it('passes Lagoslife custom and unbounded odds to generation without the old cap', async () => {
+  for (const maximumOdds of [5_000_000, null]) {
+    const { service, ai } = setup();
+    await service.prepareGeneration({ jobId: 'job', groupId: 'group', instruction: 'Lagoslife Mode', riskMode: 'LAGOS_LIFE', minimumOdds: 100, maximumOdds });
+    expect(ai.generate).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ minimumOdds: 100, maximumOdds }), undefined);
+  }
+  const { service, ai } = setup();
+  await service.prepareGeneration({ jobId: 'job', groupId: 'group', instruction: 'Lagoslife Mode from 100 to 5m odds', riskMode: 'LAGOS_LIFE' });
+  expect(ai.generate).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ minimumOdds: 100, maximumOdds: 5_000_000 }), undefined);
+});
