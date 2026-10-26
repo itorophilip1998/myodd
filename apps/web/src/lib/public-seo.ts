@@ -12,7 +12,7 @@ export function siteUrl() {
   return new URL(url.origin);
 }
 export function publicMetadata(path: string, title: string, description: string): Metadata {
-  const url = new URL(path, siteUrl()).href;
+  const url = new URL(path, siteUrl()).href.replace(/\/$/, '');
   return {
     title, description, alternates: { canonical: url }, robots: { index: true, follow: true },
     openGraph: { type: 'website', siteName: 'MyOdd', locale: 'en_US', title, description, url, images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'MyOdd football booking code tools' }] },

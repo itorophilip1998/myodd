@@ -1,3 +1,5 @@
+import { configureApiAuth } from '../src/lib/api';
+configureApiAuth(async () => null, false);
 import { useState } from 'react';
 import HistoryPage from '../src/app/history/page';
 import { createRoot } from 'react-dom/client';

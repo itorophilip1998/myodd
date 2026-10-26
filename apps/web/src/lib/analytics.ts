@@ -28,10 +28,15 @@ export function entryAttribution() {
     if (['http:', 'https:'].includes(referrer.protocol) && referrer.origin !== window.location.origin) safe.page_referrer = referrer.origin;
   } catch { /* Empty or malformed referrer. */ }
   const query = new URLSearchParams(window.location.search);
+  const labels = {
+    utm_source: ['google', 'bing', 'facebook', 'instagram', 'twitter', 'x', 'linkedin', 'whatsapp', 'telegram', 'youtube', 'tiktok', 'newsletter'],
+    utm_medium: ['organic', 'cpc', 'ppc', 'paid_social', 'social', 'email', 'referral', 'display', 'affiliate'],
+    utm_campaign: ['launch', 'organic', 'social', 'newsletter', 'referral'],
+  };
   for (const [input, output] of [['utm_source', 'campaign_source'], ['utm_medium', 'campaign_medium'], ['utm_campaign', 'campaign_name']] as const) {
     const value = query.get(input);
     // Only bounded campaign labels, never arbitrary text, IDs, email, or URLs.
-    if (value && /^[a-z][a-z _-]{0,49}$/i.test(value)) safe[output] = value;
+    if (value && value.length <= 50 && labels[input].includes(value.toLowerCase())) safe[output] = value.toLowerCase();
   }
   return safe;
 }

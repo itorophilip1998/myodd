@@ -13,7 +13,7 @@ export class ApiError extends Error { constructor(message: string, readonly stat
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   await waitForApiAuth();
-  const token = await sessionToken();
+  const token = signedIn ? await sessionToken() : null;
   if (signedIn && !token) throw new ApiError('Your session needs to reconnect. Please sign in again before continuing.', 401, 'SESSION_REQUIRED');
   let res: Response;
   try { res = await fetch(`${API_URL}/api${path}`, {

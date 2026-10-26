@@ -16,6 +16,7 @@ services:
         NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED: ${NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED:-false}
     environment:
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM}
       API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
     restart: unless-stopped
     # Host loopback only — not reachable from the internet. Containers use the Docker network.
