@@ -1,15 +1,16 @@
 'use client';
 import { SettingsSync } from './SettingsSync';
 import { formatAppVersion } from '@myodd/shared';
-import { LogoLoader } from './LogoLoader';
-import { createContext, useContext, useEffect, useState } from 'react';
-import { useAuth, UserButton } from '@clerk/nextjs';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useAuth, useSession, useUser, UserButton } from '@clerk/nextjs';
+import { pauseApiAuth } from '@/lib/api-auth';
+import { completeAuthFlow } from '@/lib/auth-analytics';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { accountApi, configureApiAuth } from '@/lib/api';
 import { useToast } from './ToastProvider';
 
-const SessionContext = createContext({ configured: false, signedIn: false, userId: null as string | null });
+const SessionContext = createContext({ configured: false, ready: false, signedIn: false, userId: null as string | null });
 export const useAccountSession = () => useContext(SessionContext);
 
 function SettingsIcon() {
@@ -23,36 +24,48 @@ function SettingsIcon() {
 
 export function AccountSession({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId, getToken } = useAuth();
+  const { session } = useSession();
+  const { user } = useUser();
   const query = useQueryClient();
   const toast = useToast();
   const [readyId, setReadyId] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (!isLoaded) return;
+  const previousIdentity = useRef<string | null | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!isLoaded) { pauseApiAuth(); return; }
     configureApiAuth(() => getToken(), !!userId);
-    query.clear();
+    // Initial queries are already waiting at the identity barrier. Removing
+    // them here strands their observers. On account changes reset existing
+    // data while keeping active observers attached so they can refetch safely.
+    if (previousIdentity.current !== undefined && previousIdentity.current !== (userId ?? null)) void query.resetQueries();
+    previousIdentity.current = userId ?? null;
     setReadyId(userId ?? null);
-    if (userId) {
+  }, [isLoaded, userId, getToken, query]);
+  useEffect(() => {
+    if (isLoaded && userId) {
       void accountApi.sync().catch(() => {
         toast('Your account could not sync yet. Refresh to retry; existing saves remain in the database.', { sticky: true });
       });
     }
-  }, [isLoaded, userId, getToken, query, toast]);
-  if (!isLoaded || readyId !== (userId ?? null)) {
-    return <div className="session-loading"><LogoLoader compact label="Opening your myOdd workspace" /></div>;
-  }
+  }, [isLoaded, userId, toast]);
+  useEffect(() => {
+    if (session && user) completeAuthFlow(session, user.createdAt);
+  }, [session, user]);
+  const ready = isLoaded && readyId === (userId ?? null);
   return (
-    <SessionContext.Provider value={{ configured: true, signedIn: !!userId, userId: userId ?? null }}>
-      <SettingsSync />{children}
+    <SessionContext.Provider value={{ configured: true, ready, signedIn: ready && !!userId, userId: ready ? userId ?? null : null }}>
+      {ready && <SettingsSync />}{children}
     </SessionContext.Provider>
   );
 }
 
 export function GuestSession({ children }: { children: React.ReactNode }) {
-  return <SessionContext.Provider value={{ configured: false, signedIn: false, userId: null }}>{children}</SessionContext.Provider>;
+  useLayoutEffect(() => { configureApiAuth(async () => null, false); }, []);
+  return <SessionContext.Provider value={{ configured: false, ready: true, signedIn: false, userId: null }}>{children}</SessionContext.Provider>;
 }
 
 export function AccountControls() {
   const session = useAccountSession();
+  if (session.configured && !session.ready) return <span className="account-controls" aria-live="polite">Loading account…</span>;
   if (!session.configured) {
     return (
       <div className="account-controls">

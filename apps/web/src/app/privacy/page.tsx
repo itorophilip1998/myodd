@@ -1,11 +1,8 @@
+import { publicMetadata } from '@/lib/public-seo';
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/LegalPage';
 
-export const metadata: Metadata = {
-  alternates: { canonical: '/privacy' },
-  title: 'Privacy Policy · myOdd',
-  description: 'Privacy Policy for myOdd — how we handle account and product data.',
-};
+export const metadata: Metadata = publicMetadata('/privacy', 'Privacy Policy · MyOdd', 'How MyOdd handles account data, optional analytics, and privacy preferences.');
 
 export default function PrivacyPage() {
   return (
@@ -67,7 +64,7 @@ export default function PrivacyPage() {
       </p>
 
       <h3>Optional analytics</h3>
-      <p>When enabled in production, Google Analytics 4 runs only after you opt in. We send anonymous action counts and generalized page categories, excluding prompts, booking codes, account identifiers, and private URLs. You can disable usage analytics in the footer at any time.</p>
+      <p>When enabled in production, Google Analytics 4 runs only after you opt in. Google may store analytics cookies and process browser, device, approximate location, and pseudonymous visitor information to measure visits and usage. We send action counts and generalized page categories, excluding prompts, booking codes, account identifiers, and private URLs. On public entry pages, we may send the external referring site's origin and limited campaign labels to understand traffic sources. Advertising storage and personalization remain disabled. You can reject optional analytics or disable usage analytics in the footer at any time; your choice is saved on this device. Withdrawing consent stops further analytics tracking but does not erase data already collected.</p>
       <h2>6. Retention</h2>
       <p>Collections, including public and named collections, are permanently deleted 24 hours after every match has a confirmed final result. Unsettled or unidentified matches block automatic deletion. Independent audit and training records may be retained separately.</p>
       <p>

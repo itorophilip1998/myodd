@@ -1,6 +1,6 @@
 'use client';
 import { useEffect } from 'react';
-import { track } from '@/lib/analytics';
+import { trackOnce } from '@/lib/analytics';
 import type { GenerationOutcome as Outcome } from '@myodd/shared';
 import type { GenerationReport } from '@/lib/api';
 import { generationOutcomeMessage } from '@/lib/generation-outcome-message';
@@ -9,10 +9,7 @@ export function GenerationOutcome({ outcome, report }: { outcome?: Outcome; repo
   useEffect(() => {
     if (!outcome || outcome.status === 'loading') return;
     try {
-      const key = `myodd-generation-event:${outcome.requestId}`;
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, 'sent');
-      track(outcome.generated > 0 ? 'generate_completed' : 'generate_failed', { requested: outcome.requested, generated: outcome.generated, failed: outcome.failed });
+      trackOnce(outcome.generated > 0 ? 'generate_completed' : 'generate_failed', outcome.requestId, { requested: outcome.requested, generated: outcome.generated, failed: outcome.failed });
     } catch {}
   }, [outcome]);
   if (!outcome || outcome.status === 'success' || outcome.status === 'loading') return null;

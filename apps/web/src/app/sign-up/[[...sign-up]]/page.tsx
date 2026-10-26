@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { SignUp } from '@clerk/nextjs';
 import { clerkRuntimeConfig } from '@/lib/clerk-config';
+import { AuthFlowAnalytics } from '@/components/AuthFlowAnalytics';
 
 export default function AuthPage() {
   if (!clerkRuntimeConfig().configured) {
@@ -9,6 +10,7 @@ export default function AuthPage() {
   return (
     <main className="auth-page">
       <div className="auth-stack">
+        <AuthFlowAnalytics />
         <SignUp path="/sign-up" routing="path" />
         <p className="auth-legal">
           By creating an account, you agree to our{' '}

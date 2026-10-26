@@ -1,4 +1,5 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { CopyCode } from './CopyCode';
 import { ResultBadge, ResultDetails } from './ResultBadge';
@@ -336,6 +337,7 @@ function PicksModal({
           <button type="button" className="outline-button" onClick={async () => {
             try {
               await copyText(formatTicketCopy(slip));
+      track('code_copied', { count: 1 });
               toast('Ticket copied');
             } catch {
               toast('Could not copy ticket');
@@ -415,6 +417,7 @@ export function SlipGroups({
     setCopying(true);
     try {
       await copyText(formatTicketsCopy(slips, riskMode));
+      track('code_copied', { count: slips.length });
       toast(`Copied ${slips.length} ticket${slips.length === 1 ? '' : 's'}`);
     } catch {
       toast('Could not copy this collection.', { sticky: true });
@@ -422,9 +425,11 @@ export function SlipGroups({
   }
 
   function shareAll() {
+    track('share_clicked');
     const url = `${window.location.origin}/g/${groupPublicId}`;
     // Publish in the background — do not await before share (loses user gesture).
     void api.publishGroup(groupPublicId).then(() => {
+      if (!collection?.isPublic) track('collection_published');
       toast('Now public');
       void query.invalidateQueries({ queryKey: ['group', groupPublicId] });
     }).catch(() => {});
@@ -484,6 +489,7 @@ export function SlipGroups({
   async function copyOne(slip: GeneratedSlip) {
     try {
       await copyText(formatTicketCopy(slip));
+      track('code_copied', { count: 1 });
       toast('Copied');
     } catch {
       toast('Could not copy this ticket', { sticky: true });
@@ -576,7 +582,7 @@ export function SlipGroups({
               onVerify={allowPlayCheck ? () => void checkTicket(slip.bookingCode) : undefined}
               onEdit={onEdit ? () => onEdit(slip.bookingCode) : undefined}
               onCopy={() => void copyOne(slip)}
-              onShare={() => { play('click'); setShareFor(slip); }}
+              onShare={() => { track('share_clicked'); play('click'); setShareFor(slip); }}
               onLoad={() => void loadOne(slip)}
               verifying={checkingTicket === slip.bookingCode}
               loading={loadingTicket === slip.bookingCode}
@@ -598,7 +604,7 @@ export function SlipGroups({
         modeLabel={picksModeLabel}
         modeKey={picksModeKey}
         onClose={() => setPicksFor(null)}
-        onShare={() => { setPicksFor(null); setShareFor(picksFor); }}
+        onShare={() => { track('share_clicked'); setPicksFor(null); setShareFor(picksFor); }}
       />
     )}
     {shareFor && (
