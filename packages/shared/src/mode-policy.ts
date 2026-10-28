@@ -1,12 +1,16 @@
+import { parseOddsToken } from './format-odds';
+
 /** Lowest accepted price for any single selection / game leg. */
 export const MIN_SELECTION_ODDS = 1.1;
 
-/** Hard ceiling for combined ticket odds in UI preflight (Lagoslife may still use “no max” inside mode bands below this). */
+/** Preflight ceiling for requests outside Lagoslife Mode, which has no product maximum. */
 export const MAX_TICKET_ODDS = 10_000;
 
 /** Best-effort parse of ticket odds from a free-text prompt for preflight checks. */
 export function previewOddsFromPrompt(instruction: string): { minimum: number; maximum: number | null } | null {
-  const text = instruction.trim();
+  const text = instruction.trim()
+    .replace(/\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/g, value => value.replace(/,/g, ''))
+    .replace(/\b\d+(?:\.\d+)?\s*(?:ks?|ms?|b|t|q)\b/gi, value => String(parseOddsToken(value) ?? value));
   if (!text) return null;
   const between = [...text.matchAll(/\b(?:between|from)\s+(\d+(?:\.\d+)?)\s*(?:and|to|[-–])\s*(\d+(?:\.\d+)?)\b/gi)].filter(m => !/^\s*(?:games?|tickets?|matches?|legs?|picks?)\b/i.test(text.slice((m.index ?? 0) + m[0].length))).at(-1)
     ?? [...text.matchAll(/\b(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*odds\b/gi)].at(-1);
@@ -20,7 +24,7 @@ export function previewOddsFromPrompt(instruction: string): { minimum: number; m
     const mid = Number(around[1]);
     if (Number.isFinite(mid)) return { minimum: Math.max(1.1, mid - .5), maximum: mid + .5 };
   }
-  const minOnly = text.match(/\b(?:min(?:imum)?|at\s*least)\s*(\d+(?:\.\d+)?)\b/i);
+  const minOnly = text.match(/\b(?:min(?:imum)?|at\s*least|from)\s*(\d+(?:\.\d+)?)\b/i);
   const maxOnly = text.match(/\b(?:max(?:imum)?|up\s*to|under|below)\s*(\d+(?:\.\d+)?)\b/i);
   if (minOnly || maxOnly) {
     const minimum = minOnly ? Number(minOnly[1]) : 1;
@@ -35,7 +39,7 @@ export const MODE_ODDS = {
   INVESTOR: { minimum: 2, maximum: 5 },
   GAMBLER: { minimum: 5.01, maximum: 20 },
   JAPA: { minimum: 20.01, maximum: 100 },
-  LAGOS_LIFE: { minimum: 100.01, maximum: null },
+  LAGOS_LIFE: { minimum: 100, maximum: null },
 } as const;
 
 /**

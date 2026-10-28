@@ -200,7 +200,7 @@ def _system_prompt(catalog: list[dict]) -> str:
         'For Investor Mode ignore requested odds, markets, ticket counts, and games per ticket. The search chooses those inside each-game odds 1.10–1.50. '
         'Gambler/Gamler Mode riskMode=GAMBLER, riskPreference=MODERATE, ticket odds 5.01 to 20; '
         'Japa Mode riskMode=JAPA, riskPreference=HIGHER, ticket odds 20.01 to 100; '
-        'Lagoslife/Lagos-Lifes Mode riskMode=LAGOS_LIFE, riskPreference=VERY_HIGH, ticket odds 100.01 upwards, maximumOdds=null (no app ceiling). '
+        'Lagoslife/Lagos-Lifes Mode riskMode=LAGOS_LIFE, riskPreference=VERY_HIGH, ticket odds 100 upwards, maximumOdds=null (no app ceiling). '
         'Prefer Investor Mode when the user does not name another mode. Saved preferences are applied separately by the server. '
         'For every mode except Investor, use the whole mode band unless explicit requested odds narrow it. Never allow nearest odds outside a mode band. '
         'For every mode except Investor, honor shorthand odds like “4-5 odds”, “only 4–5 odds”, “not below 4 odds”, and “make it 10 games” as hard minimumOdds/maximumOdds and exact selection counts. '

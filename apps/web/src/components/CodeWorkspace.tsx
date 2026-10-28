@@ -45,8 +45,8 @@ export function CodeWorkspace({ group, busy = false, promptToSave = false }: { g
 
   return <>
 
-    {!building && <GenerationOutcome outcome={group.job?.outcome ?? (group.job ? generationOutcome({ id: group.publicId, ...group.job }) : undefined)} />}
-    {building && <ProgressQuest job={group.job} />}
+    {!building && <GenerationOutcome report={group.generationReport} outcome={group.job?.outcome ?? (group.job ? generationOutcome({ id: group.publicId, ...group.job }) : undefined)} />}
+    {building && !hasResults && <ProgressQuest job={group.job} />}
     {showWorkspace && (
       <div className="result-toolbar">
         <BackButton

@@ -182,7 +182,9 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .code-scroll { max-height: 72vh; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 12px 2px; }
 
 .code-card { background: #17221c; border: 1px solid #ffffff12; border-radius: 15px; padding: 19px; position: relative; }
-.code-card:hover { border-color: #c6f28c44; }
+.code-card:hover, .code-grid .code-card.is-active-ticket { border-color: #c6f28c77; }
+.code-grid .code-card.is-active-ticket { background: #1d2c21; box-shadow: 0 0 0 1px #c6f28c22; }
+.code-card.is-active-ticket .booking-code { color: var(--accent); }
 .code-card-main {
   display: block; width: 100%; text-align: left; padding: 0; margin: 0;
   border: 0; background: transparent; color: inherit; cursor: pointer;
@@ -679,7 +681,7 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .library-code-check p { margin: 10px 0 0; font-size: 12px; color: #9db18e; overflow-wrap: anywhere; }
 .library-code-check .library-code-check-error { color: #e3b38c; }
 .library-code-check-result a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.legal-workspace { max-width: none; }
+.legal-workspace { max-width: 860px; margin-inline: auto; }
 .collection-choice-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid #c6f28c35; border-radius: 20px; background: #17231f; color: #e8f1e3; box-shadow: 0 24px 100px #0008; }
 .collection-choice-dialog::backdrop { background: #050d09b8; backdrop-filter: blur(5px); }
 .collection-choice-dialog[open] { animation: collection-choice-enter .28s ease-out both; }
@@ -694,10 +696,11 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 @keyframes collection-choice-content { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .collection-choice-dialog[open], .collection-choice-content { animation: none; } }
 .legal-page-back { margin-bottom: 24px; }
-.legal-page-head { margin-bottom: 28px; }
+.legal-page-head { margin-bottom: 28px; text-align: center; }
+.legal-page-head .eyebrow { justify-content: center; }
 .legal-page-head h1 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.04em; margin: 8px 0 10px; }
 .legal-effective { color: #859985; font-size: 13px; margin: 0 0 14px; }
-.legal-switch { display: flex; flex-wrap: wrap; gap: 12px; }
+.legal-switch { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .legal-switch a { color: #b7c8b6; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 .legal-switch a:hover { color: var(--accent); }
 .legal-body { color: #c5d4c4; font-size: 14px; line-height: 1.7; }
@@ -1249,6 +1252,15 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .market-chips { display: flex; gap: 6px; flex-wrap: wrap; }.market-chips button { border: 1px solid var(--line); border-radius: 20px; }
 .collection-retention, .analytics-consent { font-size: 12px; color: var(--muted); padding: 12px; line-height: 1.6; }
 .analytics-consent { max-width: 900px; margin: auto; }.analytics-consent button { padding: 12px; text-decoration: underline; }
+.seo-content { max-width: 900px; margin: 48px auto 0; padding: 24px; line-height: 1.75; overflow-wrap: anywhere; }
+.seo-content section { margin-block: 28px; }
+.seo-content h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.2; }
+.seo-content h2 { font-size: 24px; line-height: 1.3; margin-block: 28px 12px; }
+.seo-content h3 { font-size: 18px; line-height: 1.4; margin-block: 20px 8px; }
+.seo-content p, .seo-content ol { color: var(--muted); margin-block: 12px; }
+.seo-content ol { list-style: decimal; padding-left: 24px; }
+.seo-content a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.site-footer-links { flex-wrap: wrap; }
 .generation-outcome h2 { font-size: 18px; }.generation-outcome ul { padding-left: 18px; list-style: disc; }
 
 .code-card-main .copy-code.booking-code { display: inline-flex; font-size: 22px; }

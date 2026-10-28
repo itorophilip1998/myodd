@@ -1,16 +1,19 @@
 import { collectionResponseSchema, ticketResponseSchema, generateResponseSchema, generationOutcomeSchema } from '@myodd/shared';
 import type { AccountUiSettings, SelectionSettlement } from '@myodd/shared';
+import { resolveApiAuth, waitForApiAuth } from './api-auth';
+import { track } from './analytics';
 // Empty = same origin (Next proxies /api → backend). Needed for public tunnels.
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 let sessionToken: () => Promise<string | null> = async () => null;
 let signedIn = false;
-export function configureApiAuth(getToken: () => Promise<string | null>, authenticated: boolean) { sessionToken = getToken; signedIn = authenticated; }
+export function configureApiAuth(getToken: () => Promise<string | null>, authenticated: boolean) { sessionToken = getToken; signedIn = authenticated; resolveApiAuth(); }
 
 export class ApiError extends Error { constructor(message: string, readonly status: number, readonly code?: string) { super(message); } }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = await sessionToken();
+  await waitForApiAuth();
+  const token = signedIn ? await sessionToken() : null;
   if (signedIn && !token) throw new ApiError('Your session needs to reconnect. Please sign in again before continuing.', 401, 'SESSION_REQUIRED');
   let res: Response;
   try { res = await fetch(`${API_URL}/api${path}`, {
@@ -34,6 +37,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   try { return await res.json() as T; } catch { throw new ApiError('The server returned incomplete data. Please retry.', res.status, 'INVALID_RESPONSE'); }
+}
+
+async function resultCheck<T>(operation: () => Promise<T>): Promise<T> {
+  track('result_check_started');
+  try { const value = await operation(); track('result_check_completed', { count: 1, failed: 0 }); return value; }
+  catch (error) { track('result_check_completed', { count: 0, failed: 1 }); throw error; }
 }
 
 export interface CreatorSummary { publicId: string; username: string | null; name: string }
@@ -258,13 +267,13 @@ export const api = {
   verifyCode(code: string) { return request<{ codes: string[]; unavailable: number }>(`/codes/${encodeURIComponent(code)}/verify`, { method: 'POST' }); },
   verifyGroup(id: string) { return request<{ codes: string[]; unavailable: number }>(`/groups/${encodeURIComponent(id)}/verify`, { method: 'POST' }); },
   checkPlayGroup(id: string) {
-    return request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' });
+    return resultCheck(() => request<{ publicId: string; isPublic?: boolean; slips: Array<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string }>; summary: PlaySummary }>(`/groups/${encodeURIComponent(id)}/check-play`, { method: 'POST' }));
   },
   checkPlayCode(code: string) {
-    return request<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' });
+    return resultCheck(() => request<{ slipId: string; bookingCode: string; result: SelectionSettlement; playStatus: SlipPlayStatus; openLegs: number; liveLegs: number; playedLegs: number; cutLegs: number; cutSummary: string | null; cuts: unknown[]; totalLegs: number; playCheckedAt: string; isPublic?: boolean; summary: PlaySummary }>(`/codes/${encodeURIComponent(code)}/check-play`, { method: 'POST' }));
   },
   lookupAndCheck(identifier: string) {
-    return request<CodeCheckLookup>('/checks/lookup', { method: 'POST', body: JSON.stringify({ identifier }) });
+    return resultCheck(() => request<CodeCheckLookup>('/checks/lookup', { method: 'POST', body: JSON.stringify({ identifier }) }));
   },
   getJob(jobId: string) {
     return request<JobProgress>(`/jobs/${jobId}`).then(value => {

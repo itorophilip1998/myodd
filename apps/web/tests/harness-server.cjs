@@ -25,6 +25,9 @@ const esbuild = require('esbuild');
     } }],
   });
   http.createServer((req, res) => {
+    // Server-side SEO requests cannot be intercepted with page.route().
+    if (req.url === '/api/groups/test-group/public-metadata') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ publicId: 'test-group', title: 'Test Collection', createdAt: '2026-10-25T00:00:00Z' })); return; }
+    if (req.url === '/api/groups/temporary-failure/public-metadata') { res.statusCode = 503; res.end('temporarily unavailable'); return; }
     if (req.url === '/harness.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(result.outputFiles[0].text); return; }
     if (req.url === '/harness.css') { res.setHeader('Content-Type', 'text/css'); res.end(fs.readFileSync(path.join(__dirname, '../src/app/globals.css'))); return; }
     if (req.url?.startsWith('/api/')) { res.setHeader('Content-Type', 'application/json'); res.statusCode = 404; res.end(JSON.stringify({ message: 'Test provider unavailable' })); return; }

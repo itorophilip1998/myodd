@@ -1,3 +1,5 @@
+> The public Live page was removed in v0.2.20. This document describes the retained provider API.
+
 # Feature: Live games explorer
 
 ## Purpose
@@ -8,7 +10,7 @@ Browse SportyBet football fixtures that are explicitly marked **live**, with sco
 
 | Layer | Location |
 |-------|----------|
-| Web | `/live` — `GameExplorer.tsx` |
+| Web | Removed in v0.2.20 |
 | API | `explore.controller.ts` → live fixtures via bookmaker provider |
 | Cache | Redis short TTL (~10s) + coalesce concurrent refreshes |
 

@@ -1,4 +1,5 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { formatOdds } from '@myodd/shared';
 import { useState } from 'react';
 import { api } from '@/lib/api';
@@ -32,6 +33,7 @@ export function ShareButtons({ code, selectionCount, totalOdds, shareUrl, groupU
     if (!await verify()) return;
     try {
       await copyText(code);
+      track('code_copied');
       setCopied(true);
       toast('Copied');
       window.setTimeout(() => setCopied(false), 1800);
@@ -41,6 +43,7 @@ export function ShareButtons({ code, selectionCount, totalOdds, shareUrl, groupU
   }
   async function share() {
     if (!await verify()) return;
+    track('share_clicked');
     if (navigator.share) {
       try {
         await navigator.share({ title: `SportyBet ${code}`, text, url: shareUrl });

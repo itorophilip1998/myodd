@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 
 const LINKS = [
   { href: '/', label: 'Create', active: (path: string) => path === '/' || path.startsWith('/generate') || path.startsWith('/result') },
-  { href: '/live', label: 'Live', live: true, active: (path: string) => path.startsWith('/live') },
   { href: '/predictions', label: 'Predictions', active: (path: string) => path.startsWith('/predictions') },
   { href: '/history', label: 'Codes', active: (path: string) => path.startsWith('/history') || path.startsWith('/g/') || path.startsWith('/code/') },
 ] as const;
@@ -28,10 +27,9 @@ export function AppHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className={`app-nav-link${'live' in link && link.live ? ' is-live' : ''}`}
+              className="app-nav-link"
               aria-current={link.active(path) ? 'page' : undefined}
             >
-              {'live' in link && link.live ? <i className="nav-live-dot" aria-hidden /> : null}
               {link.label}
             </Link>
           ))}
@@ -48,7 +46,6 @@ export function AppHeader() {
             className="app-nav-mobile-item"
             aria-current={link.active(path) ? 'page' : undefined}
           >
-            {'live' in link && link.live ? <i className="nav-live-dot" aria-hidden /> : null}
             <span>{link.label}</span>
           </Link>
         ))}

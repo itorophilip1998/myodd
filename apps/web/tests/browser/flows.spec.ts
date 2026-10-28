@@ -1,4 +1,3 @@
-import { MAX_TICKET_ODDS } from '@myodd/shared';
 import { expect, test, type Page } from '@playwright/test';
 
 const slip = { id: 'test-slip', bookingCode: 'TEST123', shareUrl: '', totalOdds: 4, confidence: .6, riskLevel: 'LOWER', selectionCount: 1, expiresAt: null, displayStatus: 'ACTIVE', result: 'PENDING', playStatus: 'OPEN', selections: [{ homeTeam: 'Test Home', awayTeam: 'Test Away', league: 'Test League', marketName: 'Total goals', selectionName: 'Over 1.5', odds: 4, result: 'PENDING', playStatus: 'UPCOMING', kickoffAt: null }] };
@@ -147,9 +146,9 @@ for (const width of [320, 375, 767, 768, 1023, 1280]) {
 
 test('restored navigation, footer version, and compact options match each mode', async ({ page }) => {
   await mockApi(page); await page.goto('/');
-  await expect(page.locator('.app-nav-desktop a')).toHaveText(['Create', 'Live', 'Predictions', 'Codes']);
+  await expect(page.locator('.app-nav-desktop a')).toHaveText(['Create', 'Predictions', 'Codes']);
   await expect(page.locator('.site-footer > :last-child')).toHaveClass('footer-version');
-  for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100.01', String(MAX_TICKET_ODDS)]]) {
+  for (const [name, min, max] of [['Investor Mode', '2', '5'], ['Gambler Mode', '5.01', '20'], ['Japa Mode', '20.01', '100'], ['Lagoslife Mode', '100', null]] as const) {
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
     if (name === 'Investor Mode') {
       await expect(page.getByRole('button', { name: /^Options/ })).toHaveCount(0);
@@ -161,7 +160,8 @@ test('restored navigation, footer version, and compact options match each mode',
     const options = page.getByRole('dialog', { name: 'Generation options' });
     await expect(options.getByText('Matches', { exact: true })).toHaveCount(0);
     await expect(options.getByLabel('Min', { exact: true })).toHaveValue(min);
-    await expect(options.getByLabel('Max', { exact: true })).toHaveAttribute('max', max);
+    if (max == null) await expect(options.getByLabel('Max', { exact: true })).not.toHaveAttribute('max');
+    else await expect(options.getByLabel('Max', { exact: true })).toHaveAttribute('max', max);
     await expect(options.getByRole('region', { name: 'Markets', exact: true })).toBeVisible();
     await expect(options.getByRole('group', { name: 'Odds presets' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Close options' }).click();
@@ -177,7 +177,7 @@ test('successful collections show codes without routine success and policy banne
   await expect(page.getByRole('button', { name: 'Open TEST123 details' })).toHaveCSS('text-decoration-line', 'none');
 });
 
-test('markets load only when expanded, with searchable grouped rows', async ({ page }, testInfo) => {
+test('markets use the bundled catalog without provider requests', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 800 }); await mockApi(page);
   let reads = 0;
   await page.route('**/api/slips/markets', route => { reads++; return route.fulfill({ json: { version: 1, options: Array.from({ length: 18 }, (_, i) => ({ id: `test-${i}`, label: `Over ${i}.5`, category: i < 9 ? 'Total Goals' : 'First Half', available: i !== 2 })) } }); });
@@ -188,16 +188,18 @@ test('markets load only when expanded, with searchable grouped rows', async ({ p
   await expect(page.getByRole('searchbox', { name: 'Search markets' })).toHaveCount(0); expect(reads).toBe(0);
   await page.getByRole('button', { name: /^Markets/ }).click();
   await expect(page.getByRole('group', { name: 'Total Goals', exact: true })).toBeVisible();
-  await expect(page.locator('.market-options label').filter({ hasText: 'Over 2.5' }).getByRole('checkbox')).toBeDisabled();
+  await expect(page.getByLabel('Over 2.5', { exact: true })).toBeEnabled();
+  expect(reads).toBe(0);
   const choices = page.getByRole('region', { name: 'Market choices' });
   expect(await choices.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('expanded-markets.png') });
-  await page.getByRole('searchbox', { name: 'Search markets' }).fill('First Half');
+  await page.getByRole('searchbox', { name: 'Search markets' }).fill('Double Chance');
   await expect(page.getByRole('group', { name: 'Total Goals', exact: true })).toHaveCount(0);
-  await page.getByLabel('Over 9.5', { exact: true }).check();
+  await page.getByLabel('1X', { exact: true }).check();
   await page.getByRole('button', { name: /^Markets/ }).click();
   await expect(page.getByRole('searchbox')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Markets/ })).toContainText('1 selected');
+  expect(reads).toBe(0);
 });
 for (const width of [320, 1280]) {
   test(`mode information points to each card and links to its full explanation at ${width}px`, async ({ page }, testInfo) => {
@@ -247,7 +249,7 @@ test('generation shows progress before one concise terminal empty result', async
   let running = true;
   const currentJob = () => ({ ...job, status: running ? 'RUNNING' : 'FAILED', stage: running ? 'GENERATING' : 'FAILED', stageDetail: raw, error: raw, outcome: { ...outcome, status: 'empty', generated: 0, failed: 10, errors: [{ code: 'SHORTAGE', message: raw, retryable: false }] } });
   await page.route('**/api/jobs/**', route => route.fulfill({ json: currentJob() }));
-  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: currentJob(), generationReport: { notices: [raw] } } }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: currentJob(), generationReport: { notices: [raw], diagnostics: { eligibleEvents: 0 } } } }));
   await page.goto('/result/test-group?job=test-job');
   await expect(page.getByText(/search budget|original matches have eligible/)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Unable to create codes' })).toHaveCount(0);
@@ -385,4 +387,121 @@ test('saved collection reads reconnect after a temporary API restart', async ({ 
   await expect(page.getByText('Reconnecting to your collection')).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('Collection not found.')).toHaveCount(0);
+});
+
+
+test('ready tickets hide progress even while the job is still running', async ({ page }) => {
+  await mockApi(page);
+  const runningJob = { ...job, status: 'RUNNING', stage: 'CREATING_BOOKINGS' };
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: runningJob }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, job: runningJob } }));
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByRole('button', { name: 'Copy code TEST123' })).toBeVisible();
+  await expect(page.locator('.progress-quest, .logo-loader')).toHaveCount(0);
+});
+
+test('Live is removed and legal documents are centered', async ({ page }, testInfo) => {
+  await mockApi(page);
+  await page.goto('/privacy');
+  await expect(page.getByRole('link', { name: 'Live', exact: true })).toHaveCount(0);
+  for (const path of ['/privacy', '/terms']) {
+    await page.goto(path);
+    await expect(page.locator('.legal-page-head')).toHaveCSS('text-align', 'center');
+    await expect(page.locator('.legal-page-head .eyebrow')).toHaveCSS('justify-content', 'center');
+    await expect(page.locator('.legal-switch')).toHaveCSS('justify-content', 'center');
+    const bounds = await page.locator('.legal-workspace').boundingBox();
+    expect(Math.abs(bounds!.x + bounds!.width / 2 - (await page.evaluate(() => innerWidth)) / 2)).toBeLessThan(2);
+  }
+  await page.screenshot({ path: testInfo.outputPath('centered-legal.png'), fullPage: true });
+  const response = await page.goto('/live');
+  expect(response?.status()).toBe(404);
+  const sitemap = await page.request.get('/sitemap.xml');
+  expect(await sitemap.text()).not.toContain('/live');
+});
+
+
+test('Investor Mode rejects oversized prompts before submission', async ({ page }) => {
+  await mockApi(page); let submitted = false;
+  await page.route('**/api/slips/generate-from-prompt', route => { submitted = true; return route.abort(); });
+  await page.goto('/');
+  await page.locator('textarea').fill('Create fifty tickets');
+  await page.locator('textarea').press('ControlOrMeta+Enter');
+  await expect(page.getByText('You can generate up to 10 tickets at a time.').last()).toBeVisible();
+  expect(submitted).toBe(false);
+});
+
+
+for (const maximum of ['5000000', '']) {
+  test(`Lagoslife submits ${maximum || 'unlimited'} maximum odds without a hidden cap`, async ({ page }) => {
+    await mockApi(page); let payload: Record<string, unknown> = {};
+    await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
+    await page.goto('/');
+    await page.getByRole('button', { name: /Lagoslife Mode Super high risk/ }).click();
+    await page.getByRole('button', { name: /^Options/ }).click();
+    await expect(page.getByLabel('Min', { exact: true })).toHaveValue('100');
+    await expect(page.getByLabel('Max', { exact: true })).not.toHaveAttribute('max');
+    await page.getByLabel('Max', { exact: true }).fill(maximum);
+    await page.getByRole('button', { name: 'Close options' }).click();
+    await page.locator('textarea').fill('Create one ticket');
+    await page.locator('textarea').press('ControlOrMeta+Enter');
+    await expect(page).toHaveURL(/\/result\/test-group/, { timeout: 15000 });
+    expect(payload.minimumOdds).toBe(100);
+    expect(payload.maximumOdds).toBe(maximum ? Number(maximum) : null);
+    expect(String(payload.instruction)).not.toContain('must not exceed 10000');
+  });
+}
+
+test('Lagoslife expands compact prompt odds before submitting', async ({ page }) => {
+  await mockApi(page); let payload: Record<string, unknown> = {};
+  await page.route('**/api/slips/generate-from-prompt', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 202, json: { jobId: 'test-job', groupId: 'test-group', publicId: 'test-group' } }); });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Lagoslife Mode Super high risk/ }).click();
+  await page.locator('textarea').fill('Create one ticket from 100 to 5m odds');
+  await expect(page.locator('.applied-settings')).toContainText('100–5000000');
+  await page.locator('textarea').press('ControlOrMeta+Enter');
+  await expect(page).toHaveURL(/\/result\/test-group/, { timeout: 15000 });
+  expect(payload.minimumOdds).toBe(100); expect(payload.maximumOdds).toBe(5000000);
+});
+
+
+test('exact-odds shortage explains the constraint instead of claiming matches are missing', async ({ page }) => {
+  await mockApi(page);
+  const failed = { ...job, status: 'FAILED', outcome: { ...outcome, status: 'empty', generated: 0, failed: 10, errors: [{ code: 'SHORTAGE', message: 'No candidates within search budget.', retryable: false }] } };
+  await page.route('**/api/jobs/**', route => route.fulfill({ json: failed }));
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: [], job: failed, generationReport: { notices: [], diagnostics: { eligibleEvents: 101 }, effectiveConfig: { minimumOdds: 10000, maximumOdds: 10000 } } } }));
+  await page.goto('/result/test-group?job=test-job');
+  await expect(page.getByText('No tickets were found at exactly 10,000 odds. Use a wider odds range or adjust your options.')).toBeVisible();
+  await expect(page.getByText(/No eligible matches/)).toHaveCount(0);
+});
+
+test('ticket stays active after menu dismissal, loading and reload until another ticket is selected', async ({ page }, testInfo) => {
+  await mockApi(page);
+  const tickets = [slip, { ...slip, id: 'second-slip', bookingCode: 'TEST456' }];
+  await page.route('**/api/groups/test-group', route => route.fulfill({ json: { ...group, slips: tickets } }));
+  await page.route('**/api/codes/TEST123/verify', route => route.fulfill({ json: { codes: ['TEST123'], unavailable: 0 } }));
+  await page.addInitScript(() => { window.open = (() => ({ opener: null, close() {} })) as unknown as typeof window.open; });
+  await page.goto('/result/test-group?job=test-job');
+  const first = page.locator('.code-card').nth(0); const second = page.locator('.code-card').nth(1);
+  await expect(first).toBeVisible();
+  const inactiveBackground = await first.evaluate(el => getComputedStyle(el).backgroundColor);
+  await first.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await page.keyboard.press('Escape');
+  await second.hover();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await expect(second).not.toHaveClass(/is-active-ticket/);
+  await first.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Load ticket', exact: true }).click();
+  await expect(page.getByText('Opening SportyBet…')).toBeVisible();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await page.reload();
+  await expect(first).toHaveClass(/is-active-ticket/);
+  await second.getByRole('button', { name: 'Ticket actions', exact: true }).click();
+  await expect(second).toHaveClass(/is-active-ticket/);
+  await expect(first).not.toHaveClass(/is-active-ticket/);
+  await expect(page.locator('.code-card.is-active-ticket')).toHaveCount(1);
+  await expect(second).not.toHaveCSS('background-color', inactiveBackground);
+  await page.keyboard.press('Escape');
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: testInfo.outputPath('active-ticket.png'), fullPage: true });
 });

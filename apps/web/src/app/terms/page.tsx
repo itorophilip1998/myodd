@@ -1,11 +1,9 @@
+import { publicMetadata } from '@/lib/public-seo';
 import type { Metadata } from 'next';
-import { MAX_TICKET_ODDS, MODE_ODDS } from '@myodd/shared';
+import { MODE_ODDS } from '@myodd/shared';
 import { LegalPage } from '@/components/LegalPage';
 
-export const metadata: Metadata = {
-  title: 'Terms of Service · myOdd',
-  description: 'Terms of Service for myOdd — SportyBet slip generation and prediction tools.',
-};
+export const metadata: Metadata = publicMetadata('/terms', 'Terms of Service · MyOdd', 'Terms of Service for MyOdd — SportyBet booking-code generation and football tools.');
 
 export default function TermsPage() {
   return (
@@ -58,7 +56,7 @@ export default function TermsPage() {
       <h3 id="mode-japa">Japa Mode</h3>
       <p>High relative risk, targeting combined odds <strong>{MODE_ODDS.JAPA.minimum}–{MODE_ODDS.JAPA.maximum}</strong>, with individual selections between <strong>1.10 and 2.00</strong>. Combining selections increases the ways an accumulator can fail. Expect frequent losses; a high potential return does not establish a high probability of success.</p>
       <h3 id="mode-lagos-life">Lagoslife Mode</h3>
-      <p>The highest target range, beginning at <strong>{MODE_ODDS.LAGOS_LIFE.minimum}</strong> combined odds and subject to the product ceiling of <strong>{MAX_TICKET_ODDS.toLocaleString('en-US')}</strong>. Individual selections remain between <strong>1.10 and 2.00</strong>. This is highly speculative and can require many selections. Frequent losses are possible. Do not treat generated codes as an income plan or use money needed for essential expenses.</p>
+      <p>The highest target range, beginning at <strong>{MODE_ODDS.LAGOS_LIFE.minimum}</strong> combined odds with <strong>no maximum ticket odds</strong>. Individual selections remain between <strong>1.10 and 2.00</strong>. This is highly speculative and can require many selections. Frequent losses are possible. Do not treat generated codes as an income plan or use money needed for essential expenses.</p>
       <h3>How mode settings are applied</h3>
       <ul>
         <li>Investor Mode accepts a match day or date range. Markets, ticket count, games per ticket, and odds are chosen by the model inside the fixed Investor band. Options for those controls are hidden, and prompt text does not change them.</li>

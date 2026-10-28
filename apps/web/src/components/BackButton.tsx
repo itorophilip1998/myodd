@@ -57,7 +57,7 @@ export function fallbackForPath(path: string): { href: string; label: string } {
   if (path.startsWith('/g/') || path.startsWith('/code/')) return { href: '/history', label: 'Codes' };
   if (path.startsWith('/result/')) return { href: '/', label: 'Create' };
   if (path.startsWith('/settings')) return { href: '/', label: 'Create' };
-  if (path.startsWith('/live') || path.startsWith('/predictions') || path.startsWith('/history')) {
+  if (path.startsWith('/predictions') || path.startsWith('/history')) {
     return { href: '/', label: 'Create' };
   }
   if (path.startsWith('/sign-in') || path.startsWith('/sign-up')) return { href: '/', label: 'Home' };
