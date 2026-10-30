@@ -33,7 +33,7 @@ Hard ticket bands and safer per-leg odds (see `MODE_ODDS` / `MODE_SELECTION_ODDS
 
 Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
 
-Investor Mode is a system ticket. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The model chooses those inside the fixed band: combined odds 2–5, each selection 1.10–1.50, up to 10 tickets, and a game count that fits the band. Prompt text and saved defaults do not move that band or choose the markets. See [investor-system-mode.md](./investor-system-mode.md).
+Investor Mode is a system ticket. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The model chooses the ticket count and games inside the fixed band: combined odds 2–5, each selection 1.10–1.50, up to 10 tickets. Picks come only from the fixed Investor market list. Prompt text and saved defaults do not move that band or add markets. Gambler Options includes that same list, plus GG / NG. See [investor-system-mode.md](./investor-system-mode.md).
 
 ## Fixture scope
 

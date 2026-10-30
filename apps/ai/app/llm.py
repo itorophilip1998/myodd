@@ -197,7 +197,7 @@ def _system_prompt(catalog: list[dict]) -> str:
         f'{Config().model_dump_json()}. '
         'Preserve explicit odds bounds, exclusions, team/league filters, dates and selection limits. '
         'Named modes enforce combined ticket odds bands: Investor Mode is a system ticket, riskMode=INVESTOR, riskPreference=VERY_LOW, ticket odds exactly 2 to 5, numberOfSlips=10, minimumSelections=1, maximumSelections=50, markets=[], marketPolicy=prefer. '
-        'For Investor Mode ignore requested odds, markets, ticket counts, and games per ticket. The search chooses those inside each-game odds 1.10–1.50. '
+        'For Investor Mode ignore requested odds, markets, ticket counts, and games per ticket. The search uses only the fixed Investor market list, with each game priced 1.10–1.50. '
         'Gambler/Gamler Mode riskMode=GAMBLER, riskPreference=MODERATE, ticket odds 5.01 to 20; '
         'Japa Mode riskMode=JAPA, riskPreference=HIGHER, ticket odds 20.01 to 100; '
         'Lagoslife/Lagos-Lifes Mode riskMode=LAGOS_LIFE, riskPreference=VERY_HIGH, ticket odds 100 upwards, maximumOdds=null (no app ceiling). '

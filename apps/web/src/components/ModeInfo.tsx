@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { MODE_ODDS, MODE_SELECTION_ODDS, type ModeKey } from '@myodd/shared';
 
 const EXPLANATIONS: Record<ModeKey, string> = {
-  INVESTOR: 'System ticket. You choose the match day or a date range. The model picks the markets, ticket count, and games inside the fixed band. A ticket can still lose.',
+  INVESTOR: 'System ticket. You choose the match day or a date range. The model picks from a fixed market list, plus the ticket count and games, inside the fixed band. A ticket can still lose.',
   GAMBLER: 'A higher target than Investor, with more variation in results. Every selection must still win for an accumulator to win.',
   JAPA: 'High combined odds and greater uncertainty. Expect frequent losing tickets, even when individual selections have shorter prices.',
   LAGOS_LIFE: 'The highest target range. Highly speculative combinations with frequent losses; never treat this mode as an income plan.',

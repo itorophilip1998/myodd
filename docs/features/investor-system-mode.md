@@ -1,8 +1,8 @@
-# Investor Mode system ticket — v0.2.19
+# Investor Mode system ticket — v0.2.23
 
-Branch: `bug/0.2.19-investor-system-mode`.
+Branch: `bug/0.2.23-investor-market-list`.
 
-Investor Mode is a system-built betting option. The user chooses the match day or a date range. The model chooses the markets, ticket count, and games per ticket.
+Investor Mode is a system-built betting option. The user chooses the match day or a date range. The model chooses the ticket count and games per ticket from the fixed market list below.
 
 ## Fixed band
 
@@ -14,7 +14,24 @@ The band is the existing shared policy (`MODE_ODDS` / `MODE_SELECTION_ODDS`):
 - Up to **10** tickets
 - Games per ticket chosen by the search so the combined odds stay inside the band
 
-Prompt text, saved defaults, and crafted request fields do not narrow the band, pick markets, or set the ticket or game count. A request that names another mode as its final mode is unchanged.
+Prompt text, saved defaults, and crafted request fields do not narrow the band, add markets, or set the ticket or game count. A request that names another mode as its final mode is unchanged.
+
+## Fixed markets
+
+Investor search keeps a selection only when its bookmaker market is one of these. Gambler Options includes this same list, and still includes GG / NG. Japa and Lagoslife keep the previous Options list.
+
+- Player to score: Yes/No
+- Match result: Home Win (1), Draw (X), Away Win (2), 1X2
+- Double chance: 1X, X2, 12
+- Total goals: Over/Under 0.5, 1.5, 2.5, 3.5
+- Half-time result, half-time draw, HT/FT combinations, win either half
+- Leading by 3 goals in a row: Yes/No
+- Corner totals, team corners
+- Shot totals, shots on target
+- Excluded number of goals
+- Goal kicks
+
+Both teams to score, cards, handicaps, and other bookmaker markets are left out. Lines outside 0.5–3.5 are left out of total goals. Corner, shot, and goal-kick markets are the total and team-total prices, including the lines the feed offers.
 
 ## Create form
 
@@ -32,6 +49,6 @@ Inside one collection, a pick (event, market, outcome, and line) is used on at m
 |-------|----------|
 | Web | `GenerateForm.tsx`, `ModeInfo.tsx`, Terms (`#mode-investor`) |
 | API | `slips.service.ts` strips Investor overrides before the job and again before search |
-| AI | `risk_modes.lock_investor_system`, `generation.varied_candidates` |
+| AI | `risk_modes.lock_investor_system`, `investor_markets.investor_market_allowed`, `generation.varied_candidates` |
 
 No migration or new environment variable is required. Deployment is separate from this change.

@@ -76,7 +76,7 @@ class RiskModeTests(unittest.TestCase):
         self.assertFalse(within_mode_selection_odds(1.81, 'GAMBLER'))
         self.assertTrue(within_mode_selection_odds(2.0, 'JAPA'))
         self.assertFalse(within_mode_selection_odds(2.01, 'JAPA'))
-        pool = [selection(event, odds, .9 / odds) for event in range(6) for odds in (1.4, 1.7, 2.2)]
+        pool = [selection(event, odds, .9 / odds, marketName='1X2', selectionName='Home') for event in range(6) for odds in (1.4, 1.7, 2.2)]
         config = parse_rules('Investor Mode')
         config.numberOfSlips = 1
         config.minimumSelections = 2
