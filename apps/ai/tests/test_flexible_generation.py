@@ -9,11 +9,12 @@ from app.schemas import Config, Fixture, Market, MarketRule, ScoredSelection, Se
 
 
 def selection(event, odds=2, probability=.4, market='1', outcome='1', supported=Market.HOME, **values):
+    values.setdefault('marketName', 'Market')
+    values.setdefault('selectionName', 'Outcome')
     return ScoredSelection(eventId=str(event), marketId=market, outcomeId=outcome, specifier='',
                            odds=odds, probability=probability, confidence=probability * 100,
                            modelVersion='test', supportedMarket=supported,
                            homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='League',
-                           marketName='Market', selectionName='Outcome',
                            kickoffAt='2099-01-01T12:00:00Z', **values)
 
 

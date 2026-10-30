@@ -3,7 +3,7 @@ import { track } from '@/lib/analytics';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ModeInfo } from './ModeInfo';
 import { useRouter } from 'next/navigation';
-import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, requestedTicketCount } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, registryForMode, requestedTicketCount } from '@myodd/shared';
 import { MarketPicker } from './MarketPicker';
 import { ProgressQuest } from './ProgressQuest';
 import { MatchDayPicker } from './MatchDayPicker';
@@ -184,6 +184,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     touch();
     setMode(name);
     if (modeKeyFromLabel(name) === 'INVESTOR') setOperation('generate');
+    const nextMode = modeKeyFromLabel(name);
+    if (nextMode !== 'GAMBLER') {
+      const allowed = new Set(registryForMode(nextMode).map(item => item.id));
+      setSelectedMarketIds(ids => ids.filter(id => allowed.has(id)));
+    }
     const band = bandForMode(name);
     setMinOdds(String(band.minimum));
     setMaxOdds(band.maximum == null ? '' : String(band.maximum));
@@ -305,7 +310,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       : '';
     const settingsLine = (systemInvestor ? [
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
-      'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ignore requested markets, odds, ticket counts, and game counts.',
+      'Investor Mode system ticket. Choose the ticket count and games per ticket from the fixed Investor market list. Ignore requested markets, odds, ticket counts, and game counts.',
       'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.',
       dateLine,
     ] : [
@@ -327,7 +332,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const hasBook = predictionBook.length > 0;
       const payload = {
         riskMode: mode ? modeBand.key : null,
-        selectedMarketIds: systemInvestor ? [] : selectedMarketIds,
+        selectedMarketIds: systemInvestor ? [] : selectedMarketIds.filter(id => registryForMode(modeBand.key).some(item => item.id === id)),
         bookingCode: effectiveCode || undefined,
         ticketCount: systemInvestor ? undefined : uiTickets ?? (hasBook ? 1 : undefined),
         gamesPerTicket: systemInvestor ? undefined : hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
@@ -538,7 +543,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               </div>
             )}
 
-            <MarketPicker selected={selectedMarketIds} onChange={changeMarkets} />
+            <MarketPicker mode={modeBand.key} selected={selectedMarketIds} onChange={changeMarkets} />
 
             <div className="settings-toggles">
               <label className="check-option"><input type="checkbox" checked={strict} onChange={e => { touch(); setStrict(e.target.checked); }} />Only requested markets</label>

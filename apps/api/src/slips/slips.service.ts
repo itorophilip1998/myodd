@@ -292,7 +292,7 @@ export class SlipsService implements OnModuleInit {
       ? (input.maximumOdds == null ? `Ticket odds at least ${input.minimumOdds ?? 1.1}. No maximum ticket odds.` : `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds}.`)
       : '';
     const countSettings = [
-      investorSystem ? 'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
+      investorSystem ? 'Investor Mode system ticket. Choose the ticket count and games per ticket from the fixed Investor market list. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
       !investorSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
       !investorSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
       oddsSettings,

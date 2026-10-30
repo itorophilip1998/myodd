@@ -4,6 +4,7 @@ import math
 import random
 from datetime import datetime, timezone
 
+from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
 from .schemas import Config, ScoredSelection, Selection
 
@@ -60,7 +61,9 @@ def eligible(selection, config):
             and (not config.kickoffBefore or selection.kickoffAt <= config.kickoffBefore)
             and (not config.kickoffAfter or selection.kickoffAt >= config.kickoffAfter)
             and (config.minimumProbability is None or selection.probability >= config.minimumProbability)
-            and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config)))
+            and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config))
+            and (config.riskMode != 'INVESTOR' or config.fixtureMode == 'original_only' or investor_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName)))
 
 
 def event_choices(pool, config):
