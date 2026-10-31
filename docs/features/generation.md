@@ -10,7 +10,7 @@ Create ranked booking-code variations from a SportyBet share code and/or a natur
 |-------|----------|
 | Web | `/generate` — `GenerateForm.tsx`, guardrails in `lib/generate-guardrails.ts` |
 | API | `slips/*`, `jobs/create-booking.processor.ts`, `ai/ai.client.ts` |
-| AI | `/intent`, `/generate`, `/split` — `apps/ai/app/` |
+| AI | `/intent`, `/generate/<mode>`, `/tools/split` — [AI agents](ai-agents.md) |
 | Policy | `packages/shared/src/mode-policy.ts`, `chat-request.ts` |
 
 ## Entry points

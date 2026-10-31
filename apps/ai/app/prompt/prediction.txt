@@ -1,0 +1,1 @@
+Prediction agent uses live, active, future fixture selections and the configured odds or historical Poisson scoring model. Return only model-scored probabilities and their actual model versions. Never invent fixtures, bookmaker identifiers or certainty. Confidence is a ranking score, not a calibrated guarantee.

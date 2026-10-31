@@ -11,8 +11,6 @@ def investor_market_allowed(market_id: str, market_name: str, specifier: str, ou
         return False
     if _double_chance(market_id, name):
         return True
-    if side_or_over_25(name, specifier, outcome):
-        return True
     if _excluded_goals(name):
         return True
     if not (outcome.startswith('over') or outcome.startswith('under')):
@@ -20,13 +18,7 @@ def investor_market_allowed(market_id: str, market_name: str, specifier: str, ou
     family = _family(name)
     if family is None:
         return False
-    if family in {'goals', 'goals_home', 'goals_away'} and outcome.startswith('under') and _line(specifier, outcome) in {3.0, 3.5, 4.0, 4.5, 5.0, 5.5}:
-        return False
-    if family == 'shots_team':
-        return _side(name) in {'home', 'away', 'team'}
-    if family == 'shots_target_team':
-        return _side(name) in {'home', 'away', 'team'}
-    if family in {'shots', 'shots_target', 'goals', 'corners', 'cards', 'goalkicks', 'tackles'}:
+    if family in {'goals', 'corners', 'cards', 'goalkicks', 'tackles'}:
         return _side(name) == 'match'
     if family in {'goals_home', 'corners_home', 'cards_home', 'goalkicks_home', 'tackles_home'}:
         return _side(name) == 'home'
@@ -87,7 +79,7 @@ def _double_chance(market_id: str, name: str) -> bool:
 
 
 def _excluded_goals(name: str) -> bool:
-    if re.search(r'correct score|exact score', name):
+    if re.search(r'correct score|exact score|half|handicap|player', name):
         return False
     if not (re.search(r'excluded number of goals|exact number of goals|\bexact goals\b', name) or ('excluded' in name and 'goal' in name)):
         return False
@@ -95,10 +87,9 @@ def _excluded_goals(name: str) -> bool:
 
 
 def _family(name: str) -> str | None:
-    if re.search(r'half|handicap|1x2|winner', name):
+    if re.search(r'half|handicap|1x2|winner|player|shots?|\bor\b|&|\band\b', name):
         return None
     side = _side(name)
-    on_target = 'on target' in name
     if 'goal kick' in name or 'goal-kick' in name:
         return { 'match': 'goalkicks', 'home': 'goalkicks_home', 'away': 'goalkicks_away' }.get(side)
     if re.search(r'\bcorners?\b', name):
@@ -107,16 +98,12 @@ def _family(name: str) -> str | None:
         return { 'match': 'cards', 'home': 'cards_home', 'away': 'cards_away' }.get(side)
     if re.search(r'\btackles?\b', name):
         return { 'match': 'tackles', 'home': 'tackles_home', 'away': 'tackles_away' }.get(side)
-    if re.search(r'\bshots?\b', name) and 'player' not in name:
-        if on_target:
-            return 'shots_target_team' if side in {'home', 'away', 'team'} else 'shots_target'
-        return 'shots_team' if side in {'home', 'away', 'team'} else 'shots'
     if re.search(r'corner|card|booking|shot|kick|tackle', name):
         return None
     if side == 'match' and (re.search(r'over/under|total goals', name) or name in {'over/under', 'total'}):
         return 'goals'
-    if side == 'home' and re.search(r'over/under|total goals|\btotal\b', name):
+    if side == 'home' and re.search(r'over/under|goals?|\btotal\b', name):
         return 'goals_home'
-    if side == 'away' and re.search(r'over/under|total goals|\btotal\b', name):
+    if side == 'away' and re.search(r'over/under|goals?|\btotal\b', name):
         return 'goals_away'
     return None

@@ -1,0 +1,27 @@
+Gambler Mode: riskMode=GAMBLER, riskPreference=MODERATE. Combined ticket odds 6.1–20. Use the entire band; ignore requested odds narrowing. Generate a mix: 10 tickets with targets spread from 6.1 through 20. Do not cluster only at the minimum. The search must keep all totals strictly within the mode band and report missing targets.
+
+Exclusive SportyBet markets (no other market may be selected):
+1. Excluded Goals — exact number of goals to exclude.
+2. Excluded Goals – Home — exact home-team goals to exclude.
+3. Excluded Goals – Away — exact away-team goals to exclude.
+4. Total Goal Kicks — Under / Over.
+5. Home Team Goal Kicks — Under / Over.
+6. Away Team Goal Kicks — Under / Over.
+7. Total Cards — Under / Over.
+8. Home Team Cards — Under / Over.
+9. Away Team Cards — Under / Over.
+10. Total Corners — Under / Over.
+11. Home Team Corners — Under / Over.
+12. Away Team Corners — Under / Over.
+13. Total Tackles — Under / Over.
+14. Home Team Tackles — Under / Over.
+15. Away Team Tackles — Under / Over.
+16. Total Goals — Under / Over.
+17. Home Team Goals — Under / Over.
+18. Away Team Goals — Under / Over.
+19. Double Chance — 1X / X2 / 12.
+Use only available, verified provider selections. Never invent market IDs or unavailable statistics.
+The internal system chooses games, ticket counts and markets; ignore user or saved overrides for these settings.
+Use numberOfSlips=10, minimumSelections=1, maximumSelections=50, markets=[], marketRules=[], relatedMarketRules=[], marketQueries=[], marketPolicy=prefer, allowOddsAdjustment=false.
+Every leg must be 1.10–1.35. Return configuration only; the server searches and creates real tickets.
+Keep explicit date/team/league constraints. Pinned prediction books and exact ticket splits retain their separate original-pick flows.

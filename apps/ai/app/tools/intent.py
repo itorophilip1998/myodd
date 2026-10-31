@@ -1,19 +1,20 @@
 import json
-from .generation_limits import validate_ticket_count
+from app.tools.generation_limits import validate_ticket_count
 import hashlib
-import os
 import re
 import time
-from datetime import datetime, timezone
 
-import httpx
-
-from .schemas import Config, Market
-from .risk_modes import MODES, apply_default_investor, apply_named_mode
-from .draw_markets import draw_request
-from .llm import IntentProviderError, parse_chat_completions, resolve_provider_name, resolve_settings, select_model
-from .market_preferences import resolve_preferences
-from .odds_format import extract_games_per_ticket, extract_odds_bounds, has_safer_slang
+from app.memory.cache import intent_cache as _intent_cache
+from app.memory.preferences import apply_preferences
+from app.llms.client import parse_ollama
+from app.schemas import Config, Market
+from app.tools.risk_modes import MODES, apply_default_investor, apply_named_mode
+from app.tools.draw_markets import draw_request
+from app.llms.errors import IntentProviderError
+from app.llms.client import parse_chat_completions
+from app.llms.settings import resolve_provider_name, resolve_settings, select_model
+from app.tools.market_preferences import resolve_preferences
+from app.tools.odds_format import extract_games_per_ticket, extract_odds_bounds, has_safer_slang
 
 
 def parse_rules(instruction: str) -> Config:
@@ -85,9 +86,6 @@ def parse_rules(instruction: str) -> Config:
     return apply_default_investor(apply_named_mode(Config.model_validate(data), instruction), instruction)
 
 
-_intent_cache: dict[tuple, tuple[float, Config]] = {}
-
-
 def local_fallback_supported(instruction: str) -> bool:
     text = instruction.casefold()
     # Investor Mode drops user odds, markets, and counts, so extra wording is safe to ignore.
@@ -116,18 +114,18 @@ def local_fallback_supported(instruction: str) -> bool:
     return simple_request or (numeric and not unsupported)
 
 
-def _parse_intent(instruction: str, available_markets: list[dict] | None = None) -> Config:
+def _parse_intent(instruction: str, available_markets: list[dict] | None = None, prompt_mode: str | None = None) -> Config:
     provider = resolve_provider_name()
     if provider in ('openai', 'groq'):
         settings = resolve_settings()
         model = select_model(instruction, available_markets, settings)
         catalog_key = hashlib.sha256(json.dumps(available_markets or [], sort_keys=True).encode()).hexdigest()
-        cache_key = (provider, model, settings.route, settings.temperature, settings.base_url, instruction, catalog_key)
+        cache_key = (provider, model, settings.route, settings.temperature, settings.base_url, instruction, catalog_key, prompt_mode)
         cached = _intent_cache.get(cache_key)
         if cached and time.monotonic() - cached[0] < 300:
             return resolve_preferences(cached[1].model_copy(deep=True), available_markets or [], instruction)
         try:
-            config = parse_chat_completions(instruction, available_markets, model=model)
+            config = parse_chat_completions(instruction, available_markets, model=model, prompt_mode=prompt_mode)
         except IntentProviderError as exc:
             reason = str(exc).casefold()
             transient = 'rate limit' in reason or 'could not reach' in reason or bool(re.search(r'http 5\d\d', reason))
@@ -146,43 +144,14 @@ def _parse_intent(instruction: str, available_markets: list[dict] | None = None)
         return resolve_preferences(config, available_markets or [], instruction)
     # Optional local language model. The response is configuration only; it never invents fixtures.
     if provider == 'ollama':
-        schema = Config.model_json_schema()
-        response = httpx.post(
-            os.getenv('OLLAMA_URL', 'http://host.docker.internal:11434') + '/api/chat',
-            json={'model': os.getenv('OLLAMA_MODEL', 'llama3.2'), 'stream': False, 'format': schema,
-                  'messages': [{'role': 'system', 'content': f'Convert football slip instructions to configuration. Current UTC time: {datetime.now(timezone.utc).isoformat()}. Return only configuration; do not select fixtures or invent IDs.'},
-                               {'role': 'user', 'content': instruction}], 'options': {'temperature': 0}},
-            timeout=90,
-        )
-        response.raise_for_status()
-        return resolve_preferences(Config.model_validate(json.loads(response.json()['message']['content'])), available_markets or [], instruction)
+        return resolve_preferences(parse_ollama(instruction, available_markets, prompt_mode), available_markets or [], instruction)
     if provider == 'rules':
         return resolve_preferences(parse_rules(instruction), available_markets or [], instruction)
     raise ValueError(f'Unsupported AI_PROVIDER: {provider}')
 
 
-def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None) -> Config:
+def parse_intent(instruction: str, available_markets: list[dict] | None = None, learned_defaults: dict | None = None, *, prompt_mode: str | None = None) -> Config:
     explicit_count = validate_ticket_count(instruction)
-    config = _parse_intent(instruction, available_markets)
-    memory = learned_defaults or {}
-    text = instruction.casefold()
-    if memory.get('ticketCount') and explicit_count is None and not re.search(r'(?:create|generate|give me)\s+\d+|\d+\s+(?:tickets?|codes?|slips?|parts?|pieces?)|\bsplit\b', text):
-        config.numberOfSlips = min(10, max(1, int(memory['ticketCount'])))
-    games = extract_games_per_ticket(instruction)
-    if games is not None:
-        config.minimumSelections = config.maximumSelections = games
-    elif re.search(r'games per ticket:\s*random', text):
-        if not re.search(r'\b(?:min(?:imum)?|max(?:imum)?)\s+\d+\s*(?:games?|matches?|legs?|selections?)', text):
-            config.minimumSelections, config.maximumSelections = 1, 50
-    elif memory.get('gamesPerTicket') and not re.search(r'\d+\s+(?:games?|matches?|picks?|legs?|selections?)', text):
-        config.minimumSelections = config.maximumSelections = memory['gamesPerTicket']
-    low, high = extract_odds_bounds(instruction)
-    if low is not None:
-        config.minimumOdds = low
-    if high is not None:
-        config.maximumOdds = high
-    if memory.get('riskMode') and not re.search(r'\b(?:mode|modes|risk|odds|between|around|conservative|aggressive|safer|higher|lower|medium|moderate)\b', text):
-        label = {'INVESTOR': 'Investor Mode', 'GAMBLER': 'Gambler Mode', 'JAPA': 'Japa Mode', 'LAGOS_LIFE': 'Lagoslife Mode'}[memory['riskMode']]
-        config = apply_named_mode(config, label)
-    config = apply_named_mode(config, instruction)
-    return apply_default_investor(config, instruction)
+    config = (_parse_intent(instruction, available_markets, prompt_mode) if prompt_mode
+              else _parse_intent(instruction, available_markets))
+    return apply_preferences(config, instruction, learned_defaults, explicit_count)

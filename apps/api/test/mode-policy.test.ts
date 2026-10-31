@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest';
 import { clampOddsToMode, withinModeOdds, withinModeSelectionOdds } from '@myodd/shared';
 it('enforces every mode boundary, including no artificial Lagoslife ceiling', () => {
-  expect(withinModeOdds(2, 'INVESTOR')).toBe(true);
-  expect(withinModeOdds(5, 'INVESTOR')).toBe(true);
-  expect(withinModeOdds(5.01, 'INVESTOR')).toBe(false);
+  expect(withinModeOdds(3, 'INVESTOR')).toBe(true);
+  expect(withinModeOdds(6, 'INVESTOR')).toBe(true);
+  expect(withinModeOdds(6.01, 'INVESTOR')).toBe(false);
   expect(withinModeOdds(5, 'GAMBLER')).toBe(false);
-  expect(withinModeOdds(5.01, 'GAMBLER')).toBe(true);
+  expect(withinModeOdds(6.1, 'GAMBLER')).toBe(true);
   expect(withinModeOdds(20, 'GAMBLER')).toBe(true);
   expect(withinModeOdds(20, 'JAPA')).toBe(false);
   expect(withinModeOdds(20.01, 'JAPA')).toBe(true);
@@ -33,10 +33,10 @@ it('enforces safe per-game odds inside named-mode tickets', () => {
 
 it('clamps a manual ticket-odds range into the selected mode band', () => {
   expect(clampOddsToMode(4, 5, 'INVESTOR')).toEqual({ minimum: 4, maximum: 5 });
-  expect(clampOddsToMode(1, 10, 'INVESTOR')).toEqual({ minimum: 2, maximum: 5 });
+  expect(clampOddsToMode(1, 10, 'INVESTOR')).toEqual({ minimum: 3, maximum: 6 });
   // Range fully below Gambler floor falls back to the mode band.
-  expect(clampOddsToMode(4, 5, 'GAMBLER')).toEqual({ minimum: 5.01, maximum: 20 });
-  expect(clampOddsToMode(6, 12, 'GAMBLER')).toEqual({ minimum: 6, maximum: 12 });
+  expect(clampOddsToMode(4, 5, 'GAMBLER')).toEqual({ minimum: 6.1, maximum: 20 });
+  expect(clampOddsToMode(7, 12, 'GAMBLER')).toEqual({ minimum: 7, maximum: 12 });
   expect(clampOddsToMode(50, null, 'LAGOS_LIFE')).toEqual({ minimum: 100, maximum: null });
 });
 

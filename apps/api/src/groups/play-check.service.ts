@@ -16,9 +16,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { decideLegPlayStatus, isDoneLeg, isDoneSlip, matchPhase, type LegMatchPhase } from './play-leg-status';
 import { FootballResultsService, type MatchEvidence } from './football-results.service';
 import { BbcResultsService } from './bbc-results.service';
+import { observation, type ForecastLeg } from '../learning/observation';
 import { settlementFromScore } from './score-settlement';
 
-type LegInput = {
+type LegInput = ForecastLeg & {
   id: string;
   sportyEventId: string;
   marketId: string;
@@ -199,6 +200,9 @@ export class PlayCheckService {
       if (playStatus === 'UPCOMING') openLegs++;
       else if (playStatus === 'LIVE') liveLegs++;
       else if (isDoneLeg(playStatus)) doneLegs++;
+
+      const sample = observation(leg, slipId, settlement, source, phase, conflict, checkedAt);
+      if (sample) updates.push(this.prisma.predictionObservation.upsert(sample));
 
       updates.push(this.prisma.slipSelection.update({
         where: { id: leg.id },

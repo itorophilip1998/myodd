@@ -115,7 +115,7 @@ export class AiClient {
   }
 
   predict(fixtures: BookmakerFixture[]) {
-    return this.post<{ pool: ScoredSelection[]; modelVersion: string }>('/predictions', { fixtures });
+    return this.post<{ pool: ScoredSelection[]; modelVersion: string }>('/generate/prediction', { fixtures });
   }
 
   discoverCodes(sources: string[]) {
@@ -130,10 +130,11 @@ export class AiClient {
   }
 
   async split(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[], parts: number) {
-    return this.validateGeneration(await this.post('/split', { fixtures, config, originalSelections, parts }));
+    return this.validateGeneration(await this.post('/tools/split', { fixtures, config, originalSelections, parts }));
   }
 
   async generate(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[] = [], expandedSearch = false) {
-    return this.validateGeneration(await this.post('/generate', { fixtures, config, originalSelections, expandedSearch }));
+    const route = config.riskMode ? { INVESTOR: 'investor', GAMBLER: 'gambler', JAPA: 'japa', LAGOS_LIFE: 'lagos-life' }[config.riskMode] : null;
+    return this.validateGeneration(await this.post(route ? `/generate/${route}` : '/generate', { fixtures, config, originalSelections, expandedSearch }));
   }
 }

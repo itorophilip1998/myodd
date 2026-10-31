@@ -67,6 +67,9 @@ export interface BookmakerOutcome {
 }
 
 export interface ScoredSelection extends BookmakerSelection {
+  baseProbability?: number | null;
+  baseModelVersion?: string | null;
+  predictedAt?: string | null;
   supportedMarket: SupportedMarket;
   probability: number;
   confidence: number;

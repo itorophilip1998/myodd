@@ -1,4 +1,4 @@
-from .generation_limits import validate_ticket_count
+from app.tools.generation_limits import validate_ticket_count
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
@@ -127,6 +127,9 @@ class Selection(BaseModel):
 
 
 class ScoredSelection(Selection):
+    baseProbability: float | None = Field(default=None, gt=0, lt=1)
+    baseModelVersion: str | None = None
+    predictedAt: datetime | None = None
     odds: float
     homeTeam: str
     awayTeam: str

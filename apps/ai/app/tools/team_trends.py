@@ -1,23 +1,15 @@
 """Recent finished-score trends for Investor and Gambler goal markets.
 
 Corners, cards, shots, tackles, and goal kicks are not scored here. The results
-feed only has full-time goals, so those markets are left out of the trend pool.
+feed only has full-time goals; approved non-goal markets retain bookmaker estimates.
 """
-import json
 import math
 import re
-import time
-from concurrent.futures import ThreadPoolExecutor
-from datetime import date, timedelta
 
-import httpx
-
-from .investor_markets import side_or_over_25
-from .schemas import ScoredSelection
+from app.tools.investor_markets import side_or_over_25, investor_market_allowed
+from app.schemas import ScoredSelection
 
 TREND_VERSION = 'trend-bbc-v1'
-_CACHE: dict = {'at': 0.0, 'rows': [], 'ttl': 0.0}
-_DAYS = 30
 _MIN_MATCHES = 5
 
 
@@ -69,48 +61,6 @@ def _double(outcome: str) -> str | None:
     if text in {'12', 'homeaway', 'homeoraway', '1or2'}:
         return '12'
     return None
-
-
-def parse_bbc_results(html: str, day: str) -> list[dict]:
-    script = re.search(r'window\.__INITIAL_DATA__\s*=\s*("(?:[^"\\]|\\.)*")\s*;', html)
-    if not script:
-        return []
-    state = json.loads(json.loads(script.group(1)))
-    rows = []
-    for key, value in (state.get('data') or {}).items():
-        if not str(key).startswith('sport-data-scores-fixtures?'):
-            continue
-        data = (value or {}).get('data') or {}
-        if data.get('sport') != 'football' or data.get('selectedStartDate') != day:
-            continue
-        for group in data.get('eventGroups') or []:
-            for secondary in group.get('secondaryGroups') or []:
-                for event in secondary.get('events') or []:
-                    parsed = _finished(event)
-                    if parsed:
-                        rows.append(parsed)
-    return rows
-
-
-def _finished(event: dict) -> dict | None:
-    if event.get('status') != 'PostEvent':
-        return None
-    period = (event.get('periodLabel') or {}).get('value')
-    if period not in {'FT', 'AET', 'PENS'}:
-        return None
-    home, away = event.get('home') or {}, event.get('away') or {}
-    scores = (
-        (home.get('runningScores') or {}).get('fulltime'),
-        (away.get('runningScores') or {}).get('fulltime'),
-    )
-    if not all(re.fullmatch(r'(?:0|[1-9]\d?)', str(score or '')) for score in scores):
-        return None
-    if not home.get('fullName') or not away.get('fullName') or not event.get('startDateTime'):
-        return None
-    return {
-        'home': home['fullName'], 'away': away['fullName'], 'kickoff': event['startDateTime'],
-        'homeGoals': int(scores[0]), 'awayGoals': int(scores[1]),
-    }
 
 
 def _poisson(lam: float, limit: int = 11) -> list[float]:
@@ -249,6 +199,8 @@ def apply_match_trends(pool: list[ScoredSelection], matches: list[dict]) -> tupl
     for selection in pool:
         kind = market_kind(selection.marketName, selection.selectionName, selection.specifier)
         if kind is None:
+            if investor_market_allowed(selection.marketId, selection.marketName, selection.specifier, selection.selectionName):
+                priced.append(selection)
             continue
         expected = index.expected(selection.homeTeam, selection.awayTeam)
         if expected is None:
@@ -264,56 +216,9 @@ def apply_match_trends(pool: list[ScoredSelection], matches: list[dict]) -> tupl
             'confidence': round(probability * 100, 2),
             'modelVersion': TREND_VERSION,
         }))
-    if trend and len({row.eventId for row in trend}) >= 2:
-        return trend, (
-            'Goal, team-goal, excluded-goal, double-chance, and Home, Draw, or Away or Over 2.5 picks were ranked from recent finished scores. '
-            'Corners, cards, shots, tackles, and goal kicks were left out because those stats are not in the results feed.'
-        )
     if trend:
         return trend + priced, (
-            'Some teams had no recent finished scores, so those goal picks used bookmaker prices. '
-            'Corners, cards, shots, tackles, and goal kicks were left out.'
+            'Goal and double-chance picks used recent finished scores where available. '
+            'Other approved markets and teams without sufficient history used bookmaker-implied estimates.'
         )
-    if priced:
-        return priced, (
-            'Recent scores did not match these teams, so goal picks used bookmaker prices. '
-            'Corners, cards, shots, tackles, and goal kicks were left out.'
-        )
-    return [], 'Recent scores did not support any of the shared Investor and Gambler markets.'
-
-
-def load_recent_matches(days: int = _DAYS, today: date | None = None, fetch=None) -> list[dict]:
-    now = time.time()
-    if fetch is None and now - _CACHE['at'] < _CACHE['ttl']:
-        return _CACHE['rows']
-    start = today or date.today()
-    loader = fetch or _fetch_day
-    dates = [(start - timedelta(days=offset)).isoformat() for offset in range(1, days + 1)]
-
-    def one(day: str) -> list[dict]:
-        try:
-            return loader(day)
-        except Exception:
-            return []
-
-    rows: list[dict] = []
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        for batch in pool.map(one, dates):
-            rows.extend(batch)
-    if fetch is None:
-        _CACHE['at'] = now
-        _CACHE['rows'] = rows
-        _CACHE['ttl'] = 6 * 60 * 60 if rows else 10 * 60
-    return rows
-
-
-def _fetch_day(day: str) -> list[dict]:
-    response = httpx.get(
-        f'https://www.bbc.co.uk/sport/football/scores-fixtures/{day}',
-        headers={'Accept': 'text/html', 'User-Agent': 'myOdd/0.2 (team trend)'},
-        timeout=8,
-        follow_redirects=True,
-    )
-    if response.status_code != 200 or len(response.text) > 3_000_000:
-        return []
-    return parse_bbc_results(response.text, day)
+    return priced, 'Recent scores could not score these approved markets; bookmaker-implied estimates were used.'

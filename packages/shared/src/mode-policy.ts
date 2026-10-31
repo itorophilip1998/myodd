@@ -36,8 +36,8 @@ export function previewOddsFromPrompt(instruction: string): { minimum: number; m
 
 /** Ticket (combined) odds bands for named modes. */
 export const MODE_ODDS = {
-  INVESTOR: { minimum: 2, maximum: 5 },
-  GAMBLER: { minimum: 5.01, maximum: 20 },
+  INVESTOR: { minimum: 3, maximum: 6 },
+  GAMBLER: { minimum: 6.1, maximum: 20 },
   JAPA: { minimum: 20.01, maximum: 100 },
   LAGOS_LIFE: { minimum: 100, maximum: null },
 } as const;

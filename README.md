@@ -140,8 +140,8 @@ Four selectable modes also work as typed keywords and enforce **hard per-ticket 
 
 | Mode | Ticket odds | Safe odds per game |
 |------|-------------|--------------------|
-| Investor Mode (recommended) | 3 tickets at 2, 3 at 3, 4 at 4 | 1.10–1.35 |
-| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.35 |
+| Investor Mode (recommended) | 3 near 3, 3 near 4, 2 near 5, 2 near 6 (band 3–6) | 1.10–1.35 |
+| Gambler Mode (also `Gamler Mode`) | 6.1–20 | 1.10–1.35 |
 | Japa Mode | 20.01–50 | 1.10–2.00 |
 | Lagoslife / Lagos-Lifes Mode | 35–50 | 1.10–2.00 |
 
@@ -234,7 +234,7 @@ Only matches strictly before the cutoff enter training. Retraining writes a new 
 
 ## Instruction parsing
 
-Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llm.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
+Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llms/client.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
 
 Supported providers:
 
@@ -310,7 +310,7 @@ The API reads the root `.env`. For Python host development, export AI model/inte
 | GET | `/api/groups/:publicId` | Saved group and selections |
 | GET | `/api/codes/:code` | Saved generated slip |
 
-Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate`, `POST /split`, `POST /tools/discover-codes`.
+Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate/{investor,gambler,japa,lagos-life,prediction}`, `POST /tools/split`, and `POST /tools/discover-codes`. Legacy `/generate`, `/split`, and `/predictions` remain available. See [AI agents and folder ownership](docs/features/ai-agents.md).
 
 ## Checks
 

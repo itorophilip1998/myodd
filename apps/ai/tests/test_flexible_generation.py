@@ -1,10 +1,10 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.generation import generate_report
-from app.intent import parse_intent
-from app.market_preferences import resolve_preferences
-from app.predictions import OddsModel, score_fixtures
+from app.tools.generation import generate_report
+from app.tools.intent import parse_intent
+from app.tools.market_preferences import resolve_preferences
+from app.llms.scoring import OddsModel, score_fixtures
 from app.schemas import Config, Fixture, Market, MarketRule, ScoredSelection, Selection
 
 
