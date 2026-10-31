@@ -64,10 +64,10 @@ def target_leg_bounds(pool, low: float, high: float) -> tuple[int, int]:
         return 1, 50
     cheapest, dearest = min(prices), max(prices)
     minimum = 1
-    while dearest ** minimum < low and minimum < 20:
+    while dearest ** minimum < low and minimum < 50:
         minimum += 1
     maximum = minimum
-    while cheapest ** (maximum + 1) <= high and maximum < 20:
+    while cheapest ** (maximum + 1) <= high and maximum < 50:
         maximum += 1
     return minimum, maximum
 

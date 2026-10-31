@@ -178,3 +178,11 @@ class SystemOddsMixTests(unittest.TestCase):
             report = generate_report(pool, config, [])
         self.assertEqual(report['candidates'], [])
         self.assertTrue(any('Missing targets' in n for n in report['notices']))
+
+    def test_internal_game_counts_can_exceed_twenty_for_low_priced_legs(self):
+        from app.tools.search import target_leg_bounds
+        pool = [selection(event, 1.1, .8) for event in range(40)]
+        minimum, maximum = target_leg_bounds(pool, 18, 20)
+        self.assertGreater(minimum, 20)
+        self.assertLessEqual(minimum, maximum)
+        self.assertLessEqual(maximum, 50)

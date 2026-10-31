@@ -149,3 +149,11 @@ class AgentTests(unittest.TestCase):
         self.assertEqual((config['minimumOdds'], config['maximumOdds']), (6.1, 20))
         self.assertEqual((config['numberOfSlips'], config['minimumSelections'], config['maximumSelections']), (10, 1, 50))
         self.assertEqual(config['markets'], [])
+
+    def test_unpinned_original_only_cannot_bypass_internal_creation_rules(self):
+        from app.tools.risk_modes import configure_mode
+        config = configure_mode(Config(riskMode='GAMBLER', fixtureMode='original_only', markets=['BTTS_YES'],
+                                       numberOfSlips=1, minimumOdds=2, maximumOdds=3), 'GAMBLER')
+        self.assertEqual(config.fixtureMode, 'adaptive')
+        self.assertEqual(config.markets, [])
+        self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (6.1, 20, 10))

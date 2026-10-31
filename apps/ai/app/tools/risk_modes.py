@@ -113,7 +113,10 @@ def configure_mode(config: Config, mode: str | None) -> Config:
         return config
     if config.riskMode is not None and config.riskMode != mode:
         raise ModeConstraintError('The selected route conflicts with the request risk mode.')
-    if mode in ('INVESTOR', 'GAMBLER') and config.fixtureMode != 'original_only' and not config.preserveOriginalSelections:
+    pinned = config.fixtureMode == 'original_only' and config.preserveOriginalSelections
+    if mode in ('INVESTOR', 'GAMBLER') and not pinned:
+        if config.fixtureMode == 'original_only':
+            config = config.model_copy(update={'fixtureMode': 'adaptive'})
         return lock_system_mode(config, '', mode)
     if config.fixtureMode == 'original_only' and config.preserveOriginalSelections:
         return config
