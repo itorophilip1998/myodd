@@ -123,6 +123,10 @@ model SlipSelection {
   marketName            String        @map("market_name")
   selectionName         String        @map("selection_name")
   odds                  Float
+  baseProbability       Float?        @map("base_probability")
+  baseModelVersion      String?       @map("base_model_version")
+  predictedAt           DateTime?     @map("predicted_at")
+  predictionMode        String?       @map("prediction_mode")
   predictionProbability Float         @map("prediction_probability")
   predictionScore       Float         @map("prediction_score")
   modelVersion          String        @default("odds-v1") @map("model_version")
@@ -310,4 +314,33 @@ model SavedCollection {
   @@id([userId, groupId])
   @@index([groupId])
   @@map("saved_collections")
+}
+
+// Independent of collection retention; forecast fields are immutable, result evidence may be corrected.
+model PredictionObservation {
+  id               String   @id
+  slipId           String   @map("slip_id")
+  eventId          String   @map("event_id")
+  marketId         String   @map("market_id")
+  outcomeId        String   @map("outcome_id")
+  specifier        String
+  marketName       String   @map("market_name")
+  league           String
+  mode             String?
+  odds             Float
+  probability      Float
+  baseProbability  Float    @map("base_probability")
+  modelVersion     String   @map("model_version")
+  baseModelVersion String   @map("base_model_version")
+  predictedAt      DateTime @map("predicted_at")
+  kickoffAt        DateTime @map("kickoff_at")
+  result           String
+  resultSource     String?  @map("result_source")
+  verified         Boolean  @default(false)
+  resultKnownAt    DateTime @map("result_known_at")
+  checkedAt        DateTime @map("checked_at")
+
+  @@index([kickoffAt])
+  @@index([modelVersion, kickoffAt])
+  @@map("prediction_observations")
 }

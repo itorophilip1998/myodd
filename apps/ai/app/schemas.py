@@ -127,6 +127,9 @@ class Selection(BaseModel):
 
 
 class ScoredSelection(Selection):
+    baseProbability: float | None = Field(default=None, gt=0, lt=1)
+    baseModelVersion: str | None = None
+    predictedAt: datetime | None = None
     odds: float
     homeTeam: str
     awayTeam: str

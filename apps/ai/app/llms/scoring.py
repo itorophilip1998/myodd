@@ -149,6 +149,6 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                     awayTeam=fixture.awayTeam, league=fixture.league, marketName=market.marketName,
                     selectionName=outcome.outcomeName, kickoffAt=fixture.kickoffAt,
                     supportedMarket=supported, probability=round(probability, 6),
-                    confidence=round(probability * 100, 2), modelVersion=version,
+                    confidence=round(probability * 100, 2), modelVersion=version, predictedAt=now,
                 ))
     return scored

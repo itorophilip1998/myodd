@@ -524,6 +524,8 @@ export class SlipsService implements OnModuleInit {
             homeTeam: s.homeTeam ?? '', awayTeam: s.awayTeam ?? '', league: s.league ?? '',
             marketName: s.marketName ?? '', selectionName: s.selectionName ?? '', odds: s.odds!,
             predictionProbability: s.probability, predictionScore: s.confidence, modelVersion: s.modelVersion,
+            baseProbability: s.baseProbability ?? s.probability, baseModelVersion: s.baseModelVersion ?? s.modelVersion,
+            predictedAt: s.predictedAt ? new Date(s.predictedAt) : null, predictionMode: input.config.riskMode,
             kickoffAt: s.kickoffAt ? new Date(s.kickoffAt) : null,
           })) },
         } });
