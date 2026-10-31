@@ -15,21 +15,38 @@ export const MARKET_REGISTRY: Definition[] = [
   { id: 'half.result', category: 'Half-Time / Full-Time', label: 'Half-time result', marketPattern: '^(1st half|first half|half[ -]?time) (1x2|result)$', outcomePattern: '.' },
   { id: 'half.draw', category: 'Draw Markets', label: 'Half-time draw', marketPattern: '^(1st half|first half|half[ -]?time) (1x2|result)$', outcomePattern: '^(draw|x)$' },
   { id: 'htft.any', category: 'Half-Time / Full-Time', label: 'HT/FT combinations', marketPattern: '^(ht/ft|half[ -]?time/full[ -]?time|halftime/fulltime)$', outcomePattern: '.' },
-  { id: 'half.either', category: 'Half-Time / Full-Time', label: 'Win either half', gamblerOnly: true, marketPattern: '\\bwin either half\\b', outcomePattern: '.' },
-  { id: 'player.score.yes', category: 'Player to score', label: 'Player to score: Yes', gamblerOnly: true, marketPattern: '^(?!.*\\b(?:both teams|team|first|last|next|either|anytime|home|away)\\b).*\\bto score\\b', outcomePattern: '^yes$' },
-  { id: 'player.score.no', category: 'Player to score', label: 'Player to score: No', gamblerOnly: true, marketPattern: '^(?!.*\\b(?:both teams|team|first|last|next|either|anytime|home|away)\\b).*\\bto score\\b', outcomePattern: '^no$' },
-  { id: 'lead.three.yes', category: 'Goals', label: 'Leading by 3 goals in a row: Yes', gamblerOnly: true, marketPattern: '^(?=.*\\b3\\b)(?=.*goal)(?=.*(?:lead|row|consecutive))', outcomePattern: '^yes$' },
-  { id: 'lead.three.no', category: 'Goals', label: 'Leading by 3 goals in a row: No', gamblerOnly: true, marketPattern: '^(?=.*\\b3\\b)(?=.*goal)(?=.*(?:lead|row|consecutive))', outcomePattern: '^no$' },
-  { id: 'corners.total', category: 'Corners', label: 'Corner totals', gamblerOnly: true, marketPattern: '^(?=.*corner)(?=.*(?:total|over/under|\\bover\\b|\\bunder\\b))(?!.*\\b(?:home|away|team|competitor|1x2|winner|handicap|card|booking)\\b)', outcomePattern: '.' },
-  { id: 'corners.team', category: 'Corners', label: 'Team corners', gamblerOnly: true, marketPattern: '^(?=.*corner)(?=.*(?:total|over/under|\\bover\\b|\\bunder\\b))(?=.*\\b(?:home|away|team|competitor)\\b)(?!.*\\b(?:1x2|winner|handicap|card|booking)\\b)', outcomePattern: '.' },
-  { id: 'shots.total', category: 'Shots', label: 'Shot totals', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?=.*(?:total|over/under|\\bover\\b|\\bunder\\b))(?!.*on target)(?!.*\\bplayer\\b)(?!.*\\b(?:1x2|winner|handicap)\\b)', outcomePattern: '.' },
-  { id: 'shots.target', category: 'Shots', label: 'Shots on target', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?=.*on target)(?=.*(?:total|over/under|\\bover\\b|\\bunder\\b))(?!.*\\bplayer\\b)(?!.*\\b(?:1x2|winner|handicap)\\b)', outcomePattern: '.' },
-  { id: 'goals.excluded', category: 'Goals', label: 'Excluded number of goals', gamblerOnly: true, marketPattern: 'excluded number of goals|exact number of goals|\\bexact goals\\b', outcomePattern: '.' },
-  { id: 'goalkicks.total', category: 'Goal kicks', label: 'Goal kicks', gamblerOnly: true, marketPattern: '^(?=.*goal[ -]?kicks?)(?!.*\\b(?:1x2|winner|handicap|card|booking)\\b)', outcomePattern: '.' },
+  { id: 'excluded.goals', category: 'Excluded Goals', label: 'Excluded Goals', gamblerOnly: true, marketPattern: '^(?=.*(?:excluded number of goals|exact number of goals|exact goals))(?!.*\\b(?:home|away|team|competitor)\\b)', outcomePattern: '.' },
+  { id: 'excluded.goals.home', category: 'Excluded Goals', label: 'Excluded Goals – Home', gamblerOnly: true, marketPattern: '^(?=.*(?:exact|excluded))(?=.*goal)(?=.*\\b(?:home|competitor1)\\b)(?!.*\\baway\\b)', outcomePattern: '.' },
+  { id: 'excluded.goals.away', category: 'Excluded Goals', label: 'Excluded Goals – Away', gamblerOnly: true, marketPattern: '^(?=.*(?:exact|excluded))(?=.*goal)(?=.*\\b(?:away|competitor2)\\b)', outcomePattern: '.' },
+  { id: 'goalkicks.total', category: 'Goal kicks', label: 'Total Goal Kicks', gamblerOnly: true, marketPattern: '^(?=.*goal[ -]?kicks?)(?!.*\\b(?:home|away|team|competitor|1x2|winner|handicap)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'goalkicks.home', category: 'Goal kicks', label: 'Home Team Goal Kicks', gamblerOnly: true, marketPattern: '^(?=.*goal[ -]?kicks?)(?=.*\\b(?:home|competitor1)\\b)(?!.*\\baway\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'goalkicks.away', category: 'Goal kicks', label: 'Away Team Goal Kicks', gamblerOnly: true, marketPattern: '^(?=.*goal[ -]?kicks?)(?=.*\\b(?:away|competitor2)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'cards.total', category: 'Cards', label: 'Total Cards', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:cards?|bookings?)\\b)(?!.*\\b(?:home|away|team|competitor)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'cards.home', category: 'Cards', label: 'Home Team Cards', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:cards?|bookings?)\\b)(?=.*\\b(?:home|competitor1)\\b)(?!.*\\baway\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'cards.away', category: 'Cards', label: 'Away Team Cards', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:cards?|bookings?)\\b)(?=.*\\b(?:away|competitor2)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'corners.total', category: 'Corners', label: 'Total Corners', gamblerOnly: true, marketPattern: '^(?=.*\\bcorners?\\b)(?!.*\\b(?:home|away|team|competitor|1x2|winner|handicap)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'corners.home', category: 'Corners', label: 'Home Team Corners', gamblerOnly: true, marketPattern: '^(?=.*\\bcorners?\\b)(?=.*\\b(?:home|competitor1)\\b)(?!.*\\baway\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'corners.away', category: 'Corners', label: 'Away Team Corners', gamblerOnly: true, marketPattern: '^(?=.*\\bcorners?\\b)(?=.*\\b(?:away|competitor2)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'tackles.total', category: 'Tackles', label: 'Total Tackles', gamblerOnly: true, marketPattern: '^(?=.*\\btackles?\\b)(?!.*\\b(?:home|away|team|competitor)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'tackles.home', category: 'Tackles', label: 'Home Team Tackles', gamblerOnly: true, marketPattern: '^(?=.*\\btackles?\\b)(?=.*\\b(?:home|competitor1)\\b)(?!.*\\baway\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'tackles.away', category: 'Tackles', label: 'Away Team Tackles', gamblerOnly: true, marketPattern: '^(?=.*\\btackles?\\b)(?=.*\\b(?:away|competitor2)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'goals.match', category: 'Goals', label: 'Total Goals', gamblerOnly: true, marketPattern: '^(?:over/under|total(?:\\s+goals)?)$', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'goals.home', category: 'Goals', label: 'Home Team Goals', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:home|competitor1)\\b)(?=.*(?:over/under|total|goals?))(?!.*\\b(?:corner|card|booking|shot|kick|tackle|half|handicap|exact|excluded|away)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'goals.away', category: 'Goals', label: 'Away Team Goals', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:away|competitor2)\\b)(?=.*(?:over/under|total|goals?))(?!.*\\b(?:corner|card|booking|shot|kick|tackle|half|handicap|exact|excluded)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'home.or.over.2.5', category: 'Home or Over', label: 'Home or Over 2.5', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:home|competitor1)\\b)(?=.*\\bor\\b)(?=.*\\bover\\b)(?=.*2\\.5)(?!.*\\b(?:away|under|draw|half)\\b)', outcomePattern: '^(?!no$|ng$).+' },
+  { id: 'away.or.over.2.5', category: 'Away or Over', label: 'Away or Over 2.5', gamblerOnly: true, marketPattern: '^(?=.*\\b(?:away|competitor2)\\b)(?=.*\\bor\\b)(?=.*\\bover\\b)(?=.*2\\.5)(?!.*\\b(?:home|under|draw|half)\\b)', outcomePattern: '^(?!no$|ng$).+' },
+  { id: 'draw.or.over.2.5', category: 'Draw or Over', label: 'Draw or Over 2.5', gamblerOnly: true, marketPattern: '^(?=.*\\bdraw\\b)(?=.*\\bor\\b)(?=.*\\bover\\b)(?=.*2\\.5)(?!.*\\b(?:home|away|under|half)\\b)', outcomePattern: '^(?!no$|ng$).+' },
+  { id: 'shots.total', category: 'Shots', label: 'Shots', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?!.*on target)(?!.*\\b(?:home|away|team|competitor|player)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'shots.target', category: 'Shots', label: 'Shots on target', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?=.*on target)(?!.*\\b(?:home|away|team|competitor|player)\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'shots.team', category: 'Shots', label: 'Team shots', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?!.*on target)(?=.*\\b(?:home|away|team|competitor)\\b)(?!.*\\bplayer\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
+  { id: 'shots.team.target', category: 'Shots', label: 'Team shots on target', gamblerOnly: true, marketPattern: '^(?=.*\\bshots?\\b)(?=.*on target)(?=.*\\b(?:home|away|team|competitor)\\b)(?!.*\\bplayer\\b)', outcomePattern: '^(over|under)(?:\\s|$)' },
 ];
 
+const GAMBLER_DOUBLE_CHANCE = new Set(['chance.1x', 'chance.x2', 'chance.12']);
+
 export function registryForMode(mode?: string | null) {
-  return MARKET_REGISTRY.filter(item => !item.gamblerOnly || mode === 'GAMBLER');
+  if (mode === 'GAMBLER') return MARKET_REGISTRY.filter(item => item.gamblerOnly || GAMBLER_DOUBLE_CHANCE.has(item.id));
+  return MARKET_REGISTRY.filter(item => !item.gamblerOnly);
 }
 
 export function resolveMarketIds(ids: string[], fixtures: BookmakerFixture[]) {

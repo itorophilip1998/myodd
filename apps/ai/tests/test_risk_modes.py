@@ -70,20 +70,34 @@ class RiskModeTests(unittest.TestCase):
 
     def test_named_modes_enforce_safe_per_game_odds(self):
         from app.odds_policy import within_mode_selection_odds
-        self.assertTrue(within_mode_selection_odds(1.5, 'INVESTOR'))
-        self.assertFalse(within_mode_selection_odds(1.51, 'INVESTOR'))
-        self.assertTrue(within_mode_selection_odds(1.8, 'GAMBLER'))
-        self.assertFalse(within_mode_selection_odds(1.81, 'GAMBLER'))
+        self.assertTrue(within_mode_selection_odds(1.35, 'INVESTOR'))
+        self.assertFalse(within_mode_selection_odds(1.36, 'INVESTOR'))
+        self.assertTrue(within_mode_selection_odds(1.35, 'GAMBLER'))
+        self.assertFalse(within_mode_selection_odds(1.36, 'GAMBLER'))
         self.assertTrue(within_mode_selection_odds(2.0, 'JAPA'))
         self.assertFalse(within_mode_selection_odds(2.01, 'JAPA'))
-        pool = [selection(event, odds, .9 / odds, marketName='1X2', selectionName='Home') for event in range(6) for odds in (1.4, 1.7, 2.2)]
+        pool = [selection(event, odds, .9 / odds, market='18', marketName='Over/Under', selectionName='Over 1.5') for event in range(6) for odds in (1.35, 1.5, 2.2)]
         config = parse_rules('Investor Mode')
         config.numberOfSlips = 1
         config.minimumSelections = 2
         config.maximumSelections = 3
         candidate = generate_report(pool, config, [])['candidates'][0]
-        self.assertTrue(all(1.1 <= s['odds'] <= 1.5 for s in candidate['selections']))
+        self.assertTrue(all(1.1 <= s['odds'] <= 1.35 for s in candidate['selections']))
         self.assertTrue(2 <= candidate['totalOdds'] <= 5)
+
+    def test_investor_plan_is_three_at_two_three_at_three_and_four_at_four(self):
+        pool = []
+        for event in range(30):
+            pool.append(selection(event, 1.26, .75, market='18', outcome='12', marketName='Over/Under', selectionName='Over 1.5'))
+        for event in range(30, 85):
+            pool.append(selection(event, 1.32, .7, market='18', outcome='12', marketName='Over/Under', selectionName='Over 1.5'))
+        report = generate_report(pool, parse_rules('Investor Mode'), [])
+        totals = [c['totalOdds'] for c in report['candidates']]
+        self.assertEqual(sum(2 <= total <= 2.10 for total in totals), 3)
+        self.assertEqual(sum(2.90 <= total <= 3.10 for total in totals), 3)
+        self.assertEqual(sum(3.90 <= total <= 4.10 for total in totals), 4)
+        keys = [(s['eventId'], s['marketId'], s['outcomeId'], s.get('specifier') or '') for c in report['candidates'] for s in c['selections']]
+        self.assertEqual(len(keys), len(set(keys)))
 
     def test_investor_ignores_requested_odds_games_and_markets(self):
         prompt = 'please give me only 4- 5 odds double chance make it 10 games not bellow 4 odds please\nFinal request settings (take precedence): Risk mode: Investor Mode.'
@@ -101,7 +115,7 @@ class RiskModeTests(unittest.TestCase):
             'Create tickets using my selected settings.\n'
             'Final request settings (take precedence): Investor Mode system ticket. '
             'Choose the markets, ticket count, and games per ticket. '
-            'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. '
+            'Build 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds. Each selection between 1.10 and 1.35. '
             'Ignore requested markets, odds, and counts.'
         )
         config = parse_rules(prompt)
@@ -114,7 +128,7 @@ class RiskModeTests(unittest.TestCase):
         prompt = (
             'Create tickets for today.\n'
             'Final request settings (take precedence): Investor Mode system ticket. '
-            'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.'
+            'Build 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds. Each selection between 1.10 and 1.35.'
         )
         result = parse_intent(prompt, [], {'ticketCount': 4, 'gamesPerTicket': 6})
         self.assertEqual((result.numberOfSlips, result.minimumSelections, result.maximumSelections), (10, 1, 50))
