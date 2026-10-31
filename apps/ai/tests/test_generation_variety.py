@@ -2,8 +2,8 @@ import random
 import unittest
 from unittest.mock import patch
 
-from app.generation import search
-from app.intent import parse_intent, parse_rules
+from app.tools.search import search
+from app.tools.intent import parse_intent, parse_rules
 from app.schemas import Config
 from test_flexible_generation import selection
 
@@ -38,7 +38,7 @@ class GenerationVarietyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Config(**values)
 
-    @patch('app.intent._parse_intent', return_value=Config(minimumSelections=4, maximumSelections=4))
+    @patch('app.tools.intent._parse_intent', return_value=Config(minimumSelections=4, maximumSelections=4))
     def test_random_games_ignore_learned_exact_counts(self, _):
         config = parse_intent('Generate 10 tickets. Games per ticket: Random (1–50). Investor Mode', [], {'gamesPerTicket': 8})
         self.assertEqual((config.minimumSelections, config.maximumSelections), (1, 50))

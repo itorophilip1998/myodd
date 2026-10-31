@@ -1,15 +1,15 @@
 """Named mode odds policies are enforced locally after every language-model interpretation."""
 import re
-from .generation_limits import requested_ticket_count
-from .odds_format import extract_games_per_ticket, extract_odds_bounds, has_explicit_odds_request, has_safer_slang
-from .schemas import Config
+from app.tools.generation_limits import requested_ticket_count
+from app.tools.odds_format import extract_games_per_ticket, extract_odds_bounds, has_explicit_odds_request, has_safer_slang
+from app.schemas import Config
 
 class ModeConstraintError(ValueError):
     pass
 
 MODES = (
-    (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 2., 5.),
-    (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 5.01, 20.),
+    (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
+    (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 6.1, 20.),
     (r'\bjapa\s+modes?\b', 'JAPA', 'HIGHER', 20.01, 100.),
     (r'\blagos[\s-]*(?:li(?:f|v)es?|life)(?:\s+modes?)?\b', 'LAGOS_LIFE', 'VERY_HIGH', 100, None),
 )
@@ -28,8 +28,10 @@ _MARKET_REQUEST = re.compile(
 )
 
 
-def lock_investor_system(config: Config, instruction: str) -> Config:
-    """Investor Mode is a system ticket. The user does not set odds, markets, or counts."""
+def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -> Config:
+    """Investor and Gambler use internal markets, counts and a full-band odds mix."""
+    _, _, preference, minimum, maximum = next(entry for entry in MODES if entry[1] == mode)
+    label = "Investor" if mode == "INVESTOR" else "Gambler"
     notices = list(config.unhandledRequests)
 
     def note(message: str) -> None:
@@ -38,17 +40,17 @@ def lock_investor_system(config: Config, instruction: str) -> Config:
 
     user = _user_instruction(instruction)
     low, high = extract_odds_bounds(user)
-    if has_explicit_odds_request(user) and not (low == 2 and high == 5):
-        note('Investor Mode kept its fixed ticket odds: 3 tickets at 2, 3 at 3, and 4 at 4. Requested odds were not applied.')
+    if has_explicit_odds_request(user) and not (low == minimum and high == maximum):
+        note(f'{label} Mode kept its fixed ticket odds band {minimum:g}–{maximum:g} with mixed targets across the range. Requested odds were not applied.')
     if _MARKET_REQUEST.search(user):
-        note('Investor Mode chooses the markets. Requested markets were not applied.')
+        note(f'{label} Mode chooses the markets. Requested markets were not applied.')
     tickets = requested_ticket_count(user)
     if (tickets is not None and tickets != 10) or extract_games_per_ticket(user) is not None:
-        note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.')
+        note(f'{label} Mode chooses the ticket count and games per ticket. Requested counts were not applied.')
     if re.search(r'nearest|closest|adjust (?:the )?odds|relax (?:the )?odds', user, re.I):
-        note('Investor Mode does not move odds to the nearest range.')
+        note(f'{label} Mode does not move odds to the nearest range.')
     result = config.model_copy(update={
-        'riskMode': 'INVESTOR', 'riskPreference': 'VERY_LOW', 'minimumOdds': 2., 'maximumOdds': 5.,
+        'riskMode': mode, 'riskPreference': preference, 'minimumOdds': minimum, 'maximumOdds': maximum,
         'allowOddsAdjustment': False, 'numberOfSlips': 10, 'minimumSelections': 1, 'maximumSelections': 50,
         'markets': [], 'marketQueries': [], 'marketRules': [], 'relatedMarketRules': [], 'marketPolicy': 'prefer',
         'unhandledRequests': notices,
@@ -56,7 +58,7 @@ def lock_investor_system(config: Config, instruction: str) -> Config:
     return Config.model_validate(result.model_dump())
 
 
-def apply_named_mode(config: Config, instruction: str, *, lock_investor: bool = True) -> Config:
+def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = True) -> Config:
     matches = [(m.start(), mode, preference, low, high) for pattern, mode, preference, low, high in MODES for m in re.finditer(pattern, instruction, re.I)]
     if not matches:
         # A provider may return a named mode even when the input uses an abbreviation.
@@ -66,9 +68,9 @@ def apply_named_mode(config: Config, instruction: str, *, lock_investor: bool = 
         mode, preference, low, high = found
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
-    # Lock only when the instruction names Investor Mode. An inferred label keeps the requested odds and counts.
-    if mode == 'INVESTOR' and lock_investor and matches:
-        return lock_investor_system(config, instruction)
+    # Lock named system modes; inferred numeric requests retain their custom constraints until mode generation.
+    if mode in ('INVESTOR', 'GAMBLER') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
+        return lock_system_mode(config, instruction, mode)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
     parsed_low, parsed_high = extract_odds_bounds(instruction)
@@ -94,7 +96,7 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
     if config.riskMode or any(re.search(pattern, instruction, re.I) for pattern, *_ in MODES):
         return config
     if has_safer_slang(instruction):
-        return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_investor=False)
+        return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_system=False)
     if has_explicit_odds_request(instruction):
         low, high = extract_odds_bounds(instruction)
         if low is not None and high is not None:
@@ -103,4 +105,26 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
                     return config.model_copy(update={'riskMode': mode, 'riskPreference': preference, 'minimumOdds': low, 'maximumOdds': high})
         return config.model_copy(update={'minimumOdds': low if low is not None else config.minimumOdds,
                                          'maximumOdds': high if high is not None else config.maximumOdds})
-    return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_investor=False)
+    return apply_named_mode(config, f'{instruction}\nInvestor Mode', lock_system=False)
+
+
+def configure_mode(config: Config, mode: str | None) -> Config:
+    if mode is None:
+        return config
+    if config.riskMode is not None and config.riskMode != mode:
+        raise ModeConstraintError('The selected route conflicts with the request risk mode.')
+    if mode in ('INVESTOR', 'GAMBLER') and config.fixtureMode != 'original_only' and not config.preserveOriginalSelections:
+        return lock_system_mode(config, '', mode)
+    if config.fixtureMode == 'original_only' and config.preserveOriginalSelections:
+        return config
+    _, _, preference, low, high = next(entry for entry in MODES if entry[1] == mode)
+    requested_low = config.minimumOdds if 'minimumOdds' in config.model_fields_set else low
+    requested_high = config.maximumOdds if 'maximumOdds' in config.model_fields_set else high
+    minimum = max(low, requested_low)
+    maximum = min(high, requested_high) if high is not None and requested_high is not None else high if high is not None else requested_high
+    if maximum is not None and minimum > maximum:
+        raise ModeConstraintError(f'{mode} requires ticket odds from {low:g} to {high or "no upper limit"}.')
+    return Config.model_validate({**config.model_dump(), 'riskMode': mode,
+                                  'riskPreference': preference, 'minimumOdds': minimum,
+                                  'maximumOdds': maximum, 'allowOddsAdjustment': False})
+

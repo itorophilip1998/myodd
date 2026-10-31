@@ -1,4 +1,4 @@
-from .generation_limits import validate_ticket_count
+from app.tools.generation_limits import validate_ticket_count
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated

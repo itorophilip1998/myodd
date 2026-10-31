@@ -1,7 +1,7 @@
 import type { BookmakerFixture } from './types';
 import type { GenerationConfig } from './schemas';
 
-export const MARKET_REGISTRY_VERSION = 2;
+export const MARKET_REGISTRY_VERSION = 3;
 type Definition = { id: string; category: string; label: string; providerMarketId?: string; marketPattern?: string; outcomePattern: string; line?: string; gamblerOnly?: boolean };
 export const MARKET_REGISTRY: Definition[] = [
   { id: 'result.home', category: 'Match Result', label: 'Home Win (1)', providerMarketId: '1', outcomePattern: '^(1|home|home win)$' },
@@ -45,7 +45,7 @@ export const MARKET_REGISTRY: Definition[] = [
 const GAMBLER_DOUBLE_CHANCE = new Set(['chance.1x', 'chance.x2', 'chance.12']);
 
 export function registryForMode(mode?: string | null) {
-  if (mode === 'GAMBLER') return MARKET_REGISTRY.filter(item => item.gamblerOnly || GAMBLER_DOUBLE_CHANCE.has(item.id));
+  if (mode === 'INVESTOR' || mode === 'GAMBLER') return MARKET_REGISTRY.filter(item => (item.gamblerOnly && !/^(?:shots\.|(?:home|away|draw)\.or\.)/.test(item.id)) || GAMBLER_DOUBLE_CHANCE.has(item.id));
   return MARKET_REGISTRY.filter(item => !item.gamblerOnly);
 }
 

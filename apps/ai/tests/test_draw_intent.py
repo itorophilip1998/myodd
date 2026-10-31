@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import patch
 import httpx
-from app.draw_markets import draw_request
-from app.market_preferences import resolve_preferences
-from app.generation import generate_report
-from app.intent import parse_intent, _intent_cache
+from app.tools.draw_markets import draw_request
+from app.tools.market_preferences import resolve_preferences
+from app.tools.generation import generate_report
+from app.tools.intent import parse_intent, _intent_cache
 from app.schemas import Config, Market, MarketRule, ScoredSelection, Selection
 
 
@@ -86,7 +86,7 @@ class DrawIntentTests(unittest.TestCase):
         self.assertEqual(strict.relatedMarketRules, [])
 
     @patch.dict('os.environ', {'AI_PROVIDER': 'openai', 'AI_API_KEY': 'test-secret', 'AI_MODEL': 'gpt-4o-mini'})
-    @patch('app.llm.httpx.post')
+    @patch('app.llms.client.httpx.post')
     def test_shorthand_interval_draws_survive_provider_rate_limits(self, post):
         _intent_cache.clear()
         post.return_value = httpx.Response(429)
@@ -106,14 +106,14 @@ class IntervalScoringTests(unittest.TestCase):
                 {'outcomeId':'a','outcomeName':'Away','odds':10,'isActive':True}]}])
 
     def test_complete_interval_prices_remove_the_three_way_margin(self):
-        from app.predictions import OddsModel, score_fixtures
+        from app.llms.scoring import OddsModel, score_fixtures
         pool = score_fixtures([self.fixture()], OddsModel())
         self.assertAlmostEqual(sum(s.probability for s in pool), 1, places=5)
         self.assertAlmostEqual(pool[1].probability, (1/1.2)/(1/10+1/1.2+1/10), places=5)
         self.assertTrue(all(s.modelVersion == 'odds-interval-v1' for s in pool))
 
     def test_missing_outcomes_cannot_create_false_normalized_certainty(self):
-        from app.predictions import OddsModel, score_fixtures
+        from app.llms.scoring import OddsModel, score_fixtures
         fixture = self.fixture()
         fixture.markets[0].outcomes[0].isActive = False
         pool = score_fixtures([fixture], OddsModel())
@@ -121,7 +121,7 @@ class IntervalScoringTests(unittest.TestCase):
         self.assertAlmostEqual(pool[0].probability, 1/1.2, places=5)
 
     def test_conditional_early_payouts_are_not_treated_as_exclusive_results(self):
-        from app.predictions import complete_interval_result
+        from app.llms.scoring import complete_interval_result
         fixture = self.fixture()
         fixture.markets[0].marketName += ' - 1UP'
         self.assertFalse(complete_interval_result(fixture.markets[0]))

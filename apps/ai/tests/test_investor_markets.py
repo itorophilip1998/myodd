@@ -1,7 +1,7 @@
 import unittest
 
-from app.generation import generate_report
-from app.investor_markets import investor_market_allowed
+from app.tools.generation import generate_report
+from app.tools.investor_markets import investor_market_allowed
 from app.schemas import Config, Market
 from test_flexible_generation import selection
 
@@ -13,6 +13,14 @@ def allowed(market_id, name, specifier, outcome):
 class InvestorMarketTests(unittest.TestCase):
     def test_fixed_list_accepts_the_named_families(self):
         cases = [
+            ('20', 'Away team over/under', 'total=5.5', 'Under 5.5'),
+            ('19', 'Home team total goals', 'total=3.5', 'Under 3.5'),
+            ('18', 'Over/Under', 'total=5.5', 'Under 5.5'),
+            ('18', 'Over/Under', 'total=5', 'Under 5'),
+            ('18', 'Over/Under', 'total=4.5', 'Under 4.5'),
+            ('18', 'Over/Under', 'total=4', 'Under 4'),
+            ('18', 'Over/Under', 'total=3', 'Under 3'),
+            ('18', 'Over/Under', 'total=3.5', 'Under 3.5'),
             ('21', 'Exact goals', '', '2'),
             ('21', 'Home team exact goals', '', '1'),
             ('21', 'Away team exact goals', '', '0'),
@@ -39,6 +47,13 @@ class InvestorMarketTests(unittest.TestCase):
             ('10', 'Double Chance', '', '1X'),
             ('10', 'Double Chance', '', 'X2'),
             ('10', 'Double Chance', '', '12'),
+        ]
+        for case in cases:
+            with self.subTest(market=case[1], outcome=case[3]):
+                self.assertTrue(allowed(*case))
+
+    def test_other_markets_are_left_out(self):
+        rejected = [
             ('81', 'Home or over 2.5', '', 'Yes'),
             ('82', 'Away or over 2.5', '', 'Yes'),
             ('85', 'Draw or over 2.5', '', 'Yes'),
@@ -48,13 +63,6 @@ class InvestorMarketTests(unittest.TestCase):
             ('201', 'Total shots on target', 'total=8.5', 'Under 8.5'),
             ('202', 'Home team total shots', 'total=11.5', 'Over 11.5'),
             ('203', 'Away team shots on target', 'total=4.5', 'Under 4.5'),
-        ]
-        for case in cases:
-            with self.subTest(market=case[1], outcome=case[3]):
-                self.assertTrue(allowed(*case))
-
-    def test_other_markets_are_left_out(self):
-        rejected = [
             ('1', '1X2', '', 'Home'),
             ('29', 'Both teams to score', '', 'Yes'),
             ('60', '1st half - 1x2', '', 'Draw'),
@@ -65,14 +73,6 @@ class InvestorMarketTests(unittest.TestCase):
             ('68', '1st half - total', 'total=1.5', 'Over 1.5'),
             ('16', 'Handicap', 'hcp=0:1', 'Home'),
             ('38', 'Anytime goalscorer', '', 'Haaland'),
-            ('18', 'Over/Under', 'total=3.5', 'Under 3.5'),
-            ('18', 'Over/Under', 'total=3', 'Under 3'),
-            ('18', 'Over/Under', 'total=4', 'Under 4'),
-            ('18', 'Over/Under', 'total=4.5', 'Under 4.5'),
-            ('18', 'Over/Under', 'total=5', 'Under 5'),
-            ('18', 'Over/Under', 'total=5.5', 'Under 5.5'),
-            ('19', 'Home team total goals', 'total=3.5', 'Under 3.5'),
-            ('20', 'Away team over/under', 'total=5.5', 'Under 5.5'),
             ('81', 'Home or over 2.5', '', 'No'),
             ('81', 'Home or under 2.5', '', 'Yes'),
             ('81', 'Home or over 1.5', '', 'Yes'),

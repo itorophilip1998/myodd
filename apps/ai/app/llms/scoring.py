@@ -9,8 +9,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .odds_policy import MIN_SELECTION_ODDS
-from .schemas import Fixture, Market, ScoredSelection
+from app.tools.odds_policy import MIN_SELECTION_ODDS
+from app.schemas import Fixture, Market, ScoredSelection
 
 
 def supported_market(market_id: str, specifier: str, outcome_id: str, name: str):

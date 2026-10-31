@@ -1,7 +1,7 @@
 """Resolve market preferences against bookmaker-supplied IDs only."""
 import re
-from .schemas import Config, MarketRule, Market
-from .draw_markets import enforce_draw_intent
+from app.schemas import Config, MarketRule, Market
+from app.tools.draw_markets import enforce_draw_intent
 
 
 def normalized(text):

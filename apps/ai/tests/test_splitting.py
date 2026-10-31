@@ -1,6 +1,6 @@
 import unittest
 from app.schemas import Config, Selection
-from app.splitting import split_report
+from app.tools.splitting import split_report
 from test_flexible_generation import selection
 
 class SplittingTests(unittest.TestCase):

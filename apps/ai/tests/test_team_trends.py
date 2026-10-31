@@ -2,7 +2,8 @@ import unittest
 from pathlib import Path
 
 from app.schemas import Market, ScoredSelection
-from app.team_trends import apply_match_trends, market_kind, parse_bbc_results, trend_probability
+from app.tools.team_trends import apply_match_trends, market_kind, trend_probability
+from app.tools.results import parse_bbc_results
 
 
 def scored(event, market_name, selection_name, **values):
@@ -51,24 +52,25 @@ class TeamTrendTests(unittest.TestCase):
         self.assertEqual(market_kind('Draw or over 2.5', 'Yes'), 'draw_or_over')
         self.assertGreater(trend_probability('home_or_over', '', 'Yes', 2.2, 0.3), 0.7)
 
-    def test_investor_pool_keeps_scored_goal_markets_and_drops_corners(self):
+    def test_investor_pool_scores_goals_and_keeps_approved_corners_at_bookmaker_price(self):
         pool = [
             scored('1', 'Double Chance', '1X', marketId='10', outcomeId='9'),
             scored('2', 'Over/Under', 'Over 1.5', supportedMarket=Market.OVER_1_5),
             scored('3', 'Total corners', 'Under 8.5'),
         ]
         ranked, note = apply_match_trends(pool, form())
-        self.assertEqual({row.marketName for row in ranked}, {'Double Chance', 'Over/Under'})
-        self.assertTrue(all(row.modelVersion == 'trend-bbc-v1' for row in ranked))
+        self.assertEqual({row.marketName for row in ranked}, {'Double Chance', 'Over/Under', 'Total corners'})
+        self.assertTrue(all(row.modelVersion == 'trend-bbc-v1' for row in ranked if row.marketName != 'Total corners'))
+        self.assertEqual(next(row for row in ranked if row.marketName == 'Total corners').modelVersion, 'test')
         self.assertIn('recent finished scores', note)
-        self.assertIn('Corners', note)
+        self.assertIn('bookmaker-implied', note)
 
     def test_fewer_than_five_games_keeps_the_price(self):
         short = [row for row in form() if row['home'] == 'Alpha'][:4] + [row for row in form() if row['away'] == 'Beta'][:4]
         pool = [scored('1', 'Double Chance', '1X', marketId='10', outcomeId='9')]
         ranked, note = apply_match_trends(pool, short)
         self.assertEqual(ranked[0].modelVersion, 'test')
-        self.assertIn('bookmaker prices', note)
+        self.assertIn('bookmaker-implied', note)
 
     def test_missing_scores_keep_the_price_ranking(self):
         pool = [scored('1', 'Double Chance', '1X')]

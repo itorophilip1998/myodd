@@ -1,28 +1,21 @@
+"""Application setup; request handlers live in api/ and workflows in agents/."""
 from contextlib import asynccontextmanager
-import asyncio
+from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 import os
-from concurrent.futures import ProcessPoolExecutor
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
-from .generation import generate_report
-from .splitting import split_report
-from .intent import parse_intent
-from .predictions import load_model, score_fixtures
-from .team_trends import TREND_VERSION, apply_match_trends, load_recent_matches
-from .schemas import GenerateInput, Instruction, ResolveInput, SplitInput, PredictionInput
-from .market_preferences import resolve_preferences
-from .llm import IntentProviderError, health_intent_fields
-from .risk_modes import ModeConstraintError
-from .discovery import DiscoveryRequest, discover
+from app.api.routes import router
+from app.llms.scoring import load_model
 
 
 @asynccontextmanager
 async def lifespan(app):
     app.state.model = load_model()
     app.state.prediction_workers = max(1, min(8, int(os.getenv('PREDICTION_WORKERS', '2'))))
-    app.state.executor = ProcessPoolExecutor(max_workers=app.state.prediction_workers, mp_context=multiprocessing.get_context('spawn'))
+    app.state.executor = ProcessPoolExecutor(
+        max_workers=app.state.prediction_workers, mp_context=multiprocessing.get_context('spawn'))
     try:
         yield
     finally:
@@ -30,71 +23,4 @@ async def lifespan(app):
 
 
 app = FastAPI(title='myOdd AI', version='1.0.0', lifespan=lifespan)
-
-
-@app.get('/health')
-def health():
-    return {'ok': True, 'service': 'myodd-ai', 'modelVersion': app.state.model.version, **health_intent_fields()}
-
-
-@app.post('/tools/discover-codes')
-def discover_codes(body: DiscoveryRequest):
-    return discover(body)
-
-
-@app.post('/intent')
-def intent(body: Instruction):
-    try:
-        return parse_intent(body.instruction, body.availableMarkets, body.learnedDefaults.model_dump()).model_dump(mode='json')
-    except IntentProviderError as exc:
-        raise HTTPException(502, str(exc)) from None
-    except ModeConstraintError as exc:
-        raise HTTPException(422, str(exc)) from None
-    except ValueError as exc:
-        raise HTTPException(422, 'Instructions contain invalid generation settings') from exc
-
-
-@app.post('/resolve')
-def resolve(body: ResolveInput):
-    return resolve_preferences(body.config, body.availableMarkets, body.instruction).model_dump(mode='json')
-
-
-@app.post('/generate')
-async def generation(body: GenerateInput):
-    loop = asyncio.get_running_loop()
-    # Separate processes execute fixture scoring in parallel, including CPU-bound models.
-    chunks = [body.fixtures[i::app.state.prediction_workers] for i in range(app.state.prediction_workers)]
-    batches = await asyncio.gather(*[
-        loop.run_in_executor(app.state.executor, score_fixtures, chunk, app.state.model)
-        for chunk in chunks if chunk
-    ])
-    pool = [selection for batch in batches for selection in batch]
-    config = body.config
-    if config.riskMode in ('INVESTOR', 'GAMBLER') and config.fixtureMode != 'original_only':
-        matches = await loop.run_in_executor(None, load_recent_matches)
-        pool, note = apply_match_trends(pool, matches)
-        config = config.model_copy(update={'unhandledRequests': [*config.unhandledRequests, note]})
-    report = await loop.run_in_executor(app.state.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)
-    version = TREND_VERSION if any(s.modelVersion == TREND_VERSION for s in pool) else app.state.model.version
-    return {'pool': [s.model_dump(mode='json') for s in pool],
-            **report,
-            'modelVersion': version}
-
-
-@app.post('/split')
-async def split_booking(body: SplitInput):
-    loop = asyncio.get_running_loop()
-    pool = await loop.run_in_executor(app.state.executor, score_fixtures, body.fixtures, app.state.model)
-    report = await loop.run_in_executor(app.state.executor, split_report, pool, body.config, body.originalSelections, body.parts)
-    return {'pool': [s.model_dump(mode='json') for s in pool], **report, 'modelVersion': app.state.model.version}
-
-
-@app.post('/predictions')
-async def prediction_snapshot(body: PredictionInput):
-    loop = asyncio.get_running_loop()
-    chunks = [body.fixtures[i::app.state.prediction_workers] for i in range(app.state.prediction_workers)]
-    batches = await asyncio.gather(*[
-        loop.run_in_executor(app.state.executor, score_fixtures, chunk, app.state.model)
-        for chunk in chunks if chunk
-    ])
-    return {'pool': [s.model_dump(mode='json') for batch in batches for s in batch], 'modelVersion': app.state.model.version}
+app.include_router(router)
