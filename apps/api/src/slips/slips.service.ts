@@ -15,6 +15,9 @@ import { SlipValidatorService } from './slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from '../jobs/job.constants';
 import { slipFingerprint } from './slip-fingerprint';
 
+/** Markets the upcoming feed can return for every game, without one request per match. */
+const LISTING_MARKET_IDS = ['1', '10', '18', '19', '20', '29', '450004', '450005', '450006', '854', '856', '858'];
+
 export interface GenerateRequest {
   userId?: string;
   requestId?: string;
@@ -277,7 +280,7 @@ export class SlipsService implements OnModuleInit {
     const matchDay = matchDayKickoffWindow(input.matchDate ?? promptDay?.start, new Date(), input.matchDateEnd ?? promptDay?.end);
     let fixtures = original?.selections.length
       ? await this.bookmaker.getFixtures({ eventIds: original.selections.map(selection => selection.eventId) })
-      : await this.upcomingFixtures(matchDay);
+      : await this.upcomingFixtures(matchDay, detail => this.stage(input, 'READING', detail));
     if (original && input.selectedMarketIds?.length) {
       const upcoming = await this.upcomingFixtures(matchDay);
       fixtures = [...new Map([...fixtures, ...upcoming].map(fixture => [fixture.eventId, fixture])).values()];
@@ -440,13 +443,14 @@ export class SlipsService implements OnModuleInit {
     ]);
   }
 
-  private async upcomingFixtures(matchDay = matchDayKickoffWindow()) {
+  private async upcomingFixtures(matchDay = matchDayKickoffWindow(), onProgress?: (detail: string) => Promise<unknown>) {
     const hoursUntilEnd = Math.max(1, Math.ceil((new Date(matchDay.kickoffBefore).getTime() - Date.now()) / 3600000));
     const timelineHours = Math.min(168, Math.max(24, hoursUntilEnd + 6));
     const pageSize = 100;
     const listed = [];
-    for (let pageNum = 1; pageNum <= 8; pageNum += 1) {
-      const page = await this.bookmaker.getFixtures({ timelineHours, pageSize, pageNum, todayGames: false });
+    for (let pageNum = 1; pageNum <= 20; pageNum += 1) {
+      if (onProgress) await onProgress(`Loading games, page ${pageNum}`);
+      const page = await this.bookmaker.getFixtures({ timelineHours, pageSize, pageNum, todayGames: false, marketIds: LISTING_MARKET_IDS });
       listed.push(...page);
       if (page.length < pageSize) break;
     }
@@ -458,10 +462,7 @@ export class SlipsService implements OnModuleInit {
       const kickoff = new Date(fixture.kickoffAt).getTime();
       return kickoff >= start && kickoff < end;
     });
-    // The listing only carries a few markets. Load the full board for the match day.
-    const detailIds = (onDay.length ? onDay : fixtures).slice(0, 100).map(fixture => fixture.eventId);
-    const details = detailIds.length ? await this.bookmaker.getFixtures({ eventIds: detailIds }) : [];
-    return [...new Map([...fixtures, ...details].map(fixture => [fixture.eventId, fixture])).values()];
+    return onDay.length ? onDay : fixtures;
   }
 
   async enqueueBookings(input: PrepareJob, config: GenerationConfig, candidates: RankedCandidate[]) {

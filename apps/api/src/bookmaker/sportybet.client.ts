@@ -44,7 +44,7 @@ export class SportyBetClient {
     return Math.max(1, Math.floor(this.cacheTtlMs / 1000));
   }
 
-  async get<T>(path: string, options?: { cacheKey?: string; retries?: number }): Promise<T> {
+  async get<T>(path: string, options?: { cacheKey?: string; retries?: number; minIntervalMs?: number }): Promise<T> {
     const key = `${options?.cacheKey ?? 'fresh'}:${path.replace(/([?&])_t=[^&]+/g, '$1')}`;
     const existing = this.reads.get(key);
     if (existing) return existing as Promise<T>;
@@ -55,7 +55,7 @@ export class SportyBetClient {
 
   private async read<T>(
     path: string,
-    options?: { cacheKey?: string; retries?: number },
+    options?: { cacheKey?: string; retries?: number; minIntervalMs?: number },
   ): Promise<T> {
     if (options?.cacheKey) {
       const cached = await this.redis.getJson<T & { __missing?: boolean }>(options.cacheKey).catch(() => null);
@@ -68,7 +68,7 @@ export class SportyBetClient {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
-        const data = await this.request<T>('GET', path);
+        const data = await this.request<T>('GET', path, undefined, options?.minIntervalMs);
         if (options?.cacheKey) {
           await this.redis.setJson(
             options.cacheKey,
@@ -118,6 +118,7 @@ export class SportyBetClient {
     method: 'GET' | 'POST',
     path: string,
     body?: unknown,
+    minIntervalMs?: number,
   ): Promise<T> {
     if (method === 'POST' && !path.includes('/orders/share')) {
       throw new SportyBetHttpError(
@@ -126,7 +127,7 @@ export class SportyBetClient {
       );
     }
 
-    await this.acquireSlot();
+    await this.acquireSlot(minIntervalMs);
     try {
       const url = `${this.baseUrl}${path}`;
       const controller = new AbortController();
@@ -183,12 +184,14 @@ export class SportyBetClient {
     }
   }
 
-  private async acquireSlot() {
-    if (this.inFlight >= this.maxConcurrency) {
+  private async acquireSlot(minIntervalMs?: number) {
+    const interval = minIntervalMs ?? this.minIntervalMs;
+    const limit = interval < this.minIntervalMs ? Math.max(this.maxConcurrency, 12) : this.maxConcurrency;
+    if (this.inFlight >= limit) {
       await new Promise<void>((resolve) => this.queue.push(resolve));
     }
     this.inFlight += 1;
-    const wait = this.minIntervalMs - (Date.now() - this.lastRequestAt);
+    const wait = interval - (Date.now() - this.lastRequestAt);
     if (wait > 0) await sleep(wait);
     this.lastRequestAt = Date.now();
   }
