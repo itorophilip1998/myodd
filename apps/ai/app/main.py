@@ -1,6 +1,7 @@
 """Application setup; request handlers live in api/ and workflows in agents/."""
 from contextlib import asynccontextmanager
 from concurrent.futures import ProcessPoolExecutor
+import asyncio
 import multiprocessing
 import os
 
@@ -19,6 +20,10 @@ async def lifespan(app):
     try:
         yield
     finally:
+        refresh = getattr(app.state, 'trend_refresh', None)
+        if refresh and not refresh.done():
+            refresh.cancel()
+            await asyncio.gather(refresh, return_exceptions=True)
         app.state.executor.shutdown(wait=True, cancel_futures=True)
 
 

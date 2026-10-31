@@ -91,6 +91,7 @@ services:
       PREDICTION_WORKERS: ${PREDICTION_WORKERS:-2}
       CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}
       MODEL_PATH: /data/model.json
+      LEARNING_MODEL_PATH: /data/learning/active.json
       INTENT_PROVIDER: ${INTENT_PROVIDER:-rules}
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       AI_MODEL: ${AI_MODEL:-gpt-4o}
@@ -161,12 +162,6 @@ services:
       postgres:
         condition: service_healthy
     command: ["sh", "-ec", "set -o pipefail; mkdir -p /backups; while true; do name=/backups/myodd-$$(date -u +%Y%m%dT%H%M%SZ).sql.gz; pg_dump --no-owner | gzip > $$name.partial; mv $$name.partial $$name; find /backups -maxdepth 1 -name 'myodd-*.sql.gz' -type f | sort -r | tail -n +31 | while read -r old; do rm -f \"$$old\"; done; touch /backups/last-success; sleep 86400; done"]
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /backups/last-success && test $$(find /backups/last-success -mmin -1500 | wc -l) -gt 0"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   redis:
     image: redis:7-alpine

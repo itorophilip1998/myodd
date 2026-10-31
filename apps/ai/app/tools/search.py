@@ -130,7 +130,7 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
     weights = {event: [max(.001, s.probability) ** exponent
                        * (5 if matches_preference(s, config) else 1) for s in options]
                for event, options in events.items()}
-    if upper_bound < config.minimumOdds and not allow_nearest:
+    if not allow_nearest and (upper_bound < config.minimumOdds or (config.maximumOdds is not None and lower_bound > config.maximumOdds + .005)):
         return [], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
     attempts = attempt_limit if attempt_limit is not None else min(12000, max(900, config.numberOfSlips * 100))
     center = math.sqrt(config.minimumOdds * max(config.minimumOdds, ceiling))
@@ -172,10 +172,13 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
             continue
         if config.preserveOriginalSelections and not original_keys.issubset({(s.eventId, s.marketId, s.outcomeId, s.specifier) for s in picked}):
             continue
+        odds = math.prod(s.odds for s in picked)
+        within = math.isfinite(odds) and config.minimumOdds <= round(odds, 2) and (config.maximumOdds is None or round(odds, 2) <= config.maximumOdds)
+        if not within and not allow_nearest:
+            continue
         key = fingerprint(picked)
         if key == original_fingerprint:
             continue
-        odds = math.prod(s.odds for s in picked)
         joint_log = sum(math.log(max(.000001, s.probability)) for s in picked)
         volatility = sum(math.log(s.odds) ** 2 for s in picked) / legs
         preference_count = sum(matches_preference(s, config) for s in picked)
@@ -185,8 +188,14 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
                      'totalOdds': round(odds, 2), 'slipScore': round(math.exp(joint_log) * 100, 8),
                      'fingerprint': key, '_rank': ranking, '_preferred': preference_count / legs,
                      '_original': original_count / legs}
-        if math.isfinite(odds) and config.minimumOdds <= round(odds, 2) and (config.maximumOdds is None or round(odds, 2) <= config.maximumOdds):
+        if within:
             results[key] = candidate
+            if steer and attempt >= 300 and attempt % 50 == 0 and len(results) >= max(32, config.numberOfSlips * 16):
+                probe = random.Random()
+                probe.setstate(rng.getstate())
+                enough = varied_candidates(results.values(), config, probe, config.numberOfSlips, ceiling)
+                if len(enough) == config.numberOfSlips:
+                    break
             if len(results) > max(100, config.numberOfSlips * 12):
                 retained = varied_candidates(results.values(), config, rng, max(50, config.numberOfSlips * 6), ceiling,
                                              original_keys if config.preserveOriginalSelections else ())

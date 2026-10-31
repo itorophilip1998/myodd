@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { SPORTYBET_MARKET_IDS } from '@myodd/shared';
+import { SPORTYBET_MARKET_IDS, systemFixture } from '@myodd/shared';
 import type {
   LiveFixture,
   BookmakerBooking,
@@ -47,7 +47,8 @@ export class SportyBetProvider implements BookmakerProvider {
           `/api/${region}/factsCenter/event?eventId=${encodeURIComponent(eventId)}`,
           { cacheKey: query.fresh ? undefined : `sporty:event:${region}:${eventId}` },
         );
-        return mapEvent(data);
+        const fixture = mapEvent(data);
+        return query.systemOnly ? systemFixture(fixture) : fixture;
       }));
       const fixtures = results.filter((result): result is PromiseFulfilledResult<BookmakerFixture> => result.status === 'fulfilled').map(result => result.value);
       if (ids.length && !fixtures.length) throw (results[0] as PromiseRejectedResult).reason;
@@ -74,7 +75,8 @@ export class SportyBetProvider implements BookmakerProvider {
       totalNum?: number;
       tournaments?: unknown[];
     }>(path, { cacheKey: query.fresh ? undefined : cacheKey });
-    return mapFixtures(data as never);
+    const fixtures = mapFixtures(data as never);
+    return query.systemOnly ? fixtures.map(systemFixture) : fixtures;
   }
 
   async getMarkets(eventId: string): Promise<BookmakerMarket[]> {

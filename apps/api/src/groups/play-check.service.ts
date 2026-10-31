@@ -201,7 +201,7 @@ export class PlayCheckService {
       else if (playStatus === 'LIVE') liveLegs++;
       else if (isDoneLeg(playStatus)) doneLegs++;
 
-      const sample = observation(leg, slipId, settlement, source, phase, conflict, checkedAt);
+      const sample = observation(leg, slipId, settlement, source, phase, conflict, checkedAt, selections.length);
       if (sample) updates.push(this.prisma.predictionObservation.upsert(sample));
 
       updates.push(this.prisma.slipSelection.update({

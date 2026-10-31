@@ -33,11 +33,11 @@ Hard ticket bands and safer per-leg odds (see `MODE_ODDS` / `MODE_SELECTION_ODDS
 
 Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
 
-Investor Mode is a system ticket. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The model builds 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds. Each selection is 1.10–1.35. Goal and double-chance picks on that shared list are ranked from recent finished scores. Corners, cards, shots, tackles, and goal kicks stay on that list and are left out of the ticket until a stats feed covers them. Prompt text and saved defaults do not move that band or add markets. See [investor-system-mode.md](./investor-system-mode.md).
+Investor and Gambler are system tickets. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The system matches the exclusive 19-option list to the day’s listed SportyBet markets and ranks them with the numerical scoring path — it does not ask a language model to browse extra board options. Investor builds mixed tickets near 3, 4, 5, and 6 (band 3–6) and stays recommended for those lower odds. Gambler uses the same options across 6.1–20. Each selection is 1.10–1.35. Prompt text and saved defaults do not move that band or add markets. See [investor-system-mode.md](./investor-system-mode.md).
 
 ## Fixture scope
 
-- Upcoming football comes from SportyBet, up to 8 pages of 100. Full markets are loaded for up to 100 matches on the chosen day.
+- Investor/Gambler load up to 50 pages of 100 from the provided-option listing. Other modes still load up to 8 pages of 100 and may enrich a bounded match-day board.
 - Default adaptive: prefer original matches, expand when needed.
 - `original_only` / upcoming-only supported via form or language.
 - Markets must exist in the live bookmaker catalog; unknown IDs are discarded.

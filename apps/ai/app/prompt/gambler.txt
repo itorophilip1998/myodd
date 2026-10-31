@@ -20,7 +20,7 @@ Exclusive SportyBet markets (no other market may be selected):
 17. Home Team Goals — Under / Over.
 18. Away Team Goals — Under / Over.
 19. Double Chance — 1X / X2 / 12.
-Use only available, verified provider selections. Never invent market IDs or unavailable statistics.
+Use only the provided options that appear on the day’s listed markets. Never invent market IDs, browse extra board options, or use unavailable statistics.
 The internal system chooses games, ticket counts and markets; ignore user or saved overrides for these settings.
 Use numberOfSlips=10, minimumSelections=1, maximumSelections=50, markets=[], marketRules=[], relatedMarketRules=[], marketQueries=[], marketPolicy=prefer, allowOddsAdjustment=false.
 Every leg must be 1.10–1.35. Return configuration only; the server searches and creates real tickets.

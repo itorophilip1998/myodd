@@ -1333,3 +1333,11 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 
 .result-connection { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; }
 .result-connection p { flex: 1; margin: 0; min-width: 180px; }
+
+.prediction-performance { margin: 24px auto 16px; padding: 16px; width: min(1200px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 14px; }
+.prediction-performance summary { cursor: pointer; font-weight: 600; }
+.prediction-performance summary span { display: inline-block; margin-left: 12px; font-size: 13px; color: var(--muted); }
+.prediction-performance p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.performance-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-block: 20px; }
+.performance-metrics dt { font-size: 12px; color: var(--muted); }.performance-metrics dd { margin: 6px 0 0; font-size: 22px; font-weight: 600; }
+.performance-table { overflow-x: auto; margin-block: 16px; }.performance-table table { width: 100%; font-size: 13px; border-collapse: collapse; }.performance-table th, .performance-table td { padding: 10px; text-align: left; border-bottom: 1px solid var(--line); }.performance-table caption { text-align: left; margin-bottom: 8px; font-weight: 600; }

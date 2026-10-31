@@ -41,12 +41,14 @@ fi
 
 docker compose config --quiet
 echo 'Starting myOdd and applying database migrations…'
-if ! docker compose up -d "${BUILD_ARGS[@]}" --wait --wait-timeout 180; then
+# Backup is not a startup dependency; its old healthcheck blocked --wait after the first dump.
+if ! docker compose up -d "${BUILD_ARGS[@]}" --wait --wait-timeout 600 postgres redis ai migrate api web; then
   echo 'Startup failed. Container status:' >&2
   docker compose ps -a
   echo 'Inspect startup errors with: docker compose logs --tail 100 migrate api ai web' >&2
   exit 1
 fi
+docker compose up -d backup >/dev/null
 
 docker compose ps
 echo

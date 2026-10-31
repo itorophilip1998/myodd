@@ -25,7 +25,7 @@ import {
 } from '@/lib/prediction-book';
 
 const MODES = [
-  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: 'Mixed tickets 3–6 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
+  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · lower odds', detail: 'Mixed tickets 3–6 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
   { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Mixed tickets 6.1–20 · each game ≤1.35', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
   { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MODE_ODDS.JAPA.maximum} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
   { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: 'Ticket 100+ · no maximum · each game ≤2.00', icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
@@ -217,39 +217,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     if (!Number.isFinite(parsedMin) || (parsedMax != null && !Number.isFinite(parsedMax))) return null;
     return mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
   }
-
-  const appliedSummary = useMemo(() => {
-    if (systemMode) {
-      const dayBit = matchWindow.matchDate === matchWindow.matchDateEnd
-        ? matchWindow.label
-        : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
-      return `Applied: ${mode} · system picks markets, tickets, and games · mixed odds ${modeBand.minimum}–${modeBand.maximum} · each game 1.10–1.35 · ${dayBit}`;
-    }
-    if (wantsSplit) {
-      return `Applied: Split into ${effectiveSplit || '?'} · ${mode}`;
-    }
-    let optionsOdds: { minimum: number; maximum: number | null } | null = null;
-    if (oddsSource === 'manual') {
-      const parsedMin = Number(minOdds);
-      const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
-      if (Number.isFinite(parsedMin) && (parsedMax == null || Number.isFinite(parsedMax))) {
-        optionsOdds = mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
-      }
-    }
-    const fromPrompt = oddsSource === 'prompt' ? previewOddsFromPrompt(instruction) : null;
-    const previewOdds = optionsOdds ?? (fromPrompt ? (mode ? clampOddsToMode(fromPrompt.minimum, fromPrompt.maximum, modeBand.key) : fromPrompt) : null);
-    const oddsBit = previewOdds
-      ? `${previewOdds.minimum}–${previewOdds.maximum == null ? 'no maximum' : previewOdds.maximum}${optionsOdds ? '' : ' (from prompt)'}`
-      : oddsSource === 'prompt'
-        ? 'odds from prompt'
-        : 'mode default odds';
-    const ticketsBit = ticketCount ? `${ticketCount} tickets` : 'tickets from prompt';
-    const dayBit = matchWindow.matchDate === matchWindow.matchDateEnd
-      ? matchWindow.label
-      : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
-    const overrideNote = optionsOdds || ticketCount ? ' · Options win when set' : '';
-    return `Applied: ${mode || 'Auto'} · ${ticketsBit} · games ${gamesPerTicket || 'Random (1–50)'} · ${oddsBit} · ${dayBit}${overrideNote}`;
-  }, [systemMode, wantsSplit, effectiveSplit, mode, ticketCount, gamesPerTicket, oddsSource, minOdds, maxOdds, instruction, modeBand.key, matchWindow]);
 
   async function onImportFile(file: File | undefined) {
     if (!file) return;
@@ -474,7 +441,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         onKeyDown={shortcut}
         maxLength={MAX_PROMPT}
         rows={2}
-        placeholder={systemMode ? `Optional note. ${mode} picks the markets, tickets, and games.` : 'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
+        placeholder={systemMode ? `Optional note, saved with your tickets. Choose the match day; ${mode} selects approved options automatically.` : 'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
       />
       {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && (
         <p className="parsed-code-hint" title={`Using ${parsedChat.bookingCode} from your message`}>Using {parsedChat.bookingCode}</p>
@@ -485,7 +452,6 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
           {speech.interim ? speech.interim : 'Listening…'}
         </p>
       )}
-      <p className="applied-settings" role="status" title={appliedSummary}>{appliedSummary}</p>
 
       <div className="chat-input-footer">
         <div className="composer-tools">

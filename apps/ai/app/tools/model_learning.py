@@ -24,10 +24,17 @@ def prediction(parameters, row):
 def learn(samples):
     with model_lock() as path:
         active = read_active()
+        last_path = path.with_name('last-evaluation.json')
+        previous_evaluation = json.loads(last_path.read_text()) if last_path.exists() else {}
+        previous_end = max(active.get('evaluatedThrough', '') if active else '', previous_evaluation.get('evaluatedThrough', ''))
         rows = unique_samples(samples)
         digest = hashlib.sha256(json.dumps([r.model_dump(mode='json') for r in sorted(rows, key=lambda r: r.id)], sort_keys=True).encode()).hexdigest()
+        if previous_evaluation.get('datasetHash') == digest:
+            return previous_evaluation
         now = datetime.now(timezone.utc).isoformat()
         report = {'evaluatedAt': now, 'samples': len(rows), 'promoted': False, 'datasetHash': digest}
+        if previous_end:
+            report['evaluatedThrough'] = previous_end
 
         def finish(reason):
             report['reason'] = reason
@@ -44,8 +51,8 @@ def learn(samples):
         cutoff = event_times[events[int(len(events) * .7)]].date()
         test_events = {event for event, time in event_times.items() if time.date() >= cutoff}
         test = [r for r in rows if r.eventId in test_events]
-        if active:
-            prior_end = datetime.fromisoformat(active['evaluatedThrough'])
+        if previous_end:
+            prior_end = datetime.fromisoformat(previous_end)
             # Never repeatedly tune against the same holdout outcomes.
             test = [r for r in test if r.predictedAt > prior_end]
         if len(test) < MIN_TEST or len({r.eventId for r in test}) < MIN_NEW_EVENTS:
@@ -61,7 +68,7 @@ def learn(samples):
         parameters = {}
         for key, group in groups.items():
             wins = sum(r.result == 'WON' for r in group)
-            if len(group) >= MIN_GROUP and min(wins, len(group) - wins) >= 10:
+            if len(group) >= MIN_GROUP and len({r.eventId for r in group}) >= 20 and min(wins, len(group) - wins) >= 10:
                 parameters[key] = fit(group)
         if not parameters:
             return finish('No base-model/market group has enough wins and losses to learn reliably.')

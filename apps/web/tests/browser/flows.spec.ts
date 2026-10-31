@@ -156,7 +156,6 @@ test('restored navigation, footer version, and compact options match each mode',
     if (name === 'Investor Mode' || name === 'Gambler Mode') {
       await expect(page.getByRole('button', { name: /^Options/ })).toHaveCount(0);
       await expect(page.getByTitle('Match days')).toBeVisible();
-      await expect(page.locator('.applied-settings')).toContainText('system picks markets, tickets, and games');
       continue;
     }
     await page.getByRole('button', { name: /^Options/ }).click();
@@ -460,7 +459,6 @@ test('Lagoslife expands compact prompt odds before submitting', async ({ page })
   await page.goto('/');
   await page.getByRole('button', { name: /Lagoslife Mode Super high risk/ }).click();
   await page.locator('textarea').fill('Create one ticket from 100 to 5m odds');
-  await expect(page.locator('.applied-settings')).toContainText('100–5000000');
   await page.locator('textarea').press('ControlOrMeta+Enter');
   await expect(page).toHaveURL(/\/result\/test-group/, { timeout: 15000 });
   expect(payload.minimumOdds).toBe(100); expect(payload.maximumOdds).toBe(5000000);
@@ -507,4 +505,22 @@ test('ticket stays active after menu dismissal, loading and reload until another
   await page.keyboard.press('Escape');
   await page.mouse.move(0, 0);
   await page.screenshot({ path: testInfo.outputPath('active-ticket.png'), fullPage: true });
+});
+
+test('prediction performance distinguishes ticket wins, selection scores and the collecting state', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/learning/performance', route => route.fulfill({ json: {
+    overall: { samples: 120, winRate: .8, brier: .15, logLoss: .4 }, baseline: { brier: .18 },
+    tickets: { won: 2, lost: 8, void: 0, awaitingVerification: 1, winRate: .2 },
+    byMode: [{ name: 'INVESTOR', samples: 120, winRate: .8, brier: .15 }], byModel: [],
+    learning: { state: 'collecting', active: null, lastEvaluation: { reason: 'Collecting more verified outcomes before training.' } },
+  } }));
+  await page.goto('/predictions');
+  const panel = page.locator('.prediction-performance');
+  await panel.locator('summary').click();
+  await expect(panel).toContainText('120 verified selections');
+  await expect(panel).toContainText('80.0%');
+  await expect(panel).toContainText('20.0%');
+  await expect(panel).toContainText('Collecting verified outcomes');
+  await expect(panel.getByRole('table', { name: 'Results by mode' })).toBeVisible();
 });

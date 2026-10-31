@@ -88,3 +88,19 @@ def _fetch_day(day: str) -> list[dict]:
     if response.status_code != 200 or len(response.text) > 3_000_000:
         return []
     return parse_bbc_results(response.text, day)
+
+
+async def recent_matches(runtime):
+    """Read immediately; refresh history off the request path, at most once per worker."""
+    import asyncio
+    now = time.time()
+    pending = getattr(runtime, 'trend_refresh', None)
+    if now - _CACHE['at'] >= _CACHE['ttl'] and (pending is None or pending.done()):
+        pending = asyncio.create_task(asyncio.to_thread(load_recent_matches))
+        runtime.trend_refresh = pending
+
+        def completed(task):
+            if not task.cancelled():
+                task.exception()  # Consume refresh errors; requests retain their numerical base model.
+        pending.add_done_callback(completed)
+    return _CACHE['rows'] if now - _CACHE['at'] < 24 * 60 * 60 else []

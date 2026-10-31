@@ -47,3 +47,21 @@ The same pick (event, market, outcome, line) is used at most once in a collectio
 - AI: `tools/risk_modes.py`, `tools/investor_markets.py`, `tools/search.py`, `tools/generation.py`, and the separate mode prompts.
 
 No migration or new environment variable is required.
+
+## Direct generation and daily coverage — v0.2.27
+
+Investor and Gambler Create requests build their fixed configuration locally. They bypass the instruction LLM, catalog interpretation, saved form defaults and dynamic market resolution. Notes are retained with the request; the date picker or supported local match-day phrases choose the time window. Japa, Lagos Life, prediction books and split workflows retain their existing paths. The actual numerical scoring models and accepted calibration layer still rank selections. Investor remains the recommended default because of its lower 3–6 combined-odds band.
+
+Daily loading requests the provided 19-option SportyBet IDs (Double Chance, total/team goals, excluded goals, cards, corners, tackles and goal kicks, including known home/away aliases) and paginates in bounded parallel groups through up to **50 pages / 5,000 games**. Only future games inside the selected window remain eligible. The loader does **not** open individual match boards to hunt extra options. Games without a listed approved option are skipped. This replaces the old 128-game full-board enrichment.
+
+Every listed market is immediately matched against the supplied 19-market list and the 1.10–1.35 leg band. Unsupported options are removed before scoring; no model invents a new betting option or browses the catalog for alternatives. Coverage records include listed games, day games, leagues, games with approved options and unavailable pages. Partial or capped listings are disclosed. An unavailable feed is not reported as a complete empty day.
+
+Investor and Gambler share a short-lived, bounded daily snapshot and concurrent requests share in-flight loading. Cached snapshots are filtered against the current time again before use. Live/started fixtures never become selectable merely because they were cached. The current provider rate/concurrency controls and fresh pre-booking availability/price checks remain in place.
+
+Recent-score history refreshes in the background, once per worker at a time. Requests immediately use fresh cached history or explicitly tagged bookmaker-based estimates when history is unavailable; they do not wait for 30 history pages. Learning still records the actual numerical source/version used by each prediction.
+
+Combination search skips impossible price/leg-count bounds, avoids serializing rejected tickets, and stops an individual target search once it has a sufficiently sampled set of valid, disjoint candidates. Difficult targets retain their bounded search budget and shortage reporting. Mixed odds, the exact market list, no repeated picks, and final bookmaker checks are preserved.
+
+A reproducible local synthetic benchmark (150 games, five prices per game, seeded search) produced ten tickets at all requested targets: Investor **7.013s → 0.215s**, Gambler **21.573s → 0.866s**. This measures combination search only, not live network latency or predictive accuracy. Investor remains the recommended default because of its lower 3–6 combined-odds band; neither mode is claimed to guarantee winning outcomes.
+
+Implementation: `slips/system-config.ts`, `slips/system-fixtures.ts`, shared `system-markets.ts`, provider filtering, and Python `tools/search.py` / `tools/results.py`.

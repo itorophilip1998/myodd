@@ -214,7 +214,19 @@ export function browserProfileId(): string | undefined {
   try { const key = 'myodd-profile-v1'; let id = localStorage.getItem(key); if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { id = crypto.randomUUID(); localStorage.setItem(key, id); } return id; } catch { return undefined; }
 }
 export interface SavedDefaults { riskMode: string | null; ticketCount: number | null; gamesPerTicket: number | null }
+export interface PredictionMetric {
+  samples: number; winRate: number | null; brier: number | null; logLoss: number | null;
+}
+export interface PredictionPerformanceReport {
+  overall: PredictionMetric; baseline: PredictionMetric;
+  tickets: { won: number; lost: number; void: number; awaitingVerification: number; winRate: number | null };
+  byMode: Array<PredictionMetric & { name: string }>;
+  byModel: Array<PredictionMetric & { name: string }>;
+  learning: { state: string; active: { version: string } | null; lastEvaluation: { reason: string } | null };
+}
+
 export const api = {
+  predictionPerformance: () => request<PredictionPerformanceReport>('/learning/performance'),
   preferences() { if (signedIn) return request<{ preferences: SavedDefaults | null; revision: number }>('/account/preferences'); const id = browserProfileId(); return id ? request<{ preferences: SavedDefaults | null; revision: number }>(`/learning/profiles/${id}`) : Promise.resolve({ preferences: null, revision: 0 }); },
   feedback(body: { groupId: string; rating: 'helpful' | 'needs_work'; note?: string; correctedPrompt?: string; rememberSettings?: boolean }) {
     const profileId = signedIn ? crypto.randomUUID() : browserProfileId(); if (!profileId) return Promise.reject(new Error('Enable browser storage to remember your settings.'));

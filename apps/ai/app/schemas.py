@@ -150,7 +150,7 @@ class PredictionInput(BaseModel):
 
 class GenerateInput(BaseModel):
     expandedSearch: bool = False
-    fixtures: Annotated[list[Fixture], Field(max_length=1000)]
+    fixtures: Annotated[list[Fixture], Field(max_length=5000)]
     config: Config
     originalSelections: list[Selection] = Field(default_factory=list)
 

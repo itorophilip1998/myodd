@@ -52,7 +52,7 @@ class AgentTests(unittest.TestCase):
                     self.assertEqual(response.json()['riskMode'], expected)
 
     @patch('app.agents.base.apply_match_trends', side_effect=lambda pool, matches: (pool, 'Test trend tool'))
-    @patch('app.agents.base.load_recent_matches', return_value=[])
+    @patch('app.agents.base.recent_matches', return_value=[])
     def test_mode_routes_generate_with_correct_band_and_tools(self, history, trends):
         fixtures = []
         for i in range(24):
@@ -88,7 +88,7 @@ class AgentTests(unittest.TestCase):
             unknown = client.post('/generate/unknown', json={'fixtures': [], 'config': {}})
             self.assertEqual(unknown.status_code, 404)
 
-    @patch('app.agents.base.load_recent_matches')
+    @patch('app.agents.base.recent_matches')
     def test_prediction_and_split_tools_keep_their_contracts_without_trends(self, history):
         fixtures = [fixture(str(i)).model_dump(mode='json') for i in range(6)]
         original = [Selection(eventId=str(i), marketId='1', outcomeId='1').model_dump() for i in range(6)]
@@ -96,7 +96,11 @@ class AgentTests(unittest.TestCase):
             prediction = client.post('/generate/prediction', json={'fixtures': fixtures})
             legacy_prediction = client.post('/predictions', json={'fixtures': fixtures})
             self.assertEqual(prediction.status_code, 200)
-            self.assertEqual(prediction.json(), legacy_prediction.json())
+            current, legacy = prediction.json(), legacy_prediction.json()
+            for payload in (current, legacy):
+                for pick in payload['pool']:
+                    self.assertIsNotNone(pick.pop('predictedAt'))
+            self.assertEqual(current, legacy)
             body = {'fixtures': fixtures, 'originalSelections': original, 'parts': 2,
                     'config': {'minimumOdds': 1.1, 'maximumOdds': 100}}
             for path in ['/split', '/tools/split']:
@@ -137,7 +141,7 @@ class AgentTests(unittest.TestCase):
             self.assertIn('19. Double Chance — 1X / X2 / 12.', prompt)
             self.assertIn('ignore user or saved overrides', prompt)
 
-    @patch('app.agents.base.load_recent_matches', return_value=[])
+    @patch('app.agents.base.recent_matches', return_value=[])
     def test_direct_gambler_route_overrides_crafted_generation_options(self, history):
         with TestClient(app) as client:
             response = client.post('/generate/gambler', json={'fixtures': [], 'config': {
