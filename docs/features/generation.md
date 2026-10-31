@@ -37,7 +37,7 @@ Investor Mode is a system ticket. The Create form keeps the match day (one day o
 
 ## Fixture scope
 
-- Upcoming football comes from SportyBet, up to 8 pages of 100. Full markets are loaded for up to 100 matches on the chosen day.
+- Upcoming football comes from SportyBet. Listing pages continue until the feed ends, up to 20 pages of 100. Each page already includes double chance, match and team goals, excluded goals, and home, draw, or away or over 2.5 for every game in the window. Tickets are built from that list. A separate full board is not loaded for each match.
 - Default adaptive: prefer original matches, expand when needed.
 - `original_only` / upcoming-only supported via form or language.
 - Markets must exist in the live bookmaker catalog; unknown IDs are discarded.
