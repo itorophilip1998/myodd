@@ -38,7 +38,7 @@ class SplittingTests(unittest.TestCase):
         self.assertEqual(sorted(len(c['selections']) for c in result['candidates']), [3, 3, 4])
 
     def test_mode_band_skips_original_picks_outside_the_selection_odds_limit(self):
-        pool = [selection(i, odds) for i, odds in enumerate([9, 1.2, 1.3, 1.4, 1.2, 1.3, 1.4, 1.2])]
+        pool = [selection(i, odds) for i, odds in enumerate([9, 1.2, 1.3, 1.35, 1.2, 1.3, 1.35, 1.2])]
         original = [Selection(**s.model_dump()) for s in pool]
         result = split_report(pool, self.config.model_copy(update={'minimumOdds': 1, 'maximumOdds': 10, 'riskMode': 'INVESTOR'}), original, 3)
         self.assertEqual(len(result['candidates']), 3)

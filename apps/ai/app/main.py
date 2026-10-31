@@ -10,6 +10,7 @@ from .generation import generate_report
 from .splitting import split_report
 from .intent import parse_intent
 from .predictions import load_model, score_fixtures
+from .team_trends import TREND_VERSION, apply_match_trends, load_recent_matches
 from .schemas import GenerateInput, Instruction, ResolveInput, SplitInput, PredictionInput
 from .market_preferences import resolve_preferences
 from .llm import IntentProviderError, health_intent_fields
@@ -68,10 +69,16 @@ async def generation(body: GenerateInput):
         for chunk in chunks if chunk
     ])
     pool = [selection for batch in batches for selection in batch]
-    report = await loop.run_in_executor(app.state.executor, generate_report, pool, body.config, body.originalSelections, body.expandedSearch)
+    config = body.config
+    if config.riskMode in ('INVESTOR', 'GAMBLER') and config.fixtureMode != 'original_only':
+        matches = await loop.run_in_executor(None, load_recent_matches)
+        pool, note = apply_match_trends(pool, matches)
+        config = config.model_copy(update={'unhandledRequests': [*config.unhandledRequests, note]})
+    report = await loop.run_in_executor(app.state.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)
+    version = TREND_VERSION if any(s.modelVersion == TREND_VERSION for s in pool) else app.state.model.version
     return {'pool': [s.model_dump(mode='json') for s in pool],
             **report,
-            'modelVersion': app.state.model.version}
+            'modelVersion': version}
 
 
 @app.post('/split')

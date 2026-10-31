@@ -46,10 +46,10 @@ class GenerationVarietyTests(unittest.TestCase):
     def test_a_repeated_game_must_use_a_different_option(self):
         pool = []
         for event in range(4):
-            pool.append(selection(event, odds=1.45, probability=.7, outcome='home', market='1'))
-            pool.append(selection(event, odds=1.48, probability=.62, outcome='dc', market='10'))
+            pool.append(selection(event, odds=1.3, probability=.7, outcome='home', market='1'))
+            pool.append(selection(event, odds=1.32, probability=.62, outcome='dc', market='10'))
         config = Config(numberOfSlips=4, riskMode='INVESTOR', riskPreference='VERY_LOW',
-                        minimumOdds=2, maximumOdds=5, minimumSelections=2, maximumSelections=2)
+                        minimumOdds=2, maximumOdds=5, minimumSelections=3, maximumSelections=3)
         tickets, _ = search(pool, config, [], rng=random.Random(3))
         self.assertGreaterEqual(len(tickets), 2)
         seen = set()

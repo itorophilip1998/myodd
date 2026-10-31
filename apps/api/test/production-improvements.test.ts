@@ -42,22 +42,21 @@ describe('provider-grounded markets and result accounting', () => {
     expect(promptMatchDay('Weekend selections', now)).toEqual({ start: '2026-10-24', end: '2026-10-25' });
     expect(promptMatchDay('Before 2099-01-01T12:00:00Z', now)).toBeNull();
   });
-  it('resolves the investor markets added to Gambler options', () => {
+  it('resolves only the shared Investor and Gambler markets', () => {
     const fixtures: any[] = [{ markets: [
-      { marketId: '882', marketName: 'Player to score', specifier: 'player=sr:1', status: 'active', outcomes: [{ outcomeId: 'yes', outcomeName: 'Yes', isActive: true }, { outcomeId: 'no', outcomeName: 'No', isActive: true }] },
       { marketId: '166', marketName: 'Total corners', specifier: 'total=9.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 9.5', isActive: true }] },
       { marketId: '167', marketName: 'Home team total corners', specifier: 'total=4.5', status: 'active', outcomes: [{ outcomeId: 'under', outcomeName: 'Under 4.5', isActive: true }] },
+      { marketId: '168', marketName: 'Away team total corners', specifier: 'total=5.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 5.5', isActive: true }] },
       { marketId: '201', marketName: 'Total shots on target', specifier: 'total=8.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 8.5', isActive: true }] },
-      { marketId: '50', marketName: 'Home win either half', specifier: '', status: 'active', outcomes: [{ outcomeId: 'yes', outcomeName: 'Yes', isActive: true }, { outcomeId: 'no', outcomeName: 'No', isActive: true }] },
-      { marketId: '48', marketName: 'Home to win both halves', specifier: '', status: 'active', outcomes: [{ outcomeId: 'yes', outcomeName: 'Yes', isActive: true }] },
-      { marketId: '29', marketName: 'Both teams to score', specifier: '', status: 'active', outcomes: [{ outcomeId: 'yes', outcomeName: 'Yes', isActive: true }] },
+      { marketId: '203', marketName: 'Home team shots on target', specifier: 'total=4.5', status: 'active', outcomes: [{ outcomeId: 'under', outcomeName: 'Under 4.5', isActive: true }] },
+      { marketId: '1', marketName: '1X2', specifier: '', status: 'active', outcomes: [{ outcomeId: '1', outcomeName: 'Home', isActive: true }] },
     ] }];
-    expect(resolveMarketIds(['player.score.yes'], fixtures).rules).toEqual([{ marketId: '882', specifier: 'player=sr:1', outcomeIds: ['yes'] }]);
     expect(resolveMarketIds(['corners.total'], fixtures).rules.map(rule => rule.marketId)).toEqual(['166']);
-    expect(resolveMarketIds(['corners.team'], fixtures).rules.map(rule => rule.marketId)).toEqual(['167']);
+    expect(resolveMarketIds(['corners.home'], fixtures).rules.map(rule => rule.marketId)).toEqual(['167']);
+    expect(resolveMarketIds(['corners.away'], fixtures).rules.map(rule => rule.marketId)).toEqual(['168']);
     expect(resolveMarketIds(['shots.target'], fixtures).rules.map(rule => rule.marketId)).toEqual(['201']);
-    expect(resolveMarketIds(['half.either'], fixtures).rules.map(rule => rule.marketId)).toEqual(['50']);
-    expect(resolveMarketIds(['player.score.yes'], fixtures).rules[0].outcomeIds).not.toContain('no');
+    expect(resolveMarketIds(['shots.team.target'], fixtures).rules.map(rule => rule.marketId)).toEqual(['203']);
+    expect(resolveMarketIds(['corners.total'], fixtures).rules[0].outcomeIds).toEqual(['over']);
   });
   it('does not claim suspended or unavailable outcomes are usable', () => {
     expect(resolveMarketIds(['goals.over.1.5'], [{ markets: [{ ...fixtures[0].markets[0], status: 'suspended' }] }] as any).rules).toEqual([]);

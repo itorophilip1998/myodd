@@ -19,10 +19,10 @@ it('enforces every mode boundary, including no artificial Lagoslife ceiling', ()
 
 it('enforces safe per-game odds inside named-mode tickets', () => {
   expect(withinModeSelectionOdds(1.1, 'INVESTOR')).toBe(true);
-  expect(withinModeSelectionOdds(1.5, 'INVESTOR')).toBe(true);
-  expect(withinModeSelectionOdds(1.51, 'INVESTOR')).toBe(false);
-  expect(withinModeSelectionOdds(1.8, 'GAMBLER')).toBe(true);
-  expect(withinModeSelectionOdds(1.81, 'GAMBLER')).toBe(false);
+  expect(withinModeSelectionOdds(1.35, 'INVESTOR')).toBe(true);
+  expect(withinModeSelectionOdds(1.36, 'INVESTOR')).toBe(false);
+  expect(withinModeSelectionOdds(1.35, 'GAMBLER')).toBe(true);
+  expect(withinModeSelectionOdds(1.36, 'GAMBLER')).toBe(false);
   expect(withinModeSelectionOdds(2, 'JAPA')).toBe(true);
   expect(withinModeSelectionOdds(2.01, 'JAPA')).toBe(false);
   expect(withinModeSelectionOdds(2, 'LAGOS_LIFE')).toBe(true);

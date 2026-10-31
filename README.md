@@ -140,8 +140,8 @@ Four selectable modes also work as typed keywords and enforce **hard per-ticket 
 
 | Mode | Ticket odds | Safe odds per game |
 |------|-------------|--------------------|
-| Investor Mode (recommended) | 2–5 inclusive | 1.10–1.50 |
-| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.80 |
+| Investor Mode (recommended) | 3 tickets at 2, 3 at 3, 4 at 4 | 1.10–1.35 |
+| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.35 |
 | Japa Mode | 20.01–50 | 1.10–2.00 |
 | Lagoslife / Lagos-Lifes Mode | 35–50 | 1.10–2.00 |
 
@@ -180,7 +180,7 @@ The Compose `backup` service also writes daily `.sql.gz` files into host `backup
 
 Paste `GNPM8T` in the chat, select **Split a code**, choose the part count and a risk mode, then submit. Natural instructions also work: `Split GNPM8T into 3 parts using Investor Mode`. The API uses the same conservative code/count extractor as the UI, so a separate source field or `@` prefix is optional. SportyBet share links are accepted as code evidence too.
 
-Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor ≤1.50, Gambler ≤1.80, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
+Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor and Gambler ≤1.35, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
 
 Unavailable or filtered picks are counted and explained. Impossible counts, contradictory constraints or unsupported same-match/bet-builder originals return a clear error without invented or repeated picks. Static partition planning returns the entire requested partition or none; live bookmaker changes during code creation can still produce partial successes, which the job reports. Each accepted part uses the existing confirmation, persistence, expiry and copy/share pipeline. Split strategy and counts are retained in the group's generation report.
 

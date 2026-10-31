@@ -39,7 +39,7 @@ def lock_investor_system(config: Config, instruction: str) -> Config:
     user = _user_instruction(instruction)
     low, high = extract_odds_bounds(user)
     if has_explicit_odds_request(user) and not (low == 2 and high == 5):
-        note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.')
+        note('Investor Mode kept its fixed ticket odds: 3 tickets at 2, 3 at 3, and 4 at 4. Requested odds were not applied.')
     if _MARKET_REQUEST.search(user):
         note('Investor Mode chooses the markets. Requested markets were not applied.')
     tickets = requested_ticket_count(user)

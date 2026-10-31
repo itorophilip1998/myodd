@@ -37,12 +37,17 @@ export class ExploreService {
 
   async predictions(options: { market?: PredictionMarket; eventId?: string; limit?: number } = {}) {
     const snapshot = await this.snapshot('explore:predictions:v2', 90, async () => {
-      const pages = await Promise.all([1, 2].map(pageNum => this.bookmaker.getFixtures({ pageNum, pageSize: 60, timelineHours: 72, todayGames: false })));
-      const listed = [...new Map(pages.flat().map(f => [f.eventId, f])).values()]
+      const pages = [];
+      for (let pageNum = 1; pageNum <= 4; pageNum += 1) {
+        const page = await this.bookmaker.getFixtures({ pageNum, pageSize: 100, timelineHours: 72, todayGames: false });
+        pages.push(...page);
+        if (page.length < 100) break;
+      }
+      const listed = [...new Map(pages.map(f => [f.eventId, f])).values()]
         .filter(f => Number.isFinite(Date.parse(f.kickoffAt)) && Date.parse(f.kickoffAt) > Date.now());
-      // Listings often contain only 1X2. Load real alternate markets for a bounded
-      // set of upcoming games, retaining listing data if enrichment is unavailable.
-      const detailed = listed.length ? await this.bookmaker.getFixtures({ eventIds: listed.slice(0, 24).map(f => f.eventId) }).catch(() => []) : [];
+      // Listings often contain only 1X2. Load real alternate markets for upcoming games,
+      // retaining listing data if enrichment is unavailable.
+      const detailed = listed.length ? await this.bookmaker.getFixtures({ eventIds: listed.slice(0, 60).map(f => f.eventId) }).catch(() => []) : [];
       const byId = new Map(detailed.map(f => [f.eventId, f]));
       const fixtures = listed.map(f => {
         const detail = byId.get(f.eventId);

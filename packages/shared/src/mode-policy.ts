@@ -47,8 +47,8 @@ export const MODE_ODDS = {
  * Ticket totals still use MODE_ODDS; these bounds keep individual picks in a safer band.
  */
 export const MODE_SELECTION_ODDS = {
-  INVESTOR: { minimum: MIN_SELECTION_ODDS, maximum: 1.5 },
-  GAMBLER: { minimum: MIN_SELECTION_ODDS, maximum: 1.8 },
+  INVESTOR: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
+  GAMBLER: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   JAPA: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
   LAGOS_LIFE: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
 } as const;

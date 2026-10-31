@@ -133,7 +133,7 @@ export class SlipsService implements OnModuleInit {
         note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.');
       }
       if (input.minimumOdds != null || input.maximumOdds !== undefined) {
-        note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.');
+        note('Investor Mode kept its fixed ticket odds: 3 tickets at 2, 3 at 3, and 4 at 4. Requested odds were not applied.');
       }
       return {
         ...config,
@@ -292,7 +292,7 @@ export class SlipsService implements OnModuleInit {
       ? (input.maximumOdds == null ? `Ticket odds at least ${input.minimumOdds ?? 1.1}. No maximum ticket odds.` : `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds}.`)
       : '';
     const countSettings = [
-      investorSystem ? 'Investor Mode system ticket. Choose the ticket count and games per ticket from the fixed Investor market list. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
+      investorSystem ? 'Investor Mode system ticket. Choose the ticket count and games per ticket from the fixed Investor market list. Build 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds. Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.' : '',
       !investorSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
       !investorSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
       oddsSettings,
@@ -443,13 +443,24 @@ export class SlipsService implements OnModuleInit {
   private async upcomingFixtures(matchDay = matchDayKickoffWindow()) {
     const hoursUntilEnd = Math.max(1, Math.ceil((new Date(matchDay.kickoffBefore).getTime() - Date.now()) / 3600000));
     const timelineHours = Math.min(168, Math.max(24, hoursUntilEnd + 6));
-    const pages = await Promise.all([1, 2].map(pageNum => this.bookmaker.getFixtures({
-      timelineHours, pageSize: 60, pageNum, todayGames: false,
-    })));
-    const fixtures = [...new Map(pages.flat().map(fixture => [fixture.eventId, fixture])).values()]
+    const pageSize = 100;
+    const listed = [];
+    for (let pageNum = 1; pageNum <= 8; pageNum += 1) {
+      const page = await this.bookmaker.getFixtures({ timelineHours, pageSize, pageNum, todayGames: false });
+      listed.push(...page);
+      if (page.length < pageSize) break;
+    }
+    const fixtures = [...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
       .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now());
-    // Detailed markets unlock handicaps, interval outcomes and alternate lines beyond the listing API.
-    const details = fixtures.length ? await this.bookmaker.getFixtures({ eventIds: fixtures.slice(0, 24).map(f => f.eventId) }) : [];
+    const start = new Date(matchDay.kickoffAfter).getTime();
+    const end = new Date(matchDay.kickoffBefore).getTime();
+    const onDay = fixtures.filter(fixture => {
+      const kickoff = new Date(fixture.kickoffAt).getTime();
+      return kickoff >= start && kickoff < end;
+    });
+    // The listing only carries a few markets. Load the full board for the match day.
+    const detailIds = (onDay.length ? onDay : fixtures).slice(0, 100).map(fixture => fixture.eventId);
+    const details = detailIds.length ? await this.bookmaker.getFixtures({ eventIds: detailIds }) : [];
     return [...new Map([...fixtures, ...details].map(fixture => [fixture.eventId, fixture])).values()];
   }
 

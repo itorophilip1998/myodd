@@ -62,7 +62,7 @@ def eligible(selection, config):
             and (not config.kickoffAfter or selection.kickoffAt >= config.kickoffAfter)
             and (config.minimumProbability is None or selection.probability >= config.minimumProbability)
             and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config))
-            and (config.riskMode != 'INVESTOR' or config.fixtureMode == 'original_only' or investor_market_allowed(
+            and (config.riskMode not in ('INVESTOR', 'GAMBLER') or config.fixtureMode == 'original_only' or investor_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName)))
 
 
@@ -127,7 +127,58 @@ def varied_candidates(candidates, config, rng, limit, ceiling, repeatable=()):
     return picked
 
 
-def search(pool, config, original, allow_nearest=False, rng=None):
+INVESTOR_PLAN = ((2.0, 3), (3.0, 3), (4.0, 4))
+INVESTOR_ODDS_SPAN = 0.10
+
+
+def uses_investor_plan(config) -> bool:
+    """The locked Investor ticket is 3 slips at 2, 3 at 3, and 4 at 4."""
+    return (config.riskMode == 'INVESTOR' and config.fixtureMode != 'original_only'
+            and not config.preserveOriginalSelections and config.numberOfSlips == 10
+            and config.minimumOdds == 2 and config.maximumOdds == 5)
+
+
+def investor_odds_window(target: float) -> tuple[float, float]:
+    low = 2.0 if target <= 2 else target - INVESTOR_ODDS_SPAN
+    return low, target + INVESTOR_ODDS_SPAN
+
+
+def investor_leg_bounds(pool, low: float, high: float) -> tuple[int, int]:
+    prices = [s.odds for s in pool if s.odds > 1]
+    if not prices:
+        return 1, 50
+    cheapest, dearest = min(prices), max(prices)
+    minimum = 1
+    while dearest ** minimum < low and minimum < 20:
+        minimum += 1
+    maximum = minimum
+    while cheapest ** (maximum + 1) <= high and maximum < 20:
+        maximum += 1
+    return minimum, maximum
+
+
+def search_investor_plan(pool, config, original, rng=None):
+    rng = rng or random.Random()
+    blocked = set()
+    found = []
+    bounds = None
+    for target, count in INVESTOR_PLAN:
+        low, high = investor_odds_window(target)
+        least, most = investor_leg_bounds(pool, low, high)
+        scoped = config.model_copy(update={
+            'numberOfSlips': count, 'minimumOdds': low, 'maximumOdds': high,
+            'minimumSelections': least, 'maximumSelections': most,
+        })
+        tickets, possible = search(pool, scoped, original, rng=rng, blocked=blocked, steer=True, attempt_limit=12000)
+        if possible:
+            bounds = possible
+        found.extend(tickets)
+        for ticket in tickets:
+            blocked.update(selection_key(s) for s in ticket['selections'])
+    return found, bounds
+
+
+def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), steer=False, attempt_limit=None):
     events = event_choices(pool, config)
     if len(events) < config.minimumSelections:
         return [], None
@@ -144,7 +195,8 @@ def search(pool, config, original, allow_nearest=False, rng=None):
     minimum = max(config.minimumSelections, len(original_ids)) if config.preserveOriginalSelections else config.minimumSelections
     if minimum > maximum:
         return [], None
-    event_ids = sorted(events)
+    blocked = set(blocked)
+    event_ids = [event for event in sorted(events) if any(selection_key(s) not in blocked for s in events[event])]
     results = {}
     nearest = {}
     max_event_odds = sorted((max(s.odds for s in options) for options in events.values()), reverse=True)
@@ -162,11 +214,12 @@ def search(pool, config, original, allow_nearest=False, rng=None):
                for event, options in events.items()}
     if upper_bound < config.minimumOdds and not allow_nearest:
         return [], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
-    attempts = min(12000, max(900, config.numberOfSlips * 100))
+    attempts = attempt_limit if attempt_limit is not None else min(12000, max(900, config.numberOfSlips * 100))
+    center = math.sqrt(config.minimumOdds * max(config.minimumOdds, ceiling))
     for attempt in range(attempts):
         # Vary lengths and targets while keeping explicitly fixed counts/ranges intact.
         legs = rng.randint(minimum, maximum)
-        target_log = rng.uniform(math.log(config.minimumOdds), math.log(max(config.minimumOdds, ceiling)))
+        target_log = math.log(center) if steer else rng.uniform(math.log(config.minimumOdds), math.log(max(config.minimumOdds, ceiling)))
         chosen = (sorted(original_ids) + rng.sample([event for event in event_ids if event not in original_ids], legs - len(original_ids))
                   if config.preserveOriginalSelections else rng.sample(event_ids, legs))
         if original_ids and attempt % 3 != 0:
@@ -175,12 +228,16 @@ def search(pool, config, original, allow_nearest=False, rng=None):
         log_odds = 0.0
         for index, event in enumerate(chosen):
             choices = events[event]
+            if blocked:
+                choices = [s for s in choices if selection_key(s) not in blocked]
+            if not choices:
+                break
             if config.preserveOriginalSelections and event in original_ids:
                 choices = [s for s in choices if (s.eventId, s.marketId, s.outcomeId, s.specifier) in original_keys]
                 if not choices:
                     break
             remaining = legs - index
-            if attempt % 4 in (1, 2):
+            if steer or attempt % 4 in (1, 2):
                 target = (target_log - log_odds) / remaining
                 ordering = sorted(choices, key=lambda s: abs(math.log(s.odds) - target)
                                   + (0 if matches_preference(s, config) else .12))[:min(6, len(choices))]
@@ -271,6 +328,10 @@ def generate_report(pool: list[ScoredSelection], config: Config, original: list[
     if config.fixtureMode != 'original_only' or not original:
         exact_stages.append(preferred if preferences else filtered)
     candidates, bounds = [], None
+    if uses_investor_plan(config):
+        stage = preferred if preferences else filtered
+        candidates, bounds = search_investor_plan(stage, config, original)
+        exact_stages = []
     for stage in exact_stages:
         current, possible = search(stage, config, original)
         if possible:
@@ -318,6 +379,13 @@ def generate_report(pool: list[ScoredSelection], config: Config, original: list[
         effective.minimumOdds = min(config.minimumOdds, *(c['totalOdds'] for c in candidates))
         effective.maximumOdds = max(config.maximumOdds, *(c['totalOdds'] for c in candidates)) if config.maximumOdds is not None else None
         notices.append(f'Used your nearest-odds option: returned totals span {min(c["totalOdds"] for c in candidates):g}–{max(c["totalOdds"] for c in candidates):g}.')
+    if uses_investor_plan(config) and len(candidates) < config.numberOfSlips:
+        grouped = []
+        for target, count in INVESTOR_PLAN:
+            low, high = investor_odds_window(target)
+            got = sum(1 for c in candidates if low <= c['totalOdds'] <= high)
+            grouped.append(f'{got} of {count} at {target:g}')
+        notices.append('Investor plan is 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds (' + ', '.join(grouped) + ').')
     if len(candidates) < config.numberOfSlips:
         notices.append(f'Found {len(candidates)} of {config.numberOfSlips} requested unique combinations within the search budget.')
     if not candidates and bounds:

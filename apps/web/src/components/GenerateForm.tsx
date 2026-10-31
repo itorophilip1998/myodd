@@ -25,8 +25,8 @@ import {
 } from '@/lib/prediction-book';
 
 const MODES = [
-  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: 'Ticket 2–5 · each game 1.10–1.50', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
-  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Ticket 5.01–20 · each game ≤1.80', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
+  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · low risk', detail: '3 tickets at 2 · 3 at 3 · 4 at 4 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
+  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Ticket 5.01–20 · each game ≤1.35', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
   { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MODE_ODDS.JAPA.maximum} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
   { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: 'Ticket 100+ · no maximum · each game ≤2.00', icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
 ];
@@ -223,7 +223,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       const dayBit = matchWindow.matchDate === matchWindow.matchDateEnd
         ? matchWindow.label
         : `${matchWindow.matchDate}→${matchWindow.matchDateEnd}`;
-      return `Applied: Investor Mode · system picks markets, tickets, and games · ticket 2–5 · each game 1.10–1.50 · ${dayBit}`;
+      return `Applied: Investor Mode · system picks markets, tickets, and games · 3 at 2, 3 at 3, 4 at 4 · each game 1.10–1.35 · ${dayBit}`;
     }
     if (wantsSplit) {
       return `Applied: Split into ${effectiveSplit || '?'} · ${mode}`;
@@ -311,7 +311,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const settingsLine = (systemInvestor ? [
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       'Investor Mode system ticket. Choose the ticket count and games per ticket from the fixed Investor market list. Ignore requested markets, odds, ticket counts, and game counts.',
-      'Ticket odds between 2 and 5. Each selection between 1.10 and 1.50.',
+      'Build 3 tickets at 2 odds, 3 at 3 odds, and 4 at 4 odds. Each selection between 1.10 and 1.35.',
       dateLine,
     ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',
