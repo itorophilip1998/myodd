@@ -867,6 +867,7 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .library-layouts { display:flex; gap:3px; padding:4px; background:#142017; border:1px solid var(--line); border-radius:9px; }
 .library-layouts button { padding:7px 10px; color:#8ea18c; display:flex; align-items:center; gap:6px; font-size:11px; border-radius:6px; }
 .library-layouts button[aria-pressed=true] { background:#c6f28c17; color:var(--accent); }
+.library-layouts .layout-icon { display:block; flex-shrink:0; fill:currentColor; }
 .library-toolbar { display:flex; align-items:center; gap:12px; margin:18px 0; }
 .library-search { display:flex; align-items:center; gap:10px; flex:1; border:1px solid var(--line); background:#15211a; padding:9px 12px; border-radius:9px; }
 .library-search span { color:var(--accent); font-size:22px; line-height:1; }

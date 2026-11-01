@@ -17,7 +17,7 @@ export default function TermsPage() {
       <h2>1. Who we are</h2>
       <p>
         myOdd is a software product that helps users explore SportyBet-style slip ideas, generate shareable
-        booking codes, and review prediction-oriented information. Contact: <a href="mailto:support@myodd.app">support@myodd.app</a>.
+        booking codes, and review prediction-oriented information. Contact: <a href="mailto:myodd@support.org">myodd@support.org</a>.
       </p>
 
       <h2>2. Eligibility and responsible use</h2>
@@ -111,7 +111,7 @@ export default function TermsPage() {
 
       <h2>12. Contact</h2>
       <p>
-        Questions about these Terms: <a href="mailto:support@myodd.app">support@myodd.app</a>.
+        Questions about these Terms: <a href="mailto:myodd@support.org">myodd@support.org</a>.
       </p>
     </LegalPage>
   );

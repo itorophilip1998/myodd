@@ -5,7 +5,7 @@ const token = 'c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM';
 test('public content and Google verification render without browser JavaScript', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
-  for (const [path, heading] of [['/', 'Football booking codes.'], ['/about', 'About MyOdd'], ['/faq', 'MyOdd frequently asked questions'], ['/terms', 'Terms of Service'], ['/privacy', 'Privacy Policy']]) {
+  for (const [path, heading] of [['/', 'Football booking codes.'], ['/about', 'About MyOdd'], ['/faq', 'MyOdd frequently asked questions'], ['/contact', 'Contact us'], ['/terms', 'Terms of Service'], ['/privacy', 'Privacy Policy']]) {
     const response = await page.goto(`${canonical}${path}`);
     expect(response?.status()).toBe(200);
     await expect(page.locator('h1')).toHaveCount(1);
@@ -16,7 +16,8 @@ test('public content and Google verification render without browser JavaScript',
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', `${canonical}${path === '/' ? '' : path}`);
   }
   await page.goto(canonical);
-  await expect(page.getByRole('heading', { name: 'How MyOdd works' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'How MyOdd works' })).toHaveCount(0);
+  await expect(page.locator('article.seo-content')).toHaveCount(0);
   const schema = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
   expect(schema['@graph'].map((value: { '@type': string }) => value['@type'])).toEqual(['Organization', 'WebSite', 'SoftwareApplication']);
   expect(JSON.stringify(schema)).not.toMatch(/aggregateRating|review|offers/);
@@ -29,7 +30,7 @@ test('sitemap contains only durable canonical public routes and robots allows no
   expect(sitemap.headers()['content-type']).toContain('xml');
   const xml = await sitemap.text();
   const locations = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => match[1]);
-  expect(locations).toEqual(['/', '/about', '/faq', '/terms', '/privacy'].map(path => `${canonical}${path === '/' ? '' : path}`));
+  expect(locations).toEqual(['/', '/about', '/faq', '/contact', '/terms', '/privacy'].map(path => `${canonical}${path === '/' ? '' : path}`));
   expect(xml).not.toContain('<lastmod>');
   const robots = await request.get('/robots.txt');
   expect(robots.status()).toBe(200);

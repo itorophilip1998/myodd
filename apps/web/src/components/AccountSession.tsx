@@ -1,6 +1,5 @@
 'use client';
 import { SettingsSync } from './SettingsSync';
-import { formatAppVersion } from '@myodd/shared';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth, useSession, useUser, UserButton } from '@clerk/nextjs';
 import { pauseApiAuth } from '@/lib/api-auth';
@@ -86,7 +85,6 @@ export function AccountControls() {
       <UserButton>
         <UserButton.MenuItems>
           <UserButton.Link label="Settings" labelIcon={<SettingsIcon />} href="/settings" />
-          <UserButton.Link label={formatAppVersion(process.env.NEXT_PUBLIC_APP_GIT_SHA)} labelIcon={<span aria-hidden>ⓘ</span>} href="/settings#app-version" />
         </UserButton.MenuItems>
       </UserButton>
     </div>

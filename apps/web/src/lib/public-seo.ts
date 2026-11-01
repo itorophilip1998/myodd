@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { cache } from 'react';
 
-export const PUBLIC_ROUTES = ['/', '/about', '/faq', '/terms', '/privacy'] as const;
+export const PUBLIC_ROUTES = ['/', '/about', '/faq', '/contact', '/terms', '/privacy'] as const;
+export const SUPPORT_EMAIL = 'myodd@support.org';
 export const HOME_TITLE = 'MyOdd — Football Booking Code Generator & Betting Tools';
 export const HOME_DESCRIPTION = 'Generate, organize, and share football booking codes with MyOdd. Explore betting markets, manage your selections, and check match results in one place.';
 export const GOOGLE_VERIFICATION = 'c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM';
