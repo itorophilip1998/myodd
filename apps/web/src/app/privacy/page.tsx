@@ -15,7 +15,7 @@ export default function PrivacyPage() {
 
       <h2>1. Who we are</h2>
       <p>
-        Operator: myOdd. Privacy contact: <a href="mailto:support@myodd.app">support@myodd.app</a>.
+        Operator: myOdd. Privacy contact: <a href="mailto:myodd@support.org">myodd@support.org</a>.
       </p>
 
       <h2>2. Information we collect</h2>
@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       <p>Collections, including public and named collections, are permanently deleted 24 hours after every match has a confirmed final result. Unsettled or unidentified matches block automatic deletion. Independent audit and training records may be retained separately.</p>
       <p>
         Account settings and independent audit records are retained as needed for the Service, backups, security, and legal requirements. You may delete collections you own from Codes.
-        Account deletion requests can be sent to <a href="mailto:support@myodd.app">support@myodd.app</a>.
+        Account deletion requests can be sent to <a href="mailto:myodd@support.org">myodd@support.org</a>.
       </p>
 
       <h2>7. Security</h2>
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
 
       <h2>12. Contact</h2>
       <p>
-        Privacy questions: <a href="mailto:support@myodd.app">support@myodd.app</a>.
+        Privacy questions: <a href="mailto:myodd@support.org">myodd@support.org</a>.
       </p>
     </LegalPage>
   );

@@ -5,7 +5,7 @@ ALTER TABLE "slip_selections"
   ADD COLUMN "prediction_mode" TEXT;
 
 CREATE TABLE "prediction_observations" (
-  "id" TEXT NOT NULL PRIMARY KEY, "slip_id" TEXT NOT NULL, "event_id" TEXT NOT NULL,
+  "id" TEXT NOT NULL PRIMARY KEY, "slip_id" TEXT NOT NULL, "ticket_size" INTEGER NOT NULL, "event_id" TEXT NOT NULL,
   "market_id" TEXT NOT NULL, "outcome_id" TEXT NOT NULL, "specifier" TEXT NOT NULL,
   "market_name" TEXT NOT NULL, "league" TEXT NOT NULL, "mode" TEXT, "odds" DOUBLE PRECISION NOT NULL,
   "probability" DOUBLE PRECISION NOT NULL, "base_probability" DOUBLE PRECISION NOT NULL,

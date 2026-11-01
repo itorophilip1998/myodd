@@ -8,6 +8,7 @@ export function ResponsibleFooter() {
       <nav className="site-footer-links" aria-label="Legal">
         <Link href="/about">About MyOdd</Link>
         <Link href="/faq">FAQ</Link>
+        <Link href="/contact">Contact us</Link>
         <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</Link>
         <span aria-hidden>·</span>
         <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>

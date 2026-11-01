@@ -114,6 +114,14 @@ export class AiClient {
     return generationConfigSchema.parse(await this.post('/resolve', { instruction, config, availableMarkets: this.catalog(instruction, fixtures) }));
   }
 
+  learningStatus() {
+    return this.post<Record<string, unknown>>('/learning/status', {});
+  }
+
+  updateLearning(samples: unknown[]) {
+    return this.post<Record<string, unknown>>('/learning/update', { samples });
+  }
+
   predict(fixtures: BookmakerFixture[]) {
     return this.post<{ pool: ScoredSelection[]; modelVersion: string }>('/generate/prediction', { fixtures });
   }

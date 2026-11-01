@@ -19,6 +19,9 @@ def read_active():
     artifact = json.loads(path.read_text())
     if artifact.get('format') != 'logit-calibration-v1' or not isinstance(artifact.get('parameters'), dict):
         raise ValueError('Invalid learning model artifact')
+    for key in ('version', 'activatedAt', 'trainUntil', 'evaluatedThrough'):
+        if not isinstance(artifact.get(key), str) or not artifact[key]:
+            raise ValueError('Missing learning model metadata')
     for values in artifact['parameters'].values():
         if len(values) != 2 or not all(isinstance(v, (float, int)) and math.isfinite(v) for v in values):
             raise ValueError('Invalid calibration parameters')

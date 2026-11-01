@@ -2,7 +2,7 @@ export type EventName = 'page_view' | 'sign_up' | 'login' | 'generate_started' |
 type Counts = { count?: number; requested?: number; generated?: number; failed?: number };
 export type EventValues = Counts & { page_path?: string };
 const EVENTS: readonly string[] = ['page_view', 'sign_up', 'login', 'generate_started', 'generate_completed', 'generate_failed', 'code_copied', 'collection_saved', 'collection_published', 'collection_deleted', 'market_selected', 'result_check_started', 'result_check_completed', 'share_clicked'];
-const PUBLIC_ENTRY_PATHS = ['/', '/about', '/faq', '/terms', '/privacy'];
+const PUBLIC_ENTRY_PATHS = ['/', '/about', '/faq', '/contact', '/terms', '/privacy'];
 declare global { interface Window { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void } }
 export const ANALYTICS_CONSENT_KEY = 'myodd-analytics-consent';
 export function analyticsAvailable() {

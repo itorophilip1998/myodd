@@ -82,7 +82,9 @@ export class SportyBetClient {
         attempt += 1;
         const retryable =
           err instanceof SportyBetHttpError &&
-          (err.status === 429 || (err.status !== undefined && err.status >= 500));
+          (err.status === 429 || err.status === 202
+            || (err.status !== undefined && err.status >= 500)
+            || ['TIMEOUT', 'NETWORK', 'EMPTY', 'INVALID_JSON', 'NOT_READY'].includes(err.code));
         if (!retryable || attempt > maxRetries) throw err;
         const delay = Math.min(2000, 250 * 2 ** (attempt - 1));
         await sleep(delay);
@@ -146,6 +148,14 @@ export class SportyBetClient {
           signal: controller.signal,
         });
 
+        if (res.status === 202 || res.status === 204) {
+          throw new SportyBetHttpError(
+            `SportyBet HTTP ${res.status}`,
+            mapStatus(res.status),
+            res.status,
+          );
+        }
+
         if (!res.ok) {
           throw new SportyBetHttpError(
             `SportyBet HTTP ${res.status}`,
@@ -154,11 +164,16 @@ export class SportyBetClient {
           );
         }
 
-        const json = (await res.json()) as {
-          bizCode?: number;
-          message?: string;
-          data?: T;
-        };
+        const text = await res.text();
+        if (!text.trim()) {
+          throw new SportyBetHttpError('SportyBet returned an empty response', 'EMPTY', res.status);
+        }
+        let json: { bizCode?: number; message?: string; data?: T };
+        try {
+          json = JSON.parse(text) as { bizCode?: number; message?: string; data?: T };
+        } catch {
+          throw new SportyBetHttpError('SportyBet returned a non-JSON response', 'INVALID_JSON', res.status);
+        }
 
         if (json.bizCode !== undefined && json.bizCode !== 10000) {
           throw new SportyBetHttpError(
@@ -208,6 +223,8 @@ function sleep(ms: number) {
 }
 
 function mapStatus(status: number) {
+  if (status === 202) return 'NOT_READY';
+  if (status === 204) return 'EMPTY';
   if (status === 400) return 'BAD_REQUEST';
   if (status === 401) return 'UNAUTHORIZED';
   if (status === 403) return 'FORBIDDEN';

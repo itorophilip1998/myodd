@@ -41,8 +41,11 @@ def unique_samples(rows):
     # Repeated bookings/users do not turn one football outcome into hundreds of training examples.
     ordered = sorted(rows, key=lambda r: (r.predictedAt, r.id))
     unique = {}
+    conflicts = set()
     for row in ordered:
         key = (row.eventId, row.marketId, row.outcomeId, row.specifier)
+        if key in unique and unique[key].result != row.result:
+            conflicts.add(key)
         if key not in unique:
             unique[key] = row
-    return list(unique.values())
+    return [row for key, row in unique.items() if key not in conflicts]

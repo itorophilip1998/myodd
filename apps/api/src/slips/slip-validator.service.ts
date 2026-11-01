@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { combinedOdds, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { combinedOdds, isSystemMode, systemSelectionAllowed, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 
 @Injectable()
@@ -19,6 +19,8 @@ export class SlipValidatorService {
       const outcome = market?.outcomes.find(o => o.outcomeId === leg.outcomeId && o.isActive);
       if (!event || !market || !outcome || seenEvents.has(leg.eventId) || !Number.isFinite(outcome.odds) || !withinModeSelectionOdds(outcome.odds, config.riskMode)) return null;
       if (!['', '0', 'active', 'open'].includes(market.status.toLowerCase())) return null;
+      if (isSystemMode(config.riskMode) && !config.preserveOriginalSelections
+        && (!systemSelectionAllowed(market, outcome) || /live|inplay|in play|finished|ended|closed|complete/i.test(event.matchStatus ?? ''))) return null;
       const kickoff = new Date(event.kickoffAt).getTime();
       if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return null;
       if (config.kickoffBefore && kickoff > new Date(config.kickoffBefore).getTime()) return null;

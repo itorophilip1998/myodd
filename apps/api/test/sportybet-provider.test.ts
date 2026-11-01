@@ -22,6 +22,32 @@ it('bypasses cached event data for an explicit result check', async () => {
     eventId: 'event', estimateStartTime: Date.UTC(2026, 0, 1), matchStatus: 'Finished', setScore: '2:1',
   }) };
   const [fixture] = await new SportyBetProvider(client as any).getFixtures({ eventIds: ['event'], fresh: true });
-  expect(client.get.mock.calls[0][1]).toEqual({ cacheKey: undefined });
+  expect(client.get.mock.calls[0][1]).toMatchObject({ cacheKey: undefined, retries: 0 });
   expect(fixture).toMatchObject({ matchStatus: 'Finished', score: '2 : 1' });
+});
+
+it('looks up listed games when the event board is unavailable', async () => {
+  const client = { regionCode: 'ng', get: vi.fn(async (path: string) => {
+    if (path.includes('/factsCenter/event?')) throw Object.assign(new Error('SportyBet HTTP 202'), { code: 'NOT_READY', status: 202 });
+    return { tournaments: [{ name: 'League', events: [{
+      eventId: 'sr:match:9', homeTeamName: 'A', awayTeamName: 'B', estimateStartTime: Date.UTC(2099, 0, 1),
+      markets: [{ id: '10', desc: 'Double Chance', outcomes: [{ id: '9', desc: '1X', odds: 1.22, isActive: 1 }] }],
+    }] }] };
+  }) };
+  const [game] = await new SportyBetProvider(client as any).getFixtures({ eventIds: ['sr:match:9'], systemOnly: true });
+  expect(game.eventId).toBe('sr:match:9');
+  expect(game.markets[0]?.marketId).toBe('10');
+  expect(client.get.mock.calls.some((call: string[]) => String(call[0]).includes('pcUpcomingEvents'))).toBe(true);
+});
+
+it('keeps only product-approved options when loading a fixed-mode board', async () => {
+  const client = { regionCode: 'ng', get: vi.fn().mockResolvedValue({
+    eventId: 'event', estimateStartTime: Date.UTC(2099, 0, 1), homeTeamName: 'A', awayTeamName: 'B', markets: [
+      { id: '1', desc: '1X2', outcomes: [{ id: '1', desc: 'Home', odds: 1.2, isActive: 1 }] },
+      { id: '10', desc: 'Double Chance', outcomes: [{ id: '9', desc: '1X', odds: 1.25, isActive: 1 }, { id: '11', desc: 'X2', odds: 1.8, isActive: 1 }] },
+    ],
+  }) };
+  const [game] = await new SportyBetProvider(client as any).getFixtures({ eventIds: ['event'], systemOnly: true });
+  expect(game.markets.map(m => m.marketId)).toEqual(['10']);
+  expect(game.markets[0].outcomes.map(o => o.outcomeId)).toEqual(['9']);
 });

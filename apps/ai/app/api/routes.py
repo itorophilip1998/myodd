@@ -1,5 +1,10 @@
 """HTTP validation and response formatting only; agents own orchestration."""
+import asyncio
 from fastapi import APIRouter, HTTPException, Request
+
+from app.memory.model_store import model_status
+from app.tools.learning_data import LearningBatch
+from app.tools.model_learning import learn
 
 from app.agents import PREDICTION_AGENT, get_agent
 from app.llms.errors import IntentProviderError
@@ -84,3 +89,16 @@ async def split(body: SplitInput, request: Request):
 @router.post('/predictions')
 async def prediction(body: PredictionInput, request: Request):
     return await PREDICTION_AGENT.predict(body, request.app.state)
+
+
+@router.post('/learning/status')
+def learning_status():
+    return model_status()
+
+
+@router.post('/learning/update')
+async def learning_update(body: LearningBatch):
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, learn, body.samples)
+    except (OSError, ValueError, KeyError, TypeError):
+        raise HTTPException(503, 'Learning storage is unavailable or invalid; the base model remains available.') from None

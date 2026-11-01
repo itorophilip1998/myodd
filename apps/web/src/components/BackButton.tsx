@@ -61,6 +61,6 @@ export function fallbackForPath(path: string): { href: string; label: string } {
     return { href: '/', label: 'Create' };
   }
   if (path.startsWith('/sign-in') || path.startsWith('/sign-up')) return { href: '/', label: 'Home' };
-  if (path.startsWith('/terms') || path.startsWith('/privacy')) return { href: '/', label: 'Home' };
+  if (path.startsWith('/terms') || path.startsWith('/privacy') || path.startsWith('/about') || path.startsWith('/faq') || path.startsWith('/contact')) return { href: '/', label: 'Home' };
   return { href: '/', label: 'Back' };
 }

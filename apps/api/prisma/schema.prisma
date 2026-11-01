@@ -320,6 +320,7 @@ model SavedCollection {
 model PredictionObservation {
   id               String   @id
   slipId           String   @map("slip_id")
+  ticketSize       Int      @map("ticket_size")
   eventId          String   @map("event_id")
   marketId         String   @map("market_id")
   outcomeId        String   @map("outcome_id")

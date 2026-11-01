@@ -8,6 +8,6 @@ export default function AboutPage() {
     <h2>Save, share, and review</h2><p>Account holders can save collections privately and choose when to publish them. Public collections are accessible by link. Result checks show available match updates, including pending or unknown outcomes when confirmation is unavailable.</p>
     <h2>Understand the limits</h2><p>MyOdd is not a bookmaker and does not accept wagers. Predictions, odds, and match data do not guarantee outcomes. Availability depends on the provider. Collections are temporary and eligible for deletion after all matches are confirmed final and the retention window has passed.</p>
     <p>18+ only. Gamble responsibly and follow local requirements.</p>
-    <p><Link href="/">Generate football booking codes</Link> · <Link href="/faq">Read frequently asked questions</Link> · <Link href="/privacy">Privacy policy</Link></p>
+    <p><Link href="/">Generate football booking codes</Link> · <Link href="/faq">Read frequently asked questions</Link> · <Link href="/contact">Contact us</Link> · <Link href="/privacy">Privacy policy</Link></p>
   </main>;
 }

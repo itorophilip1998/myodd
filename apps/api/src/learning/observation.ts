@@ -8,7 +8,7 @@ export type ForecastLeg = {
 };
 const SOURCES = new Set(['SPORTYBET_SHARE_JSON', 'SPORTYBET_SHARE_PAGE', 'BBC_SPORT_SCORE']);
 export function observation(leg: ForecastLeg, slipId: string, result: string, source: string | null,
-  phase: string, conflict: boolean, checkedAt: Date) {
+  phase: string, conflict: boolean, checkedAt: Date, ticketSize: number) {
   const probability = leg.predictionProbability, baseProbability = leg.baseProbability;
   if (!leg.predictedAt || !leg.kickoffAt || leg.predictedAt >= leg.kickoffAt || !leg.modelVersion || !leg.baseModelVersion
     || !Number.isFinite(probability) || probability! <= 0 || probability! >= 1
@@ -18,7 +18,7 @@ export function observation(leg: ForecastLeg, slipId: string, result: string, so
   const label = { result, resultSource: source, verified, checkedAt };
   return {
     where: { id: leg.id },
-    create: { id: leg.id, slipId, eventId: leg.sportyEventId, marketId: leg.marketId, outcomeId: leg.outcomeId,
+    create: { id: leg.id, slipId, ticketSize, eventId: leg.sportyEventId, marketId: leg.marketId, outcomeId: leg.outcomeId,
       specifier: leg.specifier, marketName: leg.marketName ?? '', league: leg.league ?? '', mode: leg.predictionMode ?? null,
       odds: leg.odds!, probability: probability!, baseProbability: baseProbability!, modelVersion: leg.modelVersion,
       baseModelVersion: leg.baseModelVersion, predictedAt: leg.predictedAt, kickoffAt: leg.kickoffAt,
