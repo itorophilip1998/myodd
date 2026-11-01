@@ -37,7 +37,7 @@ Investor and Gambler are system tickets. The Create form keeps the match day (on
 
 ## Fixture scope
 
-- Investor/Gambler load up to 50 pages of 100 from the provided-option listing. Other modes still load up to 8 pages of 100 and may enrich a bounded match-day board.
+- Upcoming football comes from SportyBet. Listing pages continue until the feed ends, up to 20 pages of 100. Each page already includes double chance, match and team goals, excluded goals, and home, draw, or away or over 2.5 for every game in the window. Tickets are built from that list. A separate full board is not loaded for each match. Investor and Gambler use the same listing and keep only the exclusive 19 provided options.
 - Default adaptive: prefer original matches, expand when needed.
 - `original_only` / upcoming-only supported via form or language.
 - Markets must exist in the live bookmaker catalog; unknown IDs are discarded.

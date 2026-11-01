@@ -59,7 +59,8 @@ export class CreateBookingProcessor extends WorkerHost {
     let bookingStarted = false;
     let accepted: { booking: BookmakerBooking; selections: ScoredSelection[] };
     try {
-      const selections = await this.validator.validate(data.selections, data.config, undefined, fixtures => this.slips.audit(data, 'VALIDATION_SNAPSHOT', { taskId: job.id, fixtures }, `${job.id}:validation:${job.attemptsMade}`));
+      const listing = await this.slips.fixturesForValidation(data.config);
+      const selections = await this.validator.validate(data.selections, data.config, listing, fixtures => this.slips.audit(data, 'VALIDATION_SNAPSHOT', { taskId: job.id, fixtures }, `${job.id}:validation:${job.attemptsMade}`));
       if (!selections) throw new Error('Selections no longer satisfy market availability or requested filters');
       await this.slips.audit(data, 'BOOKING_ATTEMPT', { taskId: job.id, selections, timestamp: new Date().toISOString() });
       // A durable write barrier prevents worker restarts from blindly repeating a provider POST.

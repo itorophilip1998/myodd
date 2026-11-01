@@ -121,6 +121,13 @@ describe('privacy, settings, and safe caching', () => {
     expect(readUiSettings()).toMatchObject({ defaultMode: 'JAPA' });
     expect(uiSettingsSchema.safeParse({ ...DEFAULT_UI_SETTINGS, theme: 'dark' }).success).toBe(false);
   });
+  it('does not treat empty 202 event boards as successful JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 202, text: async () => '', json: async () => { throw new SyntaxError('Unexpected end of JSON input'); },
+    }));
+    const client = new SportyBetClient({ getJson: vi.fn(), setJson: vi.fn() } as any);
+    await expect(client.get('/factsCenter/event?eventId=sr:match:1', { retries: 0 })).rejects.toMatchObject({ code: 'NOT_READY', status: 202 });
+  });
   it('deduplicates simultaneous safe reads and never caches booking POSTs', async () => {
     const redis = { getJson: vi.fn().mockResolvedValue(null), setJson: vi.fn().mockResolvedValue(undefined) };
     const client = new SportyBetClient(redis as any);

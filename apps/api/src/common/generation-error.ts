@@ -4,7 +4,7 @@ import { SportyBetHttpError } from '../bookmaker/sportybet.client';
 export function generationFailure(error: unknown, bookingStarted = false): GenerationFailure {
   if (error instanceof SportyBetHttpError) {
     if (bookingStarted && ['TIMEOUT', 'NETWORK'].includes(error.code)) return { code: 'BOOKING_UNCERTAIN', message: 'The provider did not confirm whether this booking was created. It will not be created again automatically.', retryable: false };
-    if (['TIMEOUT', 'NETWORK'].includes(error.code)) return { code: 'NETWORK_ERROR', message: 'The betting service could not be reached. Please try again.', retryable: true };
+    if (['TIMEOUT', 'NETWORK', 'EMPTY', 'INVALID_JSON', 'NOT_READY'].includes(error.code)) return { code: 'NETWORK_ERROR', message: 'The betting service could not be reached. Please try again.', retryable: true };
     if (['NOT_FOUND', 'INVALID_BOOKING_CODE'].includes(error.code)) return { code: 'UNAVAILABLE_CODE', message: 'This booking code was not found or may have expired.', retryable: false };
     return { code: 'PROVIDER_ERROR', message: 'The betting service rejected this booking. Markets may have changed.', retryable: error.status === 429 || (error.status ?? 0) >= 500 };
   }
