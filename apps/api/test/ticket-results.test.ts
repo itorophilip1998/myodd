@@ -14,6 +14,7 @@ function setup(selections: any[] = [selection], page = new Map(), fixtures: any[
   const prisma = {
     $queryRaw: vi.fn().mockResolvedValue([]),
     slipGroup: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    predictionObservation: { upsert: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     slipSelection: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     generatedSlip: { update: vi.fn().mockImplementation(args => Promise.resolve(args)) },
     trainingEvent: { create: vi.fn().mockImplementation(args => Promise.resolve(args)) },
@@ -229,4 +230,16 @@ it('queues unresolved archived tickets and recent corrections, and continues aft
   await expect(processor.process()).rejects.toThrow('retry required');
   expect(checks.checkSlips).toHaveBeenCalledTimes(2);
   expect(prisma.generatedSlip.findMany.mock.calls[0][0].where).not.toHaveProperty('expiresAt');
+});
+
+it('archives a frozen forecast with its verified result in the same settlement transaction', async () => {
+  const { service, prisma } = setup([{ ...selection, matchStatus: 'Finished' }]);
+  await service.checkOne('slip', 'ABC123', [{ ...leg, predictionProbability: .8, baseProbability: .9,
+    modelVersion: 'odds-v2@cal-v1-test', baseModelVersion: 'odds-v2', predictedAt: new Date('2019-12-31'),
+    predictionMode: 'INVESTOR', odds: 1.25 }]);
+  expect(prisma.predictionObservation.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    where: { id: 'leg' }, create: expect.objectContaining({ probability: .8, baseProbability: .9, verified: true,
+      result: 'WON', resultSource: 'SPORTYBET_SHARE_JSON', ticketSize: 1 }),
+  }));
+  expect(prisma.$transaction).toHaveBeenCalledOnce();
 });

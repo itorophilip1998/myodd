@@ -10,7 +10,7 @@ Rank upcoming pre-match outcomes for browsing (over/under, draws, corners, BTTS,
 |-------|----------|
 | Web | `/predictions` |
 | API | `explore` + `predictions` modules |
-| AI | `POST /predictions` |
+| AI | `POST /generate/prediction` (legacy `/predictions` retained) |
 | Cache | Redis / `Prediction` rows |
 
 ## Behaviour

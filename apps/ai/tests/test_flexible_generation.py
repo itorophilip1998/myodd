@@ -1,19 +1,20 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.generation import generate_report
-from app.intent import parse_intent
-from app.market_preferences import resolve_preferences
-from app.predictions import OddsModel, score_fixtures
+from app.tools.generation import generate_report
+from app.tools.intent import parse_intent
+from app.tools.market_preferences import resolve_preferences
+from app.llms.scoring import OddsModel, score_fixtures
 from app.schemas import Config, Fixture, Market, MarketRule, ScoredSelection, Selection
 
 
 def selection(event, odds=2, probability=.4, market='1', outcome='1', supported=Market.HOME, **values):
+    values.setdefault('marketName', 'Market')
+    values.setdefault('selectionName', 'Outcome')
     return ScoredSelection(eventId=str(event), marketId=market, outcomeId=outcome, specifier='',
                            odds=odds, probability=probability, confidence=probability * 100,
                            modelVersion='test', supportedMarket=supported,
                            homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='League',
-                           marketName='Market', selectionName='Outcome',
                            kickoffAt='2099-01-01T12:00:00Z', **values)
 
 

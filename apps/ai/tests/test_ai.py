@@ -10,10 +10,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.generation import fingerprint, generate
-from app.intent import parse_rules
+from app.tools.selections import fingerprint
+from app.tools.generation import generate
+from app.tools.intent import parse_rules
 from app.main import app
-from app.predictions import OddsModel, PoissonModel, score_fixtures
+from app.llms.scoring import OddsModel, PoissonModel, score_fixtures
 from app.schemas import Config, Fixture, Market, Selection
 from app.train import train
 
@@ -87,14 +88,16 @@ class PredictionTests(unittest.TestCase):
 
 
 class GenerationTests(unittest.TestCase):
-    def test_unique_ranked_slips_preserve_original_fixtures(self):
+    def test_unique_scored_slips_preserve_original_fixtures(self):
         pool = score_fixtures([fixture(str(i)) for i in range(6)], OddsModel())
         config = Config(numberOfSlips=5, minimumOdds=2, maximumOdds=8, maximumSelections=3)
         original = [Selection(eventId=str(i), marketId='1', outcomeId='1') for i in range(3)]
         results = generate(pool, config, original)
         self.assertGreater(len(results), 0)
         self.assertEqual(len({r['fingerprint'] for r in results}), len(results))
-        self.assertEqual([r['slipScore'] for r in results], sorted([r['slipScore'] for r in results], reverse=True))
+        # Risk/volatility ranking may differ from raw probability ordering.
+        for ticket in results:
+            self.assertAlmostEqual(ticket['slipScore'], math.prod(s['probability'] for s in ticket['selections']) * 100, places=6)
         for slip in results:
             events = [s['eventId'] for s in slip['selections']]
             self.assertEqual(len(set(events)), len(events))

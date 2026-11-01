@@ -34,3 +34,23 @@ it('rejects malformed generation results at the AI boundary with an actionable m
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: null }))));
   await expect(new AiClient().generate([], generationConfigSchema.parse({}))).rejects.toThrow('generation service returned incomplete data');
 });
+
+it.each([
+  ['INVESTOR', 'investor'], ['GAMBLER', 'gambler'], ['JAPA', 'japa'], ['LAGOS_LIFE', 'lagos-life'],
+] as const)('routes %s generation directly to its agent', async (riskMode, route) => {
+  const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+  vi.stubGlobal('fetch', fetch);
+  await new AiClient().generate([], generationConfigSchema.parse({ riskMode })).catch(() => undefined);
+  expect(fetch.mock.calls[0][0]).toMatch(new RegExp(`/generate/${route}$`));
+  expect(JSON.parse(fetch.mock.calls[0][1].body).config.riskMode).toBe(riskMode);
+});
+
+it('uses the prediction agent and independent split tool endpoints', async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response('{}'));
+  vi.stubGlobal('fetch', fetch);
+  const client = new AiClient();
+  await client.predict([]);
+  await client.split([], generationConfigSchema.parse({}), [], 2).catch(() => undefined);
+  expect(fetch.mock.calls[0][0]).toMatch(/\/generate\/prediction$/);
+  expect(fetch.mock.calls[1][0]).toMatch(/\/tools\/split$/);
+});

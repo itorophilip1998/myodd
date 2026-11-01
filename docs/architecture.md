@@ -51,7 +51,7 @@ The AI service has **no database and no bookmaker credentials**. The API owns pe
 
 1. User submits prompt / code on web (`GenerateForm`).
 2. API creates `SlipGroup` + `GenerationJob`, enqueues BullMQ work on `create-booking`.
-3. Worker calls AI (`/intent`, `/generate` or `/split`) with real fixture/market catalogs.
+3. Worker calls AI (`/intent`, the selected `/generate/<mode>` route, or `/tools/split`) with real fixture/market catalogs. Mode agents compose the shared model and tools; see [AI agents](features/ai-agents.md).
 4. API creates booking codes via SportyBet, confirms selections/odds, writes `GeneratedSlip` / `SlipSelection`.
 5. Web polls `GET /api/jobs/:jobId` and loads `GET /api/groups/:id`.
 

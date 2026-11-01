@@ -42,6 +42,22 @@ describe('provider-grounded markets and result accounting', () => {
     expect(promptMatchDay('Weekend selections', now)).toEqual({ start: '2026-10-24', end: '2026-10-25' });
     expect(promptMatchDay('Before 2099-01-01T12:00:00Z', now)).toBeNull();
   });
+  it('resolves only the shared Investor and Gambler markets', () => {
+    const fixtures: any[] = [{ markets: [
+      { marketId: '166', marketName: 'Total corners', specifier: 'total=9.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 9.5', isActive: true }] },
+      { marketId: '167', marketName: 'Home team total corners', specifier: 'total=4.5', status: 'active', outcomes: [{ outcomeId: 'under', outcomeName: 'Under 4.5', isActive: true }] },
+      { marketId: '168', marketName: 'Away team total corners', specifier: 'total=5.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 5.5', isActive: true }] },
+      { marketId: '201', marketName: 'Total shots on target', specifier: 'total=8.5', status: 'active', outcomes: [{ outcomeId: 'over', outcomeName: 'Over 8.5', isActive: true }] },
+      { marketId: '203', marketName: 'Home team shots on target', specifier: 'total=4.5', status: 'active', outcomes: [{ outcomeId: 'under', outcomeName: 'Under 4.5', isActive: true }] },
+      { marketId: '1', marketName: '1X2', specifier: '', status: 'active', outcomes: [{ outcomeId: '1', outcomeName: 'Home', isActive: true }] },
+    ] }];
+    expect(resolveMarketIds(['corners.total'], fixtures).rules.map(rule => rule.marketId)).toEqual(['166']);
+    expect(resolveMarketIds(['corners.home'], fixtures).rules.map(rule => rule.marketId)).toEqual(['167']);
+    expect(resolveMarketIds(['corners.away'], fixtures).rules.map(rule => rule.marketId)).toEqual(['168']);
+    expect(resolveMarketIds(['shots.target'], fixtures).rules.map(rule => rule.marketId)).toEqual(['201']);
+    expect(resolveMarketIds(['shots.team.target'], fixtures).rules.map(rule => rule.marketId)).toEqual(['203']);
+    expect(resolveMarketIds(['corners.total'], fixtures).rules[0].outcomeIds).toEqual(['over']);
+  });
   it('does not claim suspended or unavailable outcomes are usable', () => {
     expect(resolveMarketIds(['goals.over.1.5'], [{ markets: [{ ...fixtures[0].markets[0], status: 'suspended' }] }] as any).rules).toEqual([]);
   });
@@ -104,6 +120,13 @@ describe('privacy, settings, and safe caching', () => {
     writeUiSettings({ ...DEFAULT_UI_SETTINGS, defaultMode: 'JAPA' });
     expect(readUiSettings()).toMatchObject({ defaultMode: 'JAPA' });
     expect(uiSettingsSchema.safeParse({ ...DEFAULT_UI_SETTINGS, theme: 'dark' }).success).toBe(false);
+  });
+  it('does not treat empty 202 event boards as successful JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 202, text: async () => '', json: async () => { throw new SyntaxError('Unexpected end of JSON input'); },
+    }));
+    const client = new SportyBetClient({ getJson: vi.fn(), setJson: vi.fn() } as any);
+    await expect(client.get('/factsCenter/event?eventId=sr:match:1', { retries: 0 })).rejects.toMatchObject({ code: 'NOT_READY', status: 202 });
   });
   it('deduplicates simultaneous safe reads and never caches booking POSTs', async () => {
     const redis = { getJson: vi.fn().mockResolvedValue(null), setJson: vi.fn().mockResolvedValue(undefined) };

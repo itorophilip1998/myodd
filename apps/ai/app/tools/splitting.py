@@ -1,8 +1,8 @@
 """Partition original picks exactly once. Risk modes affect grouping, never invent replacements."""
 import math
 import random
-from .generation import eligible, fingerprint
-from .schemas import Config, ScoredSelection, Selection
+from app.tools.selections import eligible, fingerprint
+from app.schemas import Config, ScoredSelection, Selection
 
 
 def split_report(pool: list[ScoredSelection], config: Config, original: list[Selection], parts: int):

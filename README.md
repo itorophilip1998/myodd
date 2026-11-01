@@ -140,14 +140,16 @@ Four selectable modes also work as typed keywords and enforce **hard per-ticket 
 
 | Mode | Ticket odds | Safe odds per game |
 |------|-------------|--------------------|
-| Investor Mode (recommended) | 2–5 inclusive | 1.10–1.50 |
-| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.80 |
+| Investor Mode (recommended) | 3 near 3, 3 near 4, 2 near 5, 2 near 6 (band 3–6) | 1.10–1.35 |
+| Gambler Mode (also `Gamler Mode`) | 6.1–20 | 1.10–1.35 |
 | Japa Mode | 20.01–50 | 1.10–2.00 |
 | Lagoslife / Lagos-Lifes Mode | 35–50 | 1.10–2.00 |
 
 Ticket odds never exceed **50** in any mode. Explicit odds targets narrow the mode band; asking above 50 is blocked before generate starts. A typed contradictory target fails clearly; a final mode selected in the controls overrides an older conflicting range and reports that change. Nearest-odds adjustment cannot escape a named band. Inventory, selection-count, numerical and bookmaker constraints still apply. These names do not promise prediction accuracy or a guaranteed outcome.
 
 Ticket count (1–10) can be set in Options or the prompt. Games per ticket are chosen automatically between 1 and 50 unless the prompt asks for an exact count (hard max 50). The compact panel also includes the generate/split action, split count, match scope and market/odds toggles. Split part counts must preserve all eligible original picks; contradictory sizes fail instead of repeating picks. Results are paginated (12/24/48 per page), searched and sorted before pagination; Copy all checks and copies the entire valid collection.
+
+Investor and Gambler use a direct fixed-policy path: no instruction-LLM or market-catalog planning call. They request the provided 19-option IDs on the day’s fixture listing, match only those options, and do not open match boards to hunt extras. Investor remains recommended for its lower combined odds. See [system-mode coverage and speed](docs/features/investor-system-mode.md).
 
 ## Progress, working codes and retained training data
 
@@ -157,7 +159,7 @@ Result cards contain only recently verified, fully active codes. Older codes are
 
 `training_events` is an append-only application journal with versioned JSON payloads: accepted requests, source/fixture/market snapshots, model metadata, parsed and effective configuration, every scored pool/candidate set, final booking plans, validation-time fixture snapshots, booking attempts/rejections/confirmed responses, settlement and stage changes. Events and accepted selections are saved transactionally with job progress; a confirmed booking is durably retained in Redis before its PostgreSQL write is retried. Startup can rebuild missing queue work from database request/plan events. Catalog discovery and validation snapshots are retained rather than overwritten. Legacy collections are imported into the journal, explicitly marked as lacking historical fixture context.
 
-`TrainingFeedback` retains helpful/not-helpful feedback, notes and corrected prompts. **Remember these settings** saves an account preference profile when signed in, or an anonymous browser profile for guests, containing only an approved mode, ticket count and exact games-per-ticket default. Future requests can use these defaults when unspecified; explicit prompts/control values take precedence. Raw feedback notes are not executed as system instructions. This is preference adaptation, not automatic fine-tuning or proof of a betting edge. Prompts and generated tickets are not win/loss labels; predictive retraining still needs verified completed-match outcomes and evaluation (see the CSV/Poisson workflow below).
+`TrainingFeedback` retains helpful/not-helpful feedback, notes and corrected prompts. **Remember these settings** saves an account preference profile when signed in, or an anonymous browser profile for guests, containing only an approved mode, ticket count and exact games-per-ticket default. Future requests can use these defaults when unspecified; explicit prompts/control values take precedence. Raw feedback notes are not executed as system instructions. Feedback remains preference adaptation. Separately, verified pre-match forecasts and completed-match outcomes now feed a scheduled probability-calibration loop every six hours. A candidate must beat the baseline and incumbent on later, unseen matches before activation. The Predictions page tracks selection/ticket results and probability error. See [prediction performance and learning](docs/features/learning.md) for data requirements, deployment migration and promotion checks. The CSV/Poisson workflow below remains available for historical goal-model training.
 
 Export a consistent PostgreSQL snapshot as JSONL, with record-count and SHA-256 manifest:
 
@@ -180,7 +182,7 @@ The Compose `backup` service also writes daily `.sql.gz` files into host `backup
 
 Paste `GNPM8T` in the chat, select **Split a code**, choose the part count and a risk mode, then submit. Natural instructions also work: `Split GNPM8T into 3 parts using Investor Mode`. The API uses the same conservative code/count extractor as the UI, so a separate source field or `@` prefix is optional. SportyBet share links are accepted as code evidence too.
 
-Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor ≤1.50, Gambler ≤1.80, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
+Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor and Gambler ≤1.35, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
 
 Unavailable or filtered picks are counted and explained. Impossible counts, contradictory constraints or unsupported same-match/bet-builder originals return a clear error without invented or repeated picks. Static partition planning returns the entire requested partition or none; live bookmaker changes during code creation can still produce partial successes, which the job reports. Each accepted part uses the existing confirmation, persistence, expiry and copy/share pipeline. Split strategy and counts are retained in the group's generation report.
 
@@ -234,7 +236,7 @@ Only matches strictly before the cutoff enter training. Retraining writes a new 
 
 ## Instruction parsing
 
-Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llm.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
+Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llms/client.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
 
 Supported providers:
 
@@ -310,7 +312,7 @@ The API reads the root `.env`. For Python host development, export AI model/inte
 | GET | `/api/groups/:publicId` | Saved group and selections |
 | GET | `/api/codes/:code` | Saved generated slip |
 
-Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate`, `POST /split`, `POST /tools/discover-codes`.
+Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate/{investor,gambler,japa,lagos-life,prediction}`, `POST /tools/split`, and `POST /tools/discover-codes`. Legacy `/generate`, `/split`, and `/predictions` remain available. See [AI agents and folder ownership](docs/features/ai-agents.md).
 
 ## Checks
 

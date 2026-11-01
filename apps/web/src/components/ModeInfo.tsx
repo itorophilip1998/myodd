@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import { MODE_ODDS, MODE_SELECTION_ODDS, type ModeKey } from '@myodd/shared';
 
 const EXPLANATIONS: Record<ModeKey, string> = {
-  INVESTOR: 'System ticket. You choose the match day or a date range. The model picks the markets, ticket count, and games inside the fixed band. A ticket can still lose.',
-  GAMBLER: 'A higher target than Investor, with more variation in results. Every selection must still win for an accumulator to win.',
+  INVESTOR: 'Recommended system ticket for lower odds. You choose the match day or a date range. The system matches our 19 provided options to the day’s listed markets — it does not browse extra board options. Mixed targets near 3, 4, 5, and 6. Goal and double-chance picks are ranked from recent finished scores. A ticket can still lose.',
+  GAMBLER: 'Same fast path as Investor: provided options on the day’s listed games, mixed targets across 6.1–20. Investor stays recommended for its lower odds. Goal and double-chance picks use the same recent-score ranking. Every selection must still win for an accumulator to win.',
   JAPA: 'High combined odds and greater uncertainty. Expect frequent losing tickets, even when individual selections have shorter prices.',
   LAGOS_LIFE: 'The highest target range. Highly speculative combinations with frequent losses; never treat this mode as an income plan.',
 };
@@ -43,7 +43,7 @@ export function ModeInfo({ name, mode, termsHash }: { name: string; mode: ModeKe
     {open && createPortal(<div ref={panel} id={id} role="dialog" aria-label={`About ${name}`} tabIndex={-1} className={`mode-tip${position.above ? ' is-above' : ''}`} style={{ left: position.left, top: position.top, '--tip-arrow': `${position.arrow}px` } as CSSProperties}>
       <div className="mode-tip-head"><strong>{name}</strong><button type="button" aria-label="Close mode information" onClick={() => close(true)}>×</button></div>
       <p>{EXPLANATIONS[mode]}</p>
-      <dl><div><dt>Ticket odds</dt><dd>{MODE_ODDS[mode].minimum}–{MODE_ODDS[mode].maximum ?? 'no maximum'}</dd></div><div><dt>Each selection</dt><dd>{MODE_SELECTION_ODDS[mode].minimum}–{MODE_SELECTION_ODDS[mode].maximum}</dd></div></dl>
+      <dl><div><dt>Ticket odds</dt><dd>{mode === 'INVESTOR' ? 'Mixed targets: 3, 4, 5, 6' : `${MODE_ODDS[mode].minimum}–${MODE_ODDS[mode].maximum ?? 'no maximum'}`}</dd></div><div><dt>Each selection</dt><dd>{MODE_SELECTION_ODDS[mode].minimum}–{MODE_SELECTION_ODDS[mode].maximum}</dd></div></dl>
       <a href={`/terms#${termsHash}`} target="_blank" rel="noopener noreferrer">Learn more <span aria-hidden>↗</span><span className="sr-only"> about {name} (opens in a new tab)</span></a>
     </div>, document.body)}
   </>;

@@ -9,8 +9,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .odds_policy import MIN_SELECTION_ODDS
-from .schemas import Fixture, Market, ScoredSelection
+from app.tools.odds_policy import MIN_SELECTION_ODDS
+from app.schemas import Fixture, Market, ScoredSelection
 
 
 def supported_market(market_id: str, specifier: str, outcome_id: str, name: str):
@@ -149,6 +149,6 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                     awayTeam=fixture.awayTeam, league=fixture.league, marketName=market.marketName,
                     selectionName=outcome.outcomeName, kickoffAt=fixture.kickoffAt,
                     supportedMarket=supported, probability=round(probability, 6),
-                    confidence=round(probability * 100, 2), modelVersion=version,
+                    confidence=round(probability * 100, 2), modelVersion=version, predictedAt=now,
                 ))
     return scored

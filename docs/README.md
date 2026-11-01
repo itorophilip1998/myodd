@@ -18,6 +18,7 @@ Product docs for the myOdd monorepo: SportyBet Nigeria booking-code variations f
 | Collections, share & history | [features/collections.md](./features/collections.md) |
 | Booking codes (SportyBet) | [features/booking.md](./features/booking.md) |
 | Live games explorer | [features/live.md](./features/live.md) |
+| AI agents and folder ownership | [features/ai-agents.md](./features/ai-agents.md) |
 | Predictions explorer | [features/predictions.md](./features/predictions.md) |
 | Code catalog discovery | [features/catalog.md](./features/catalog.md) |
 | Learning & preferences | [features/learning.md](./features/learning.md) |

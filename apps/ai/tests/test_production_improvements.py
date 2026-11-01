@@ -1,7 +1,7 @@
 import random
 import unittest
-from app.generation import search
-from app.intent import parse_rules
+from app.tools.search import search
+from app.tools.intent import parse_rules
 from app.schemas import Config
 from test_flexible_generation import selection
 

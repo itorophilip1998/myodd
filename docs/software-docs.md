@@ -120,7 +120,7 @@ docker compose config --quiet
 | Catalog | `/api/catalog/*` |
 | Learning | `/api/learning/*` |
 
-AI (internal): `/health`, `/intent`, `/resolve`, `/generate`, `/split`, `/predictions`, `/tools/discover-codes`.
+AI (internal): `/health`, `/intent`, `/resolve`, `/generate/investor`, `/generate/gambler`, `/generate/japa`, `/generate/lagos-life`, `/generate/prediction`, `/tools/split`, `/tools/discover-codes`. Legacy `/generate`, `/split`, `/predictions` dispatch through the same agents. See [AI agents](features/ai-agents.md).
 
 ## Conventions
 

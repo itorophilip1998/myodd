@@ -97,8 +97,8 @@ The inventory includes the pre-existing result-badge changes preserved in this r
 .env.example
 .gitignore
 Dockerfile.node
-apps/ai/app/generation.py
-apps/ai/app/intent.py
+apps/ai/app/tools/generation.py
+apps/ai/app/tools/intent.py
 apps/ai/app/odds_format.py
 apps/ai/app/risk_modes.py
 apps/ai/tests/test_draw_intent.py

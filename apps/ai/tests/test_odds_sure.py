@@ -1,8 +1,8 @@
 """Target odds + sure/safer slang parsing."""
 import unittest
 
-from app.intent import parse_rules
-from app.odds_format import extract_odds_bounds, has_safer_slang
+from app.tools.intent import parse_rules
+from app.tools.odds_format import extract_odds_bounds, has_safer_slang
 from app.schemas import Market
 
 
@@ -35,7 +35,7 @@ class SurePromptRulesTests(unittest.TestCase):
             'sure 5 odds\nFinal request settings (take precedence): Risk mode: Investor Mode.'
         )
         self.assertEqual(config.riskMode, 'INVESTOR')
-        self.assertEqual((config.minimumOdds, config.maximumOdds), (2, 5))
+        self.assertEqual((config.minimumOdds, config.maximumOdds), (3, 6))
         self.assertEqual(config.markets, [])
         self.assertTrue(any('not a guaranteed' in n.casefold() or 'requested odds were not applied' in n.casefold()
                             for n in config.unhandledRequests))
@@ -45,7 +45,7 @@ class SurePromptRulesTests(unittest.TestCase):
         config = parse_rules('sure banker tickets around 5')
         self.assertEqual(config.riskMode, 'INVESTOR')
         self.assertEqual(config.riskPreference, 'VERY_LOW')
-        self.assertEqual((config.minimumOdds, config.maximumOdds), (4.5, 5.0))
+        self.assertEqual((config.minimumOdds, config.maximumOdds), (4.5, 5.5))
         self.assertIn(Market.HOME, config.markets)
 
 

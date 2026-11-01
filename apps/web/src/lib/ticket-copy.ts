@@ -1,14 +1,14 @@
 import { MODE_ODDS, type ModeKey } from '@myodd/shared';
 import { modeTag } from '@/lib/mode-label';
 
-/** Mode band for the title, e.g. `2–5` or `35–50`. */
+/** Mode band for the title, e.g. `3–6` or `35–50`. */
 export function modeOddsRangeLabel(mode?: string | null): string | null {
   if (!mode || !(mode in MODE_ODDS)) return null;
   const band = MODE_ODDS[mode as ModeKey];
   return `${band.minimum}–${band.maximum}`;
 }
 
-/** Title line: `Investor Mode · 2–5 odds` */
+/** Title line: `Investor Mode · 3–6 odds` */
 export function ticketCopyTitle(mode?: string | null): string {
   const name = modeTag(mode);
   const range = modeOddsRangeLabel(mode);
@@ -27,7 +27,7 @@ export function formatTicketCopy(
 
 /**
  * Collection copy:
- * Investor Mode · 2–5 odds
+ * Investor Mode · 3–6 odds
  * ABC12XYZ
  * ABC12XY3
  */

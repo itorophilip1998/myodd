@@ -2,8 +2,8 @@ import random
 import unittest
 from unittest.mock import patch
 
-from app.generation import search
-from app.intent import parse_intent, parse_rules
+from app.tools.search import search
+from app.tools.intent import parse_intent, parse_rules
 from app.schemas import Config
 from test_flexible_generation import selection
 
@@ -38,7 +38,7 @@ class GenerationVarietyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Config(**values)
 
-    @patch('app.intent._parse_intent', return_value=Config(minimumSelections=4, maximumSelections=4))
+    @patch('app.tools.intent._parse_intent', return_value=Config(minimumSelections=4, maximumSelections=4))
     def test_random_games_ignore_learned_exact_counts(self, _):
         config = parse_intent('Generate 10 tickets. Games per ticket: Random (1–50). Investor Mode', [], {'gamesPerTicket': 8})
         self.assertEqual((config.minimumSelections, config.maximumSelections), (1, 50))
@@ -46,10 +46,10 @@ class GenerationVarietyTests(unittest.TestCase):
     def test_a_repeated_game_must_use_a_different_option(self):
         pool = []
         for event in range(4):
-            pool.append(selection(event, odds=1.45, probability=.7, outcome='home', market='1'))
-            pool.append(selection(event, odds=1.48, probability=.62, outcome='dc', market='10'))
+            pool.append(selection(event, odds=1.3, probability=.7, outcome='home', market='1'))
+            pool.append(selection(event, odds=1.32, probability=.62, outcome='dc', market='10'))
         config = Config(numberOfSlips=4, riskMode='INVESTOR', riskPreference='VERY_LOW',
-                        minimumOdds=2, maximumOdds=5, minimumSelections=2, maximumSelections=2)
+                        minimumOdds=2, maximumOdds=5, minimumSelections=3, maximumSelections=3)
         tickets, _ = search(pool, config, [], rng=random.Random(3))
         self.assertGreaterEqual(len(tickets), 2)
         seen = set()

@@ -65,3 +65,30 @@ it('normalizes local defaults and legacy learned output counts independently of 
   const { normalizeLearnedPreferences } = await import('../src/learning/preferences');
   expect(normalizeLearnedPreferences({ ticketCount: 50, gamesPerTicket: 50 })).toEqual({ ticketCount: 10, gamesPerTicket: 50 });
 });
+
+it.each(['INVESTOR', 'GAMBLER'] as const)('%s queues only internal game, count, market and odds settings', async riskMode => {
+  const { SlipsService } = await import('../src/slips/slips.service');
+  const transaction = vi.fn().mockResolvedValue({ group: { id: 'g', publicId: 'p' }, job: { id: 'j', status: 'PENDING' } });
+  const queue = { add: vi.fn() };
+  const service = new SlipsService({} as any, {} as any, {} as any, {} as any, { $transaction: transaction } as any, {} as any, queue as any);
+  await service.startGeneration({ riskMode, instruction: 'Create 2 tickets using BTTS with 3 games per ticket',
+    selectedMarketIds: ['btts.yes'], ticketCount: 2, gamesPerTicket: 3, minimumOdds: 2, maximumOdds: 4 });
+  expect(queue.add).toHaveBeenCalledWith('prepare-generation', expect.objectContaining({
+    riskMode, operation: 'generate', selectedMarketIds: [], ticketCount: undefined, gamesPerTicket: undefined,
+    minimumOdds: undefined, maximumOdds: undefined,
+  }), expect.any(Object));
+});
+
+it('exposes the same exclusive market options for Investor and Gambler', async () => {
+  const { registryForMode } = await import('@myodd/shared');
+  const investor = registryForMode('INVESTOR');
+  expect(investor).toEqual(registryForMode('GAMBLER'));
+  expect(investor).toHaveLength(21); // 18 market definitions plus 1X, X2 and 12.
+  expect(investor.map(option => option.id)).toEqual(expect.arrayContaining([
+    'excluded.goals', 'excluded.goals.home', 'excluded.goals.away',
+    'goalkicks.total', 'goalkicks.home', 'goalkicks.away', 'cards.total', 'cards.home', 'cards.away',
+    'corners.total', 'corners.home', 'corners.away', 'tackles.total', 'tackles.home', 'tackles.away',
+    'goals.match', 'goals.home', 'goals.away', 'chance.1x', 'chance.x2', 'chance.12',
+  ]));
+  expect(investor.some(option => /shots|\.or\.|btts|result\./.test(option.id))).toBe(false);
+});

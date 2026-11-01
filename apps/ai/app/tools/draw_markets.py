@@ -1,6 +1,6 @@
 """Conservative draw-market matching using real labels, periods and outcome IDs."""
 import re
-from .schemas import MarketRule
+from app.schemas import MarketRule
 
 
 def period(label):
@@ -75,7 +75,7 @@ def enforce_draw_intent(config, catalog, instruction):
     exact, related = draw_rules(catalog, requested, alternatives=not strict)
     if not config.riskMode and not re.search(r'\bodds\b|\baround\s+\d', instruction, re.I):
         # A minute interval is not an odds target. Do not impose an unrequested 2.5-5 band.
-        from .odds_policy import MIN_SELECTION_ODDS
+        from app.tools.odds_policy import MIN_SELECTION_ODDS
         config.minimumOdds, config.maximumOdds = MIN_SELECTION_ODDS, None
     config.markets = []  # A generic DRAW enum must not admit a different period.
     config.marketRules = exact

@@ -12,3 +12,4 @@ export * from './settlement';
 export * from './ui-settings';
 export * from './market-registry';
 export * from './generation-outcome';
+export * from './system-markets';

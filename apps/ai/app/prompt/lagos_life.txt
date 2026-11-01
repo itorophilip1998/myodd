@@ -1,0 +1,1 @@
+Lagoslife/Lagos-Lifes Mode: riskMode=LAGOS_LIFE, riskPreference=VERY_HIGH. Combined ticket odds start at 100 with maximumOdds=null unless the user narrows the range. Each leg must be 1.10–2.00. No application ceiling on combined odds. Never promise a win.

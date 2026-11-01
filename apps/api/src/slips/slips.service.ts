@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, isSystemMode, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -13,7 +13,12 @@ import { AiClient } from '../ai/ai.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SlipValidatorService } from './slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from '../jobs/job.constants';
+import { systemConfig } from './system-config';
+import { SystemFixtureLoader } from './system-fixtures';
 import { slipFingerprint } from './slip-fingerprint';
+
+/** Markets the upcoming feed can return for every game, without one request per match. */
+const LISTING_MARKET_IDS = ['1', '10', '18', '19', '20', '29', '450004', '450005', '450006', '854', '856', '858'];
 
 export interface GenerateRequest {
   userId?: string;
@@ -70,6 +75,7 @@ function normalizeCandidates(candidates: RankedCandidate[] | ScoredSelection[][]
 
 @Injectable()
 export class SlipsService implements OnModuleInit {
+  private readonly systemFixtures: SystemFixtureLoader;
   constructor(
     @Inject(BOOKMAKER_PROVIDER) private readonly bookmaker: BookmakerProvider,
     private readonly predictions: PredictionsService,
@@ -78,7 +84,7 @@ export class SlipsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
     @InjectQueue(CREATE_BOOKING_QUEUE) private readonly queue: Queue,
-  ) {}
+  ) { this.systemFixtures = new SystemFixtureLoader(bookmaker); }
 
   async onModuleInit() {
     // Rebuild missing Redis work from durable database plans after a restart or queue loss.
@@ -117,28 +123,32 @@ export class SlipsService implements OnModuleInit {
     return { version: MARKET_REGISTRY_VERSION, options: [...options, ...observed.values()] };
   }
 
-  private investorSystem(input: GenerateRequest) {
-    return input.riskMode === 'INVESTOR' && !input.splitInto && !input.pinnedSelections?.length;
+  private internalSystem(input: GenerateRequest) {
+    return (input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER') && !input.splitInto && !input.pinnedSelections?.length;
   }
 
   private explicitControls(config: GenerationConfig, input: GenerateRequest, fixtures: import('@myodd/shared').BookmakerFixture[]): GenerationConfig {
-    if (this.investorSystem(input)) {
-      const band = MODE_ODDS.INVESTOR;
+    if (this.internalSystem(input)) {
+      const mode = input.riskMode!;
+      const label = mode === 'INVESTOR' ? 'Investor' : 'Gambler';
+      const band = MODE_ODDS[mode];
       const notices = [...config.unhandledRequests];
       const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
       if (input.selectedMarketIds?.length) {
-        note('Investor Mode chooses the markets. Requested markets were not applied.');
+        note(`${label} Mode chooses the markets. Requested markets were not applied.`);
       }
       if (input.ticketCount || input.gamesPerTicket) {
-        note('Investor Mode chooses the ticket count and games per ticket. Requested counts were not applied.');
+        note(`${label} Mode chooses the ticket count and games per ticket. Requested counts were not applied.`);
       }
       if (input.minimumOdds != null || input.maximumOdds !== undefined) {
-        note('Investor Mode kept its fixed ticket odds of 2 to 5. Requested odds were not applied.');
+        note(`${label} Mode uses mixed ticket odds across ${band.minimum}–${band.maximum}. Requested odds were not applied.`);
       }
       return {
         ...config,
-        riskMode: 'INVESTOR',
-        riskPreference: RiskPreference.VERY_LOW,
+        riskMode: mode,
+        riskPreference: mode === 'INVESTOR' ? RiskPreference.VERY_LOW : RiskPreference.MODERATE,
+        fixtureMode: 'upcoming',
+        preserveOriginalSelections: false,
         minimumOdds: band.minimum,
         maximumOdds: band.maximum,
         allowOddsAdjustment: false,
@@ -185,10 +195,10 @@ export class SlipsService implements OnModuleInit {
     const requestedCount = requestedTicketCount(req.instruction);
     if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
-    if (req.riskMode === 'INVESTOR' && req.operation !== 'split' && !req.pinnedSelections?.length) {
+    if ((req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER') && req.operation !== 'split' && !req.pinnedSelections?.length) {
       req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
     }
-    const investorSystem = req.riskMode === 'INVESTOR' && req.operation === 'generate' && !req.pinnedSelections?.length;
+    const internalSystem = (req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER') && req.operation === 'generate' && !req.pinnedSelections?.length;
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
@@ -222,7 +232,7 @@ export class SlipsService implements OnModuleInit {
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
         expiresAt: codeExpiry(new Date()),
       } });
-      const count = investorSystem ? 10 : req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
+      const count = internalSystem ? 10 : req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
       const job = await tx.generationJob.create({ data: { groupId: group.id, requestKey, requestId: req.requestId, payloadHash, requestedCount: Math.min(10, Math.max(1, count)) } });
       await tx.trainingEvent.create({ data: { eventKey: `${job.id}:request`, groupId: group.id, jobId: job.id, profileId: req.profileId,
         kind: 'REQUEST_ACCEPTED', payload: { ...req, engineVersion: 'myodd-v5', acceptedAt: new Date().toISOString() } as Prisma.InputJsonValue } });
@@ -273,28 +283,29 @@ export class SlipsService implements OnModuleInit {
     // A fresh prompt has no implicit source: catalog templates may already be settled.
     const original = input.bookingCode ? await this.bookmaker.getBooking(input.bookingCode, { fresh: true }) : null;
     if (input.bookingCode && original && !input.userId) await this.catalog.remember(input.bookingCode, 'private', undefined, original);
+    const internalSystem = this.internalSystem(input);
     const promptDay = promptMatchDay(input.instruction);
     const matchDay = matchDayKickoffWindow(input.matchDate ?? promptDay?.start, new Date(), input.matchDateEnd ?? promptDay?.end);
-    let fixtures = original?.selections.length
+    const systemSnapshot = internalSystem ? await this.systemFixtures.load(matchDay, detail => this.stage(input, 'READING', detail)) : null;
+    let fixtures = systemSnapshot ? systemSnapshot.fixtures : original?.selections.length
       ? await this.bookmaker.getFixtures({ eventIds: original.selections.map(selection => selection.eventId) })
-      : await this.upcomingFixtures(matchDay);
-    if (original && input.selectedMarketIds?.length) {
+      : await this.upcomingFixtures(matchDay, detail => this.stage(input, 'READING', detail));
+    if (!internalSystem && original && input.selectedMarketIds?.length) {
       const upcoming = await this.upcomingFixtures(matchDay);
       fixtures = [...new Map([...fixtures, ...upcoming].map(fixture => [fixture.eventId, fixture])).values()];
     }
-    const memory = input.profileId ? await this.prisma.learningProfile.findUnique({ where: { id: input.profileId } }) : null;
-    await this.audit(input, 'SOURCE_SNAPSHOT', { original, fixtures, matchDay, preferences: memory?.preferences ?? null, preferenceRevision: memory?.revision ?? null });
-    const modelInfo = await this.ai.modelInfo();
+    const memory = !internalSystem && input.profileId ? await this.prisma.learningProfile.findUnique({ where: { id: input.profileId } }) : null;
+    await this.audit(input, 'SOURCE_SNAPSHOT', { original, fixtures, matchDay, preferences: memory?.preferences ?? null, preferenceRevision: memory?.revision ?? null, fixtureCoverage: systemSnapshot?.coverage });
+    const modelInfo = internalSystem ? { planner: 'internal-fixed-policy', riskMode: input.riskMode, options: 'provided-19-market-list' } : await this.ai.modelInfo();
     await this.audit(input, 'MODEL_CONFIGURATION', modelInfo);
-    await this.stage(input, 'PLANNING', `Understanding your requested markets across ${fixtures.length} loaded games`);
-    const investorSystem = this.investorSystem(input);
-    const oddsSettings = !investorSystem && (input.minimumOdds != null || input.maximumOdds !== undefined)
+    await this.stage(input, 'PLANNING', internalSystem ? `Matching approved options across ${fixtures.length} games` : `Understanding your requested markets across ${fixtures.length} loaded games`);
+    const oddsSettings = !internalSystem && (input.minimumOdds != null || input.maximumOdds !== undefined)
       ? (input.maximumOdds == null ? `Ticket odds at least ${input.minimumOdds ?? 1.1}. No maximum ticket odds.` : `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds}.`)
       : '';
     const countSettings = [
-      investorSystem ? 'Investor Mode system ticket. Choose the markets, ticket count, and games per ticket. Ticket odds between 2 and 5. Each selection between 1.10 and 1.50. Ignore requested markets, odds, and counts.' : '',
-      !investorSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
-      !investorSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
+      internalSystem ? `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.` : '',
+      !internalSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
+      !internalSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
       oddsSettings,
       !input.splitInto ? `Match day: ${matchDay.matchDate} (${matchDay.label}). Only games kicking off between ${matchDay.kickoffAfter} and ${matchDay.kickoffBefore}.` : '',
     ].filter(Boolean).join(' ');
@@ -302,8 +313,9 @@ export class SlipsService implements OnModuleInit {
     const intentInstruction = input.splitInto
       ? `${requestInstruction}\nFinal request settings (take precedence): Split this code into ${input.splitInto} parts. Keep the original selections.`
       : requestInstruction;
-    let config = await this.ai.parse(intentInstruction + (input.riskMode ? `\nFinal request settings (take precedence): Risk mode: ${input.riskMode.replace('_', ' ')} Mode.` : ''), fixtures, memory?.preferences);
+    let config = internalSystem ? systemConfig(input.riskMode ?? null) : await this.ai.parse(intentInstruction + (input.riskMode ? `\nFinal request settings (take precedence): Risk mode: ${input.riskMode.replace('_', ' ')} Mode.` : ''), fixtures, memory?.preferences);
     config = this.explicitControls(config, input, fixtures);
+    if (systemSnapshot) config = { ...config, fixtureMode: 'upcoming', unhandledRequests: [...config.unhandledRequests, ...systemSnapshot.notices] };
     if (!original) config = { ...config, fixtureMode: 'upcoming', preserveOriginalSelections: false };
     if (input.splitInto) {
       if (!original) throw new BadRequestException('No verified source code is available to split. Paste a SportyBet code.');
@@ -314,9 +326,9 @@ export class SlipsService implements OnModuleInit {
         minimumOdds: explicitOdds || config.riskMode ? config.minimumOdds : 1.1, maximumOdds: explicitOdds || config.riskMode ? config.maximumOdds : null,
       };
     }
-    if (!investorSystem && input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
-    if (!input.splitInto && !investorSystem) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
-    if (!investorSystem && input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
+    if (!internalSystem && input.ticketCount && !input.splitInto) config.numberOfSlips = input.ticketCount;
+    if (!input.splitInto && !internalSystem) config.numberOfSlips = Math.min(10, Math.max(1, config.numberOfSlips));
+    if (!internalSystem && input.gamesPerTicket) config.minimumSelections = config.maximumSelections = input.gamesPerTicket;
     // Prediction book: keep the exact pinned outcomes; do not let mode odds bands reject them.
     if (input.pinnedSelections?.length && !input.splitInto) {
       const legs = input.gamesPerTicket ?? input.pinnedSelections.length;
@@ -332,7 +344,7 @@ export class SlipsService implements OnModuleInit {
       };
     }
     // UI ticket-odds range is authoritative and always clamped into the selected mode band.
-    if (!investorSystem && !input.splitInto && !input.pinnedSelections?.length && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
+    if (!internalSystem && !input.splitInto && !input.pinnedSelections?.length && (input.minimumOdds != null || input.maximumOdds !== undefined)) {
       const clamped = clampOddsToMode(
         input.minimumOdds ?? config.minimumOdds,
         input.maximumOdds === undefined ? config.maximumOdds : input.maximumOdds,
@@ -350,7 +362,7 @@ export class SlipsService implements OnModuleInit {
     }
     await this.audit(input, 'RESOLVED_INTENT', { config, matchDay, instruction: intentInstruction });
     await this.stage(input, 'BUILDING', `Searching ${fixtures.length} games for combinations that match your request`);
-    if (!input.splitInto && config.fixtureMode === 'upcoming' && original) {
+    if (!internalSystem && !input.splitInto && config.fixtureMode === 'upcoming' && original) {
       fixtures = (await this.upcomingFixtures(matchDay)).filter(fixture => {
         const kickoff = new Date(fixture.kickoffAt).getTime();
         return kickoff >= new Date(matchDay.kickoffAfter).getTime() && kickoff < new Date(matchDay.kickoffBefore).getTime();
@@ -362,8 +374,8 @@ export class SlipsService implements OnModuleInit {
     await this.audit(input, 'FIXTURE_SNAPSHOT', { fixtures, config });
     let result = input.splitInto
       ? await this.ai.split(fixtures, config, original!.selections, input.splitInto)
-      : await this.ai.generate(fixtures, config, original?.selections);
-    if (!input.splitInto && result.needsExpansion && config.fixtureMode === 'adaptive') {
+      : await this.ai.generate(fixtures, config, internalSystem ? undefined : original?.selections);
+    if (!internalSystem && !input.splitInto && result.needsExpansion && config.fixtureMode === 'adaptive') {
       await this.stage(input, 'BUILDING', 'Looking for more upcoming games with your requested markets');
       const upcoming = await this.upcomingFixtures(matchDay);
       fixtures = [...new Map([...fixtures, ...upcoming].map(f => [f.eventId, f])).values()]
@@ -414,7 +426,7 @@ export class SlipsService implements OnModuleInit {
     report.diagnostics.foundSlips = candidates.length;
     await this.prisma.generationJob.update({ where: { id: input.jobId }, data: { requestedCount: config.numberOfSlips } });
     await this.prisma.slipGroup.update({ where: { id: input.groupId }, data: {
-      generationReport: report as unknown as Prisma.InputJsonValue,
+      generationReport: { ...report, ...(systemSnapshot ? { fixtureCoverage: systemSnapshot.coverage } : {}) } as unknown as Prisma.InputJsonValue,
     } });
     if (!candidates.length) {
       await this.failPreparation(input.jobId, result.notices.join(' ') || 'No combinations satisfy the explicit constraints. Try different markets, a wider odds range, or allow new matches.', 'SHORTAGE');
@@ -440,17 +452,36 @@ export class SlipsService implements OnModuleInit {
     ]);
   }
 
-  private async upcomingFixtures(matchDay = matchDayKickoffWindow()) {
+  private async upcomingFixtures(matchDay = matchDayKickoffWindow(), onProgress?: (detail: string) => Promise<unknown>) {
     const hoursUntilEnd = Math.max(1, Math.ceil((new Date(matchDay.kickoffBefore).getTime() - Date.now()) / 3600000));
     const timelineHours = Math.min(168, Math.max(24, hoursUntilEnd + 6));
-    const pages = await Promise.all([1, 2].map(pageNum => this.bookmaker.getFixtures({
-      timelineHours, pageSize: 60, pageNum, todayGames: false,
-    })));
-    const fixtures = [...new Map(pages.flat().map(fixture => [fixture.eventId, fixture])).values()]
+    const pageSize = 100;
+    const listed = [];
+    for (let pageNum = 1; pageNum <= 20; pageNum += 1) {
+      if (onProgress) await onProgress(`Loading games, page ${pageNum}`);
+      const page = await this.bookmaker.getFixtures({ timelineHours, pageSize, pageNum, todayGames: false, marketIds: LISTING_MARKET_IDS });
+      listed.push(...page);
+      if (page.length < pageSize) break;
+    }
+    const fixtures = [...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
       .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now());
-    // Detailed markets unlock handicaps, interval outcomes and alternate lines beyond the listing API.
-    const details = fixtures.length ? await this.bookmaker.getFixtures({ eventIds: fixtures.slice(0, 24).map(f => f.eventId) }) : [];
-    return [...new Map([...fixtures, ...details].map(fixture => [fixture.eventId, fixture])).values()];
+    const start = new Date(matchDay.kickoffAfter).getTime();
+    const end = new Date(matchDay.kickoffBefore).getTime();
+    const onDay = fixtures.filter(fixture => {
+      const kickoff = new Date(fixture.kickoffAt).getTime();
+      return kickoff >= start && kickoff < end;
+    });
+    return onDay.length ? onDay : fixtures;
+  }
+
+  async fixturesForValidation(config: GenerationConfig) {
+    if (!isSystemMode(config.riskMode)) return undefined;
+    const matchDay = matchDayKickoffWindow(config.kickoffAfter?.slice(0, 10), new Date(), config.kickoffBefore?.slice(0, 10));
+    return (await this.systemFixtures.load({
+      ...matchDay,
+      kickoffAfter: config.kickoffAfter ?? matchDay.kickoffAfter,
+      kickoffBefore: config.kickoffBefore ?? matchDay.kickoffBefore,
+    })).fixtures;
   }
 
   async enqueueBookings(input: PrepareJob, config: GenerationConfig, candidates: RankedCandidate[]) {
@@ -509,6 +540,8 @@ export class SlipsService implements OnModuleInit {
             homeTeam: s.homeTeam ?? '', awayTeam: s.awayTeam ?? '', league: s.league ?? '',
             marketName: s.marketName ?? '', selectionName: s.selectionName ?? '', odds: s.odds!,
             predictionProbability: s.probability, predictionScore: s.confidence, modelVersion: s.modelVersion,
+            baseProbability: s.baseProbability ?? s.probability, baseModelVersion: s.baseModelVersion ?? s.modelVersion,
+            predictedAt: s.predictedAt ? new Date(s.predictedAt) : null, predictionMode: input.config.riskMode,
             kickoffAt: s.kickoffAt ? new Date(s.kickoffAt) : null,
           })) },
         } });

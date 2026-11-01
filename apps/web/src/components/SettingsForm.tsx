@@ -30,7 +30,7 @@ export function SettingsForm() {
       <section className="settings-card" aria-labelledby="pref-heading">
         <div className="settings-card-head">
           <h3 id="pref-heading">Generation defaults</h3>
-          <p>Applied when you open Create. Gambler, Japa, and Lagoslife options on the form override these for a single run. Investor Mode ignores them and builds the ticket itself.</p>
+          <p>Applied when you open Create. Japa and Lagoslife options on the form override these for a single run. Investor and Gambler ignore them and build tickets using internal settings.</p>
         </div>
         <div className="settings-grid">
           <label>

@@ -10,7 +10,7 @@ Create ranked booking-code variations from a SportyBet share code and/or a natur
 |-------|----------|
 | Web | `/generate` — `GenerateForm.tsx`, guardrails in `lib/generate-guardrails.ts` |
 | API | `slips/*`, `jobs/create-booking.processor.ts`, `ai/ai.client.ts` |
-| AI | `/intent`, `/generate`, `/split` — `apps/ai/app/` |
+| AI | `/intent`, `/generate/<mode>`, `/tools/split` — [AI agents](ai-agents.md) |
 | Policy | `packages/shared/src/mode-policy.ts`, `chat-request.ts` |
 
 ## Entry points
@@ -33,10 +33,11 @@ Hard ticket bands and safer per-leg odds (see `MODE_ODDS` / `MODE_SELECTION_ODDS
 
 Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
 
-Investor Mode is a system ticket. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The model chooses those inside the fixed band: combined odds 2–5, each selection 1.10–1.50, up to 10 tickets, and a game count that fits the band. Prompt text and saved defaults do not move that band or choose the markets. See [investor-system-mode.md](./investor-system-mode.md).
+Investor and Gambler are system tickets. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The system matches the exclusive 19-option list to the day’s listed SportyBet markets and ranks them with the numerical scoring path — it does not ask a language model to browse extra board options. Investor builds mixed tickets near 3, 4, 5, and 6 (band 3–6) and stays recommended for those lower odds. Gambler uses the same options across 6.1–20. Each selection is 1.10–1.35. Prompt text and saved defaults do not move that band or add markets. See [investor-system-mode.md](./investor-system-mode.md).
 
 ## Fixture scope
 
+- Upcoming football comes from SportyBet. Listing pages continue until the feed ends, up to 20 pages of 100. Each page already includes double chance, match and team goals, excluded goals, and home, draw, or away or over 2.5 for every game in the window. Tickets are built from that list. A separate full board is not loaded for each match. Investor and Gambler use the same listing and keep only the exclusive 19 provided options.
 - Default adaptive: prefer original matches, expand when needed.
 - `original_only` / upcoming-only supported via form or language.
 - Markets must exist in the live bookmaker catalog; unknown IDs are discarded.

@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
-import { MARKET_REGISTRY } from '@myodd/shared';
+import { registryForMode } from '@myodd/shared';
 
-export function MarketPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+export function MarketPicker({ selected, onChange, mode }: { selected: string[]; onChange: (ids: string[]) => void; mode?: string | null }) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(false);
   const id = useId();
@@ -11,7 +11,7 @@ export function MarketPicker({ selected, onChange }: { selected: string[]; onCha
     if (expanded) content.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [expanded]);
   // Ship the catalog with the app; current availability is checked during generation.
-  const options = MARKET_REGISTRY.map(item => ({ ...item, available: true }));
+  const options = registryForMode(mode).map(item => ({ ...item, available: true }));
   const categories = [...new Set(options.map(item => item.category))];
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id].slice(0, 100));
   return <section className="market-picker" aria-label="Markets">

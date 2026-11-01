@@ -4,9 +4,9 @@ MyOdd retains the homepage generator, anonymous public browsing, and local guest
 
 ## Public content and indexing policy
 
-The homepage includes server-rendered product explanations, supported-market information, a workflow, collection/result guidance, FAQs, and responsible-gambling content. `/about` and `/faq` provide durable information and are linked from the footer. Public pages have one H1, descriptive internal links, canonical metadata, Open Graph, and Twitter cards. Organization, WebSite, and SoftwareApplication JSON-LD describe the actual service without fabricated ratings, reviews, or offers. The `/opengraph-image` PNG is generated locally from the existing icon, at 1200 × 630.
+The homepage keeps the generator and structured data. Durable product explanations live on `/about`, `/faq`, and `/contact`. Public pages have one H1, descriptive internal links, canonical metadata, Open Graph, and Twitter cards. Organization, WebSite, and SoftwareApplication JSON-LD describe the actual service without fabricated ratings, reviews, or offers. The `/opengraph-image` PNG is generated locally from the existing icon, at 1200 × 630.
 
-`/sitemap.xml` contains only `/`, `/about`, `/faq`, `/terms`, and `/privacy`. It does not call the API or include collections. No unsupported modification timestamps are generated. Existing API sitemap endpoints remain compatible but are no longer used by the website sitemap.
+`/sitemap.xml` contains only `/`, `/about`, `/faq`, `/contact`, `/terms`, and `/privacy`. It does not call the API or include collections. No unsupported modification timestamps are generated. Existing API sitemap endpoints remain compatible but are no longer used by the website sitemap.
 
 `/generate`, `/predictions`, `/history`, `/settings`, authentication pages, individual codes/results, and temporary collections are `noindex`. Public collections retain canonical/social metadata for sharing. `robots.txt` allows public crawling so search engines can read `noindex`, disallows unnecessary `/api/` crawling, and advertises the canonical sitemap. Authentication and API ownership checks enforce privacy independently of robots rules.
 

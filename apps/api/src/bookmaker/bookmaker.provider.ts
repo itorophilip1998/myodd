@@ -8,6 +8,7 @@ import type {
 
 export interface FixturesQuery {
   fresh?: boolean;
+  systemOnly?: boolean;
   eventIds?: string[];
   timelineHours?: number;
   pageSize?: number;

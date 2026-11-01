@@ -33,7 +33,7 @@ const token = 'c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM';
     browser = await chromium.launch({channel:'chrome',headless:true});
     const context = await browser.newContext({javaScriptEnabled:false});
     const page = await context.newPage();
-    for (const route of ['/', '/about', '/faq', '/terms', '/privacy']) {
+    for (const route of ['/', '/about', '/faq', '/contact', '/terms', '/privacy']) {
       const response=await page.goto(`${origin}${route}`);
       assert.equal(response.status(),200,route);
       assert.equal(await page.locator('h1').count(),1,route);
@@ -42,7 +42,7 @@ const token = 'c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM';
       assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'),'index, follow');
     }
     await page.goto(origin);
-    assert.ok((await page.locator('article').innerText()).includes('How MyOdd works'));
+    assert.equal(await page.locator('article.seo-content').count(), 0);
     const data=JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
     assert.deepEqual(data['@graph'].map(item=>item['@type']),['Organization','WebSite','SoftwareApplication']);
     for (const route of ['/generate','/predictions','/history','/settings','/sign-in','/sign-up','/g/public-example']) {
@@ -53,7 +53,7 @@ const token = 'c315TbfKdqoaKm_ZCFVUj_UGicyj8QmWpGurIdRyVzM';
     assert.equal((await fetch(`${origin}/g/missing`)).status,404);
     assert.equal((await fetch(`${origin}/g/temporary-failure`)).status,500);
     const sitemap=await (await fetch(`${origin}/sitemap.xml`)).text();
-    assert.deepEqual([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]),['/','/about','/faq','/terms','/privacy'].map(route=>`${canonical}${route === '/' ? '' : route}`));
+    assert.deepEqual([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]),['/','/about','/faq','/contact','/terms','/privacy'].map(route=>`${canonical}${route === '/' ? '' : route}`));
     assert.ok(!sitemap.includes('<lastmod>'));
     const robots=await (await fetch(`${origin}/robots.txt`)).text();
     assert.ok(robots.includes(`Sitemap: ${canonical}/sitemap.xml`));
