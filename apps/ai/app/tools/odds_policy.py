@@ -6,8 +6,10 @@ MIN_SELECTION_ODDS = 1.1
 # Safe per-game / per-leg odds inside a ticket for named modes.
 # Ticket totals still use risk_modes.MODES; these keep individual picks safer.
 MODE_SELECTION_ODDS = {
+    'OVER15_MACHINE': (MIN_SELECTION_ODDS, 1.25),
     'INVESTOR': (MIN_SELECTION_ODDS, 1.35),
     'GAMBLER': (MIN_SELECTION_ODDS, 1.35),
+    'STATSMAN': (MIN_SELECTION_ODDS, 1.35),
     'JAPA': (MIN_SELECTION_ODDS, 2.0),
     'LAGOS_LIFE': (MIN_SELECTION_ODDS, 2.0),
 }

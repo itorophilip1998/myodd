@@ -117,10 +117,15 @@ def load_model():
         return OddsModel()
     if name == 'poisson':
         return PoissonModel(os.getenv('MODEL_PATH', '/data/model.json'))
+    if name == 'statsman':
+        from app.llms.statsman import StatsmanModel
+        return StatsmanModel(os.getenv('STATSMAN_DATA_DIR', './data/statsman'))
     raise ValueError(f'Unknown prediction model: {name}')
 
 
 def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
+    from app.llms.statsman import StatsmanModel
+
     scored = []
     now = datetime.now(timezone.utc)
     for fixture in fixtures:
@@ -143,6 +148,11 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                         version = 'odds-interval-v1' if interval else 'odds-raw-v1'
                     elif fixture.homeTeam not in league.get('teams', {}) or fixture.awayTeam not in league.get('teams', {}):
                         version = model.fallback.version
+                if isinstance(model, StatsmanModel):
+                    fc = model.forecast(fixture)
+                    version = model.version if fc.covered else f'{model.version}-uncovered'
+                    if supported == Market.OTHER and not fc.covered:
+                        version = model.fallback_version
                 scored.append(ScoredSelection(
                     eventId=fixture.eventId, marketId=market.marketId, outcomeId=outcome.outcomeId,
                     specifier=market.specifier, odds=outcome.odds, homeTeam=fixture.homeTeam,
@@ -151,4 +161,8 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                     supportedMarket=supported, probability=round(probability, 6),
                     confidence=round(probability * 100, 2), modelVersion=version, predictedAt=now,
                 ))
+    if isinstance(model, StatsmanModel):
+        from app.tools.statsman_picks import apply_statsman_ticket_filter
+        # Predictions explorer still wants the full scored pool; ticket filter runs in generation.
+        model._last_pool_unfiltered = scored  # noqa: SLF001 — shared with Statsman Mode
     return scored

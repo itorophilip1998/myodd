@@ -23,6 +23,13 @@ it('enforces safe per-game odds inside named-mode tickets', () => {
   expect(withinModeSelectionOdds(1.36, 'INVESTOR')).toBe(false);
   expect(withinModeSelectionOdds(1.35, 'GAMBLER')).toBe(true);
   expect(withinModeSelectionOdds(1.36, 'GAMBLER')).toBe(false);
+  expect(withinModeSelectionOdds(1.25, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeSelectionOdds(1.26, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeOdds(1.9, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(2.0, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(3.15, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(1.89, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeOdds(3.2, 'OVER15_MACHINE')).toBe(false);
   expect(withinModeSelectionOdds(2, 'JAPA')).toBe(true);
   expect(withinModeSelectionOdds(2.01, 'JAPA')).toBe(false);
   expect(withinModeSelectionOdds(2, 'LAGOS_LIFE')).toBe(true);

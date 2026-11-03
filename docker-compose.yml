@@ -87,7 +87,8 @@ services:
       dockerfile: apps/ai/Dockerfile
     restart: unless-stopped
     environment:
-      PREDICTION_MODEL: ${PREDICTION_MODEL:-odds}
+      PREDICTION_MODEL: ${PREDICTION_MODEL:-statsman}
+      STATSMAN_DATA_DIR: ${STATSMAN_DATA_DIR:-/data/statsman}
       PREDICTION_WORKERS: ${PREDICTION_WORKERS:-2}
       CODE_SOURCE_URLS: ${CODE_SOURCE_URLS:-https://www.sportybet.com/ng/m/code-hub/codes}
       MODEL_PATH: /data/model.json
@@ -106,6 +107,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
     volumes:
       - ai_data:/data
+      - ./apps/ai/data/statsman:/data/statsman:ro
     ports:
       - "127.0.0.1:8000:8000"
     extra_hosts:

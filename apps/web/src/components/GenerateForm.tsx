@@ -3,7 +3,7 @@ import { track } from '@/lib/analytics';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ModeInfo } from './ModeInfo';
 import { useRouter } from 'next/navigation';
-import { MAX_TICKET_ODDS, MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, registryForMode, requestedTicketCount } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, addLagosDays, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, registryForMode, requestedTicketCount } from '@myodd/shared';
 import { MarketPicker } from './MarketPicker';
 import { ProgressQuest } from './ProgressQuest';
 import { MatchDayPicker } from './MatchDayPicker';
@@ -25,7 +25,9 @@ import {
 } from '@/lib/prediction-book';
 
 const MODES = [
+  { name: 'Over 1.5 Machine', key: 'OVER15_MACHINE' as const, risk: 'Low risk · O1.5 card', detail: '5 tickets near 3.0 (or 2.0) · legs ≤1.25 · O2.5 if O1.5 <1.11', icon: '◇', tone: 'over15', recommended: false, termsHash: 'mode-over15-machine' },
   { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · lower odds', detail: 'Mixed tickets 3–6 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
+  { name: 'Statsman Mode', key: 'STATSMAN' as const, risk: 'Model engine · high-confidence gates', detail: 'goals/corners/shots ≥76% · side bands', icon: '▣', tone: 'statsman', recommended: false, termsHash: 'mode-statsman' },
   { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Mixed tickets 6.1–20 · each game ≤1.35', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
   { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MODE_ODDS.JAPA.maximum} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
   { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: 'Ticket 100+ · no maximum · each game ≤2.00', icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
@@ -86,7 +88,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
-  const systemMode = (modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER') && predictionBook.length === 0;
+  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER' || modeBand.key === 'STATSMAN') && predictionBook.length === 0;
   const wantsSplit = !systemMode && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
   const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
   const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
@@ -183,11 +185,17 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   function chooseMode(name: string) {
     touch();
     setMode(name);
-    if (['INVESTOR', 'GAMBLER'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
+    if (['OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
     const nextMode = modeKeyFromLabel(name);
     if (nextMode !== 'GAMBLER') {
       const allowed = new Set(registryForMode(nextMode).map(item => item.id));
       setSelectedMarketIds(ids => ids.filter(id => allowed.has(id)));
+    }
+    // Aries rising is only ~2h/day at a ground; a single day rarely fills 5×~3.0 tickets.
+    if (nextMode === 'OVER15_MACHINE' && !dateEdited) {
+      const start = lagosDateYmd();
+      setRangeStart(start);
+      setRangeEnd(addLagosDays(start, 6));
     }
     const band = bandForMode(name);
     setMinOdds(String(band.minimum));
@@ -278,7 +286,13 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     const settingsLine = (systemMode ? [
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       `${mode} system ticket. Choose the ticket count and games per ticket from the exclusive 19-market list. Ignore requested markets, odds, ticket counts, and game counts.`,
-      modeBand.key === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.' : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
+      modeBand.key === 'OVER15_MACHINE'
+        ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Build 5 tickets near 3.0; if the Aries pool cannot fill that band, near 2.0 is fine. Legs 1.10–1.25.'
+        : modeBand.key === 'STATSMAN'
+          ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
+          : modeBand.key === 'INVESTOR'
+            ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.'
+            : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
       dateLine,
     ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',

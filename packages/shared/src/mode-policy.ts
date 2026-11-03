@@ -36,7 +36,10 @@ export function previewOddsFromPrompt(instruction: string): { minimum: number; m
 
 /** Ticket (combined) odds bands for named modes. */
 export const MODE_ODDS = {
+  /** Prefer ~3.0; shortfall may land near ~2.0. */
+  OVER15_MACHINE: { minimum: 1.9, maximum: 3.15 },
   INVESTOR: { minimum: 3, maximum: 6 },
+  STATSMAN: { minimum: 3, maximum: 6 },
   GAMBLER: { minimum: 6.1, maximum: 20 },
   JAPA: { minimum: 20.01, maximum: 100 },
   LAGOS_LIFE: { minimum: 100, maximum: null },
@@ -47,7 +50,9 @@ export const MODE_ODDS = {
  * Ticket totals still use MODE_ODDS; these bounds keep individual picks in a safer band.
  */
 export const MODE_SELECTION_ODDS = {
+  OVER15_MACHINE: { minimum: MIN_SELECTION_ODDS, maximum: 1.25 },
   INVESTOR: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
+  STATSMAN: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   GAMBLER: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   JAPA: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
   LAGOS_LIFE: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
@@ -78,7 +83,9 @@ export function modeKeyFromLabel(label?: string | null): ModeKey | null {
   if (!label) return null;
   const text = label.toLowerCase();
   if (text in MODE_ODDS) return text as ModeKey;
+  if (/\bover\s*1\.?5\s*machine\b/.test(text)) return 'OVER15_MACHINE';
   if (/\binvestor\b/.test(text)) return 'INVESTOR';
+  if (/\bstatsman\b/.test(text)) return 'STATSMAN';
   if (/\bgam(?:b)?ler\b/.test(text)) return 'GAMBLER';
   if (/\bjapa\b/.test(text)) return 'JAPA';
   if (/\blagos/.test(text)) return 'LAGOS_LIFE';

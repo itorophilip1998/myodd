@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
+from .over15_picks import over15_market_allowed
+from .statsman_picks import statsman_market_allowed
 
 
 def fingerprint(selections):
@@ -60,7 +62,11 @@ def eligible(selection, config):
             and (config.minimumProbability is None or selection.probability >= config.minimumProbability)
             and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config))
             and (config.riskMode not in ('INVESTOR', 'GAMBLER') or config.fixtureMode == 'original_only' or investor_market_allowed(
-                selection.marketId, selection.marketName, selection.specifier, selection.selectionName)))
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
+            and (config.riskMode != 'STATSMAN' or config.fixtureMode == 'original_only' or statsman_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
+            and (config.riskMode != 'OVER15_MACHINE' or config.fixtureMode == 'original_only' or over15_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds)))
 
 
 def event_choices(pool, config):

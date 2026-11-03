@@ -142,7 +142,16 @@ export class AiClient {
   }
 
   async generate(fixtures: BookmakerFixture[], config: GenerationConfig, originalSelections: BookmakerSelection[] = [], expandedSearch = false) {
-    const route = config.riskMode ? { INVESTOR: 'investor', GAMBLER: 'gambler', JAPA: 'japa', LAGOS_LIFE: 'lagos-life' }[config.riskMode] : null;
+    const route = config.riskMode
+      ? {
+        OVER15_MACHINE: 'over15-machine',
+        INVESTOR: 'investor',
+        GAMBLER: 'gambler',
+        STATSMAN: 'statsman',
+        JAPA: 'japa',
+        LAGOS_LIFE: 'lagos-life',
+      }[config.riskMode]
+      : null;
     return this.validateGeneration(await this.post(route ? `/generate/${route}` : '/generate', { fixtures, config, originalSelections, expandedSearch }));
   }
 }

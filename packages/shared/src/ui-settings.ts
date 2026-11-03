@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const uiSettingsSchema = z.object({
   soundsEnabled: z.boolean(), soundVolume: z.number().min(0).max(1),
   progressSounds: z.boolean(), toastSounds: z.boolean(),
-  defaultMode: z.enum(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']).nullable(),
+  defaultMode: z.enum(['OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable(),
   defaultOperation: z.enum(['generate', 'split']),
   defaultTickets: z.number().int().min(1).max(10).nullable(),
   defaultGames: z.number().int().min(1).max(50).nullable(),

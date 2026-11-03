@@ -45,6 +45,13 @@ export const MARKET_REGISTRY: Definition[] = [
 const GAMBLER_DOUBLE_CHANCE = new Set(['chance.1x', 'chance.x2', 'chance.12']);
 
 export function registryForMode(mode?: string | null) {
+  if (mode === 'OVER15_MACHINE') {
+    return MARKET_REGISTRY.filter(item => item.id === 'goals.over.1.5' || item.id === 'goals.over.2.5');
+  }
+  if (mode === 'STATSMAN') {
+    return MARKET_REGISTRY.filter(item =>
+      /^(?:goals\.|btts\.|corners\.|shots\.|home\.or\.over|away\.or\.over)/.test(item.id));
+  }
   if (mode === 'INVESTOR' || mode === 'GAMBLER') return MARKET_REGISTRY.filter(item => (item.gamblerOnly && !/^(?:shots\.|(?:home|away|draw)\.or\.)/.test(item.id)) || GAMBLER_DOUBLE_CHANCE.has(item.id));
   return MARKET_REGISTRY.filter(item => !item.gamblerOnly);
 }

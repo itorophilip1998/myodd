@@ -324,7 +324,9 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
   letter-spacing: .02em; color: #d5e3d1; vertical-align: middle;
 }
 .codes-heading h2 .mode-tag { margin-left: 10px; transform: translateY(-2px); }
+.mode-tag.mode-over15_machine { border-color: #7ec8e344; color: #a8dff0; }
 .mode-tag.mode-investor { border-color: #a9d87244; color: #c6f28c; }
+.mode-tag.mode-statsman { border-color: #72c4a944; color: #9ee0c4; }
 .mode-tag.mode-gambler { border-color: #d6b76d44; color: #e0cd9a; }
 .mode-tag.mode-japa { border-color: #e07a6a44; color: #f0b0a4; }
 .mode-tag.mode-lagos_life { border-color: #9b7de644; color: #cbb6f5; }
@@ -397,7 +399,7 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .mode-picker { margin-bottom: 16px; min-width: 0; }
 .mode-picker legend { color: #d1decf; font-size: 12px; margin-bottom: 12px; }
 .mode-picker legend span { color: #778c7b; margin-left: 6px; }
-.mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; }
+.mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; }
 .request-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
 .select-panel, .match-day-picker, .ticket-odds-picker, .prompt-date-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #122019aa; min-width: 0; }
 .select-panel label, .match-day-picker label, .ticket-odds-picker label, .prompt-date-row label { display: flex; flex-direction: column; gap: 6px; min-width: min(140px, 100%); color: #c5d4c4; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
@@ -441,6 +443,7 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .collection-save-hint { margin: 6px 0 0; color: #829584; font-size: 12px; line-height: 1.5; }
 .mode-option small { display: block; color: #8a9e8d; font-size: 10px; margin-top: 3px; }
 .mode-icon { font-size: 23px; line-height: 1; color: #c1ec9b; }
+.over15 .mode-icon { color: #8fd4e8; }.statsman .mode-icon { color: #9ee0c4; }
 .gambler .mode-icon { color: #e3cf8b; }.japa .mode-icon { color: #d6b4ff; }.lagos .mode-icon { color: #f3a18b; }
 .mode-check { color: var(--accent); font-size: 10px; position: absolute; right: 6px; top: 4px; }
 .chat-input-box { border-radius: 18px; padding: 16px 20px; }

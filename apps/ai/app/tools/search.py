@@ -38,19 +38,34 @@ def varied_candidates(candidates, config, rng, limit, ceiling, repeatable=()):
 
 
 INVESTOR_PLAN = ((3.0, 3), (4.0, 3), (5.0, 2), (6.0, 2))
+STATSMAN_PLAN = INVESTOR_PLAN
+OVER15_PLAN = ((3.0, 5), (2.0, 5))  # prefer ~3.0; fill any shortfall near ~2.0
 GAMBLER_PLAN = tuple((round(6.1 + i * (20 - 6.1) / 9, 2), 1) for i in range(10))
 SYSTEM_ODDS_SPAN = 0.10
+OVER15_ODDS = (1.9, 3.15)
 
 
 def uses_system_plan(config) -> bool:
     """Internal system plans cover the complete selected mode band."""
-    return (config.riskMode in ('INVESTOR', 'GAMBLER') and config.fixtureMode != 'original_only'
-            and not config.preserveOriginalSelections and config.numberOfSlips == 10
-            and (config.minimumOdds, config.maximumOdds) == ((3, 6) if config.riskMode == 'INVESTOR' else (6.1, 20)))
+    if config.fixtureMode == 'original_only' or config.preserveOriginalSelections:
+        return False
+    if config.riskMode == 'OVER15_MACHINE':
+        return config.numberOfSlips == 5 and (config.minimumOdds, config.maximumOdds) == OVER15_ODDS
+    if config.numberOfSlips != 10:
+        return False
+    if config.riskMode in ('INVESTOR', 'STATSMAN'):
+        return (config.minimumOdds, config.maximumOdds) == (3, 6)
+    if config.riskMode == 'GAMBLER':
+        return (config.minimumOdds, config.maximumOdds) == (6.1, 20)
+    return False
 
 
 def mode_plan(config):
-    return INVESTOR_PLAN if config.riskMode == 'INVESTOR' else GAMBLER_PLAN
+    if config.riskMode == 'GAMBLER':
+        return GAMBLER_PLAN
+    if config.riskMode == 'OVER15_MACHINE':
+        return OVER15_PLAN
+    return STATSMAN_PLAN if config.riskMode == 'STATSMAN' else INVESTOR_PLAN
 
 
 def target_odds_window(target: float, config=None) -> tuple[float, float]:
@@ -78,10 +93,13 @@ def search_system_plan(pool, config, original, rng=None):
     found = []
     bounds = None
     for target, count in mode_plan(config):
+        need = min(count, config.numberOfSlips - len(found))
+        if need <= 0:
+            break
         low, high = target_odds_window(target, config)
         least, most = target_leg_bounds(pool, low, high)
         scoped = config.model_copy(update={
-            'numberOfSlips': count, 'minimumOdds': low, 'maximumOdds': high,
+            'numberOfSlips': need, 'minimumOdds': low, 'maximumOdds': high,
             'minimumSelections': least, 'maximumSelections': most,
         })
         tickets, possible = search(pool, scoped, original, rng=rng, blocked=blocked, steer=True, attempt_limit=12000)
