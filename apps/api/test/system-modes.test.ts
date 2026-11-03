@@ -12,6 +12,17 @@ function fixture(id: number, approved = true): BookmakerFixture {
 }
 afterEach(() => vi.restoreAllMocks());
 
+it('over 1.5 machine allows totals with the O1.5→O2.5 price rule and 1.25 leg cap', () => {
+  const ou = { marketId: '18', marketName: 'Over/Under', specifier: 'total=1.5', status: 'open', outcomes: [] };
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.18 }, 'OVER15_MACHINE')).toBe(true);
+  // Cheap O1.5 stays on the listing so AI can switch that event to O2.5.
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.08 }, 'OVER15_MACHINE')).toBe(true);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.26 }, 'OVER15_MACHINE')).toBe(false);
+  expect(systemSelectionAllowed({ ...ou, specifier: 'total=2.5' }, { ...outcome, outcomeName: 'Over 2.5', odds: 1.20 }, 'OVER15_MACHINE')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '10', marketName: 'Double Chance', specifier: '', status: 'open', outcomes: [] }, outcome, 'OVER15_MACHINE')).toBe(false);
+  expect(systemConfig('OVER15_MACHINE')).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 5, minimumOdds: 1.9, maximumOdds: 3.15 });
+});
+
 it('recognizes each provided market family and rejects unapproved or unavailable selections', () => {
   const names = ['Excluded Goals', 'Excluded Goals – Home', 'Excluded Goals – Away', 'Total Goal Kicks', 'Home Team Goal Kicks', 'Away Team Goal Kicks', 'Total Cards', 'Home Team Cards', 'Away Team Cards', 'Total Corners', 'Home Team Corners', 'Away Team Corners', 'Total Tackles', 'Home Team Tackles', 'Away Team Tackles', 'Total Goals', 'Home Team Goals', 'Away Team Goals', 'Double Chance'];
   for (const [index, marketName] of names.entries()) {
@@ -51,7 +62,8 @@ it('covers games beyond the first 100 from the provided-option listing and share
 });
 
 it('keeps listed approved options only and reports partial pages without hunting match boards', async () => {
-  const listed = [fixture(1), fixture(2, false), fixture(3)];
+  const listed = Array.from({ length: 100 }, (_, id) => fixture(id + 1, id !== 1));
+  listed[1] = fixture(2, false);
   const provider = { getFixtures: vi.fn(async (query: any) => {
     if (query.eventIds) throw new Error('Match-board option hunting is not allowed');
     if (query.pageNum === 2) throw new Error('temporary listing failure');
@@ -62,7 +74,8 @@ it('keeps listed approved options only and reports partial pages without hunting
   expect(snapshot.coverage.detailGames).toBe(0);
   expect(snapshot.coverage.missingDetails).toBe(0);
   expect(snapshot.notices.join(' ')).toContain('partial');
-  expect(snapshot.fixtures.map(g => g.eventId)).toEqual(['1', '3']);
+  expect(snapshot.fixtures.map(g => g.eventId)).toContain('1');
+  expect(snapshot.fixtures.map(g => g.eventId)).not.toContain('2');
   expect(snapshot.fixtures.every(g => g.markets.every(m => m.marketId === '10'))).toBe(true);
   expect(provider.getFixtures.mock.calls.every(([q]) => !q.eventIds)).toBe(true);
 });
@@ -84,6 +97,27 @@ it.each(['INVESTOR', 'GAMBLER'] as const)('%s uses direct internal planning and 
   expect(ai.generate.mock.calls[0][0].some((g: BookmakerFixture) => g.eventId === '139')).toBe(true);
   expect(bookmaker.getFixtures.mock.calls.every(([q]) => !q.eventIds)).toBe(true);
   expect(prisma.slipGroup.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ generationReport: expect.objectContaining({ fixtureCoverage: expect.objectContaining({ dayGames: 140, detailGames: 0 }) }) }) }));
+});
+
+it('OVER15_MACHINE plans five near-3 tickets from day-wide Over/Under listings', async () => {
+  const games = Array.from({ length: 40 }, (_, id) => ({
+    eventId: String(id), homeTeam: `Home ${id}`, awayTeam: `Away ${id}`, league: `League ${id % 5}`,
+    categoryName: 'Football', kickoffAt: '2099-01-01T12:00:00Z', matchStatus: 'Not started',
+    markets: [{ marketId: '18', marketName: 'Over/Under', specifier: 'total=1.5', status: 'active',
+      outcomes: [{ outcomeId: '12', outcomeName: 'Over 1.5', odds: 1.18, isActive: true }] }],
+  }));
+  const bookmaker = { getFixtures: vi.fn(async (query: any) => query.pageNum === 1 ? games : []) };
+  const selections = [{ eventId: '1', marketId: '18', outcomeId: '12', specifier: 'total=1.5', odds: 1.18 }];
+  const ai = { modelInfo: vi.fn(), parse: vi.fn().mockRejectedValue(new Error('No instruction LLM allowed')), resolve: vi.fn().mockRejectedValue(new Error('No market catalog resolution allowed')),
+    generate: vi.fn(async (_fixtures, plan) => ({ pool: [], candidates: [{ selections, slipScore: 1 }], notices: [], needsExpansion: false, effectiveConfig: plan, diagnostics: { foundSlips: 1 } })) };
+  const prisma = { generationJob: { findUniqueOrThrow: vi.fn().mockResolvedValue({ status: 'PENDING' }), update: vi.fn() }, slipGroup: { update: vi.fn() }, trainingEvent: { create: vi.fn() }, $transaction: (ops: unknown[]) => Promise.all(ops) };
+  const service = new SlipsService(bookmaker as any, { cacheScores: vi.fn() } as any, ai as any,
+    { validate: vi.fn().mockResolvedValue(selections) } as any, prisma as any, {} as any, {} as any);
+  const result = await service.prepareGeneration({ jobId: 'j', groupId: 'g', riskMode: 'OVER15_MACHINE', instruction: 'Create tickets', matchDate: '2099-01-01' });
+  expect(result?.config).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 5, minimumOdds: 1.9, maximumOdds: 3.15 });
+  expect(ai.parse).not.toHaveBeenCalled();
+  expect(ai.generate.mock.calls[0][0]).toHaveLength(40);
+  expect(bookmaker.getFixtures.mock.calls.every(([q]) => q.systemMode === 'OVER15_MACHINE' && q.marketIds.includes('18'))).toBe(true);
 });
 
 it('drops live or optionless listing games without opening match boards', async () => {

@@ -28,6 +28,10 @@ class ModeAgent:
         return parse_intent(instruction, available_markets, learned_defaults, prompt_mode=self.prompt_name)
 
     async def generate(self, body: GenerateInput, runtime):
+        from app.llms.statsman import StatsmanModel
+        from app.tools.over15_picks import apply_over15_ticket_filter
+        from app.tools.statsman_picks import apply_statsman_ticket_filter
+
         config = configure_mode(body.config, self.mode)
         pool = await score(body.fixtures, runtime)
         loop = asyncio.get_running_loop()
@@ -36,6 +40,24 @@ class ModeAgent:
             pool, note = apply_match_trends(pool, matches)
             config = config.model_copy(update={'unhandledRequests': [*config.unhandledRequests, note]})
         pool = apply_calibration(pool)
+        if config.riskMode == 'OVER15_MACHINE':
+            before = len(pool)
+            pool = apply_over15_ticket_filter(pool)
+            config = config.model_copy(update={
+                'unhandledRequests': [
+                    *config.unhandledRequests,
+                    f'Over 1.5 Machine kept {len(pool)} Aries-rising Over legs from {before} scored outcomes (O1.5, or O2.5 if O1.5 < 1.11; legs ≤1.25).',
+                ],
+            })
+        elif config.riskMode == 'STATSMAN' and isinstance(runtime.model, StatsmanModel):
+            before = len(pool)
+            pool = apply_statsman_ticket_filter(pool, runtime.model)
+            config = config.model_copy(update={
+                'unhandledRequests': [
+                    *config.unhandledRequests,
+                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals≥76%, side bands, corners/shots/SOT≥76%).',
+                ],
+            })
         report = await loop.run_in_executor(runtime.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)
         version = next((s.modelVersion for s in pool if '@cal-v1-' in s.modelVersion),
                        TREND_VERSION if any(s.modelVersion == TREND_VERSION for s in pool) else runtime.model.version)

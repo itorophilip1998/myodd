@@ -8,8 +8,10 @@ class ModeConstraintError(ValueError):
     pass
 
 MODES = (
+    (r'\bover\s*1\.?5\s+machines?\b', 'OVER15_MACHINE', 'VERY_LOW', 1.9, 3.15),
     (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
     (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 6.1, 20.),
+    (r'\bstatsman\s+modes?\b', 'STATSMAN', 'VERY_LOW', 3., 6.),
     (r'\bjapa\s+modes?\b', 'JAPA', 'HIGHER', 20.01, 100.),
     (r'\blagos[\s-]*(?:li(?:f|v)es?|life)(?:\s+modes?)?\b', 'LAGOS_LIFE', 'VERY_HIGH', 100, None),
 )
@@ -29,10 +31,13 @@ _MARKET_REQUEST = re.compile(
 
 
 def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -> Config:
-    """Investor and Gambler use internal markets, counts and a full-band odds mix."""
+    """Fixed system modes use internal markets, counts and odds targets."""
     _, _, preference, minimum, maximum = next(entry for entry in MODES if entry[1] == mode)
-    label = "Investor" if mode == "INVESTOR" else "Gambler"
+    label = {
+        'OVER15_MACHINE': 'Over 1.5 Machine', 'INVESTOR': 'Investor', 'GAMBLER': 'Gambler', 'STATSMAN': 'Statsman',
+    }.get(mode, mode.title())
     notices = list(config.unhandledRequests)
+    slips = 5 if mode == 'OVER15_MACHINE' else 10
 
     def note(message: str) -> None:
         if message not in notices:
@@ -41,17 +46,21 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     user = _user_instruction(instruction)
     low, high = extract_odds_bounds(user)
     if has_explicit_odds_request(user) and not (low == minimum and high == maximum):
-        note(f'{label} Mode kept its fixed ticket odds band {minimum:g}–{maximum:g} with mixed targets across the range. Requested odds were not applied.')
-    if _MARKET_REQUEST.search(user):
-        note(f'{label} Mode chooses the markets. Requested markets were not applied.')
+        note(f'{label} kept its fixed ticket odds band {minimum:g}–{maximum:g}. Requested odds were not applied.')
+    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE'):
+        note(f'{label} chooses the markets. Requested markets were not applied.')
+    if mode == 'STATSMAN':
+        note('Statsman Mode tickets goals ≥76%, side 58–65%→to score, side ≥66%→1/over 2.5 or win either half, corners/shots/SOT ≥76%.')
+    if mode == 'OVER15_MACHINE':
+        note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · 5 tickets near 3.0 (near 2.0 if short) · legs ≤1.25.')
     tickets = requested_ticket_count(user)
-    if (tickets is not None and tickets != 10) or extract_games_per_ticket(user) is not None:
-        note(f'{label} Mode chooses the ticket count and games per ticket. Requested counts were not applied.')
+    if (tickets is not None and tickets != slips) or extract_games_per_ticket(user) is not None:
+        note(f'{label} chooses the ticket count and games per ticket. Requested counts were not applied.')
     if re.search(r'nearest|closest|adjust (?:the )?odds|relax (?:the )?odds', user, re.I):
-        note(f'{label} Mode does not move odds to the nearest range.')
+        note(f'{label} does not move odds to the nearest range.')
     result = config.model_copy(update={
         'riskMode': mode, 'riskPreference': preference, 'minimumOdds': minimum, 'maximumOdds': maximum,
-        'allowOddsAdjustment': False, 'numberOfSlips': 10, 'minimumSelections': 1, 'maximumSelections': 50,
+        'allowOddsAdjustment': False, 'numberOfSlips': slips, 'minimumSelections': 1, 'maximumSelections': 50,
         'markets': [], 'marketQueries': [], 'marketRules': [], 'relatedMarketRules': [], 'marketPolicy': 'prefer',
         'unhandledRequests': notices,
     })
@@ -69,7 +78,7 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
     # Lock named system modes; inferred numeric requests retain their custom constraints until mode generation.
-    if mode in ('INVESTOR', 'GAMBLER') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
+    if mode in ('OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
         return lock_system_mode(config, instruction, mode)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
@@ -114,7 +123,7 @@ def configure_mode(config: Config, mode: str | None) -> Config:
     if config.riskMode is not None and config.riskMode != mode:
         raise ModeConstraintError('The selected route conflicts with the request risk mode.')
     pinned = config.fixtureMode == 'original_only' and config.preserveOriginalSelections
-    if mode in ('INVESTOR', 'GAMBLER') and not pinned:
+    if mode in ('OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
         if config.fixtureMode == 'original_only':
             config = config.model_copy(update={'fixtureMode': 'adaptive'})
         return lock_system_mode(config, '', mode)

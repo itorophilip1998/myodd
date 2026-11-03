@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { SPORTYBET_MARKET_IDS, SYSTEM_LISTING_MARKET_IDS, systemFixture } from '@myodd/shared';
+import { listingMarketIdsForMode, SPORTYBET_MARKET_IDS, systemFixture } from '@myodd/shared';
 import type {
   LiveFixture,
   BookmakerBooking,
@@ -48,7 +48,7 @@ export class SportyBetProvider implements BookmakerProvider {
           { cacheKey: query.fresh ? undefined : `sporty:event:${region}:${eventId}`, retries: 0, minIntervalMs: ids.length > 15 ? 40 : undefined },
         );
         const fixture = mapEvent(data);
-        return query.systemOnly ? systemFixture(fixture) : fixture;
+        return query.systemOnly ? systemFixture(fixture, query.systemMode) : fixture;
       }));
       const fixtures = results.filter((result): result is PromiseFulfilledResult<BookmakerFixture> => result.status === 'fulfilled').map(result => result.value);
       const missing = ids.filter(id => !fixtures.some(fixture => fixture.eventId === id));
@@ -81,13 +81,13 @@ export class SportyBetProvider implements BookmakerProvider {
       tournaments?: unknown[];
     }>(path, { cacheKey: query.fresh ? undefined : cacheKey });
     const fixtures = mapFixtures(data as never);
-    return query.systemOnly ? fixtures.map(systemFixture) : fixtures;
+    return query.systemOnly ? fixtures.map(f => systemFixture(f, query.systemMode)) : fixtures;
   }
 
   private async lookupListedEvents(eventIds: string[], query: FixturesQuery): Promise<BookmakerFixture[]> {
     const wanted = new Set(eventIds);
     const found = new Map<string, BookmakerFixture>();
-    const marketIds = query.systemOnly ? SYSTEM_LISTING_MARKET_IDS : query.marketIds;
+    const marketIds = query.systemOnly ? listingMarketIdsForMode(query.systemMode) : query.marketIds;
     for (let pageNum = 1; pageNum <= 20 && found.size < wanted.size; pageNum += 1) {
       const page = await this.getFixtures({
         pageNum,
@@ -96,6 +96,7 @@ export class SportyBetProvider implements BookmakerProvider {
         timelineHours: query.timelineHours ?? 168,
         marketIds,
         systemOnly: query.systemOnly,
+        systemMode: query.systemMode,
         fresh: query.fresh,
       });
       for (const fixture of page) {

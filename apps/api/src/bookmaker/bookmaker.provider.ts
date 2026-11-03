@@ -9,6 +9,8 @@ import type {
 export interface FixturesQuery {
   fresh?: boolean;
   systemOnly?: boolean;
+  /** When systemOnly, which fixed mode filters listing outcomes (defaults Investor). */
+  systemMode?: 'OVER15_MACHINE' | 'INVESTOR' | 'GAMBLER' | 'STATSMAN' | null;
   eventIds?: string[];
   timelineHours?: number;
   pageSize?: number;

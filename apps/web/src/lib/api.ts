@@ -47,7 +47,7 @@ async function resultCheck<T>(operation: () => Promise<T>): Promise<T> {
 
 export interface CreatorSummary { publicId: string; username: string | null; name: string }
 export type CollectionPlayResult = 'DONE' | 'LIVE' | 'OPEN' | 'UNKNOWN' | 'ALL_PLAYED' | 'CUT' | 'MIXED';
-export type RiskMode = 'INVESTOR' | 'GAMBLER' | 'JAPA' | 'LAGOS_LIFE';
+export type RiskMode = 'OVER15_MACHINE' | 'INVESTOR' | 'GAMBLER' | 'STATSMAN' | 'JAPA' | 'LAGOS_LIFE';
 export type SlipPlayStatus = 'OPEN' | 'LIVE' | 'ALL_PLAYED' | 'UNKNOWN' | 'CUT';
 export type LegPlayStatus = 'UPCOMING' | 'LIVE' | 'PLAYED' | 'UNKNOWN' | 'CUT';
 export interface PlaySummary {
