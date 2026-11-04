@@ -1,5 +1,6 @@
-"""Goals desk v2 — Zi Wei / Omikuji / Lenormand all-4 Yes books.
+"""Goals desk v2 — Zi Wei / Omikuji / Lenormand / Desk books.
 
+O1.5 path: at least 3 Yes (all 4 ranks higher). O2.5 path: all 4 Yes.
 Casts are prematch-only (seed from home vs away + desk-local kickoff + coords).
 Desk TZ is fixed UTC+1 to match the dualman goals desk stamp.
 """
@@ -391,22 +392,30 @@ def cast_desk(home: str, away: str, kickoff: datetime | str) -> DeskBook:
     )
 
 
+DESK_VOICES = ('zw', 'omi', 'len', 'book')
+
+
+def desk_yes_count(book: dict) -> int:
+    """How many of Zi Wei / Omikuji / Lenormand / Desk say Yes."""
+    return sum(1 for key in DESK_VOICES if book.get(key) == 'Yes')
+
+
 def all4_yes(book: dict) -> bool:
-    """Z / O / L / Desk all Yes (raw ZW, matching dualman sheet Y/Y/Y/Y)."""
-    return (
-        book.get('zw') == 'Yes'
-        and book.get('omi') == 'Yes'
-        and book.get('len') == 'Yes'
-        and book.get('book') == 'Yes'
-    )
+    """Z / O / L / Desk all Yes (required for Over 2.5)."""
+    return desk_yes_count(book) == 4
 
 
-def goals_desk_probability(line: float) -> float:
-    """Rank soft — all-4 Yes is the gate; odds band does the rest."""
+def at_least_n_yes(book: dict, n: int) -> bool:
+    """O1.5 lane needs at least 3 Yes; all-4 ranks higher."""
+    return desk_yes_count(book) >= n
+
+
+def goals_desk_probability(line: float, yes_count: int = 4) -> float:
+    """Rank soft — more Yes votes rank ahead within the same line."""
     if abs(line - 1.5) < 1e-6:
-        return 0.82
+        return 0.84 if yes_count >= 4 else 0.78 if yes_count >= 3 else 0.65
     if abs(line - 2.0) < 1e-6:
-        return 0.78
+        return 0.80 if yes_count >= 4 else 0.74 if yes_count >= 3 else 0.65
     if abs(line - 2.5) < 1e-6:
-        return 0.72
+        return 0.72  # O2.5 only enters when all 4 agree
     return 0.65
