@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Ticket the dualman **goals desk v2** all-4 Yes books (Zi Wei / Omikuji / Lenormand / Desk) against SportyBet goal totals.
+Ticket the dualman **goals desk v2** books (Zi Wei / Omikuji / Lenormand / Desk) against SportyBet goal totals.
 
 ## Pick gates
 
 | Signal | Market | Odds |
 | --- | --- | --- |
-| All 4 Yes on O1.5 and O1.5 priced **1.09–1.13** | Asian Over 2 (`total=2`) — **same O1.5 ticket lane** | Asian leg ≥ 1.10 |
-| All 4 Yes on O1.5 and O1.5 priced **1.14–1.27** | Over 1.5 | **1.14–1.27** |
-| All 4 Yes on O2.5 | Over 2.5 | **1.10–1.60** |
+| **≥3 of 4 Yes** on O1.5 (prefer all 4) and O1.5 priced **1.09–1.13** | Asian Over 2 (`total=2`) — **same O1.5 ticket lane** | Asian leg ≥ 1.10 |
+| **≥3 of 4 Yes** on O1.5 (prefer all 4) and O1.5 priced **1.14–1.27** | Over 1.5 | **1.14–1.27** |
+| **All 4 Yes** on O2.5 | Over 2.5 | **1.10–1.60** |
 
-Prefer the O1.5 path (including the Asian Over 2 switch) over O2.5 on the same match. One pick per match.
+Prefer the O1.5 path (including the Asian Over 2 switch) over O2.5 on the same match. One pick per match. All-4 O1.5 picks rank ahead of 3-of-4 within the same lane.
 
 ## Ticket construction
 

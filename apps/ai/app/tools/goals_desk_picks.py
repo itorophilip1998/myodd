@@ -1,12 +1,13 @@
 """Goals desk v2 ticket gates.
 
-All 4 (ZW / OMI / LEN / Desk) must say Yes.
+O1.5 lane: at least 3 of ZW / OMI / LEN / Desk say Yes (all 4 ranks higher).
+O2.5 lane: all 4 must say Yes.
 
 Over 1.5 path (same ticket lane, combined odds 3–5):
   - If Over 1.5 is priced 1.09–1.13 → book Asian Over 2 instead.
   - If Over 1.5 is priced above 1.13 up to 1.27 → book Over 1.5.
 Over 2.5 path (separate ticket lane, combined odds 4–6):
-  - Take when priced 1.10–1.60.
+  - Take when priced 1.10–1.60 and all 4 Yes.
 
 Never mix the O1.5 lane (O1.5 + Asian O2) with Over 2.5 on the same ticket.
 One pick per match. Prefer the O1.5 path over O2.5.
@@ -15,7 +16,13 @@ from __future__ import annotations
 
 import re
 
-from app.llms.goals_desk_v2 import all4_yes, cast_desk, goals_desk_probability
+from app.llms.goals_desk_v2 import (
+    all4_yes,
+    at_least_n_yes,
+    cast_desk,
+    desk_yes_count,
+    goals_desk_probability,
+)
 from app.schemas import Market, ScoredSelection
 
 O15_LIST_MIN = 1.09  # keep cheap O1.5 so we can switch to Asian Over 2
@@ -27,6 +34,7 @@ O25_MIN = 1.10
 O25_MAX = 1.60
 ASIAN_LINE = 2.0
 ASIAN_LEG_MIN = 1.10
+O15_MIN_YES = 3
 
 
 def _line(specifier: str, name: str) -> float | None:
@@ -90,12 +98,13 @@ def goals_desk_market_allowed(market_id: str, market_name: str, specifier: str, 
     return False
 
 
-def _stamp(pick: ScoredSelection, line: float, lot: str) -> ScoredSelection:
-    prob = goals_desk_probability(line)
+def _stamp(pick: ScoredSelection, line: float, lot: str, yes_count: int) -> ScoredSelection:
+    prob = goals_desk_probability(line, yes_count)
+    tag = 'all4' if yes_count >= 4 else f'{yes_count}of4'
     return pick.model_copy(update={
         'probability': round(prob, 6),
         'confidence': round(prob * 100, 2),
-        'modelVersion': f'goals-desk-v2-all4-{lot}',
+        'modelVersion': f'goals-desk-v2-{tag}-{lot}',
     })
 
 
@@ -112,19 +121,20 @@ def apply_goals_desk_ticket_filter(pool: list[ScoredSelection]) -> list[ScoredSe
         o20 = next((s for s in selections if is_goals_total_over(s, ASIAN_LINE)), None)
         o25 = next((s for s in selections if is_goals_total_over(s, 2.5)), None)
 
-        if all4_yes(desk.o15) and o15 is not None:
+        o15_yes = desk_yes_count(desk.o15)
+        if at_least_n_yes(desk.o15, O15_MIN_YES) and o15 is not None:
             price = _price(o15.odds)
             if in_asian_window(price):
                 # Cheap O1.5 (1.09–1.13) → Asian Over 2, still on the O1.5 ticket lane.
                 if o20 is not None and _price(o20.odds) >= ASIAN_LEG_MIN:
-                    kept.append(_stamp(o20, ASIAN_LINE, desk.lot))
+                    kept.append(_stamp(o20, ASIAN_LINE, desk.lot, o15_yes))
                 continue
             if O15_DIRECT_MIN <= price <= O15_MAX:
-                kept.append(_stamp(o15, 1.5, desk.lot))
+                kept.append(_stamp(o15, 1.5, desk.lot, o15_yes))
                 continue
 
         if all4_yes(desk.o25) and o25 is not None:
             price = _price(o25.odds)
             if O25_MIN <= price <= O25_MAX:
-                kept.append(_stamp(o25, 2.5, desk.lot))
+                kept.append(_stamp(o25, 2.5, desk.lot, 4))
     return kept

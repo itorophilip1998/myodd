@@ -1,9 +1,9 @@
-"""Goals Desk v2 — all-4 Yes filter + odds gates."""
+"""Goals Desk v2 — O1.5 ≥3 Yes / O2.5 all-4 Yes + odds gates."""
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from app.llms.goals_desk_v2 import all4_yes, cast_desk
+from app.llms.goals_desk_v2 import all4_yes, at_least_n_yes, cast_desk, desk_yes_count, goals_desk_probability
 from app.schemas import Market, ScoredSelection
 from app.tools.goals_desk_picks import (
     apply_goals_desk_ticket_filter,
@@ -17,7 +17,7 @@ class GoalsDeskPolicyTests(unittest.TestCase):
         config = parse_rules('Goals Desk v2')
         self.assertEqual(config.riskMode, 'GOALS_DESK_V2')
         self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (3.0, 6.0, 10))
-        self.assertTrue(any('all-4' in note.lower() or 'Goals Desk' in note for note in config.unhandledRequests))
+        self.assertTrue(any('Goals Desk' in note or 'all-4' in note.lower() or '3 of 4' in note.lower() for note in config.unhandledRequests))
 
     def test_listing_odds_gates(self):
         self.assertTrue(goals_desk_market_allowed('18', 'Over/Under', 'total=1.5', 'Over 1.5', 1.18))
@@ -30,14 +30,21 @@ class GoalsDeskPolicyTests(unittest.TestCase):
         self.assertTrue(goals_desk_market_allowed('18', 'Over/Under', 'total=2.5', 'Over 2.5', 1.55))
         self.assertFalse(goals_desk_market_allowed('18', 'Over/Under', 'total=2.5', 'Over 2.5', 1.61))
 
-    def test_all4_requires_zw_omi_len_desk(self):
-        self.assertTrue(all4_yes({'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Yes'}))
-        self.assertFalse(all4_yes({'zw': 'Yes', 'omi': 'Pass', 'len': 'Yes', 'book': 'Yes'}))
-        self.assertFalse(all4_yes({'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Pass'}))
+    def test_o15_allows_3_of_4_while_o25_needs_all4(self):
+        four = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Yes'}
+        three = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Pass'}
+        two = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Pass', 'book': 'Pass'}
+        self.assertEqual(desk_yes_count(four), 4)
+        self.assertTrue(all4_yes(four))
+        self.assertTrue(at_least_n_yes(three, 3))
+        self.assertFalse(all4_yes(three))
+        self.assertFalse(at_least_n_yes(two, 3))
+        self.assertGreater(goals_desk_probability(1.5, 4), goals_desk_probability(1.5, 3))
 
     def test_filter_takes_o15_switches_asian_and_allows_o25(self):
         kickoff = datetime(2099, 1, 1, 12, 0, tzinfo=timezone.utc)
         yes = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Yes', 'zw_gated': 'Yes'}
+        three = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Pass', 'zw_gated': 'Yes'}
         no = {'zw': 'No', 'omi': 'No', 'len': 'No', 'book': 'No', 'zw_gated': 'No'}
 
         def make(event, line, odds, home='Arsenal'):
@@ -51,7 +58,9 @@ class GoalsDeskPolicyTests(unittest.TestCase):
             )
 
         desk_o15 = type('D', (), {'o15': yes, 'o25': no, 'btts': no, 'lot': '吉'})()
+        desk_o15_3 = type('D', (), {'o15': three, 'o25': no, 'btts': no, 'lot': '吉'})()
         desk_o25 = type('D', (), {'o15': no, 'o25': yes, 'btts': no, 'lot': '中吉'})()
+        desk_o25_3 = type('D', (), {'o15': no, 'o25': three, 'btts': no, 'lot': '中吉'})()
         desk_both = type('D', (), {'o15': yes, 'o25': yes, 'btts': no, 'lot': '末吉'})()
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15):
@@ -60,6 +69,11 @@ class GoalsDeskPolicyTests(unittest.TestCase):
             ])
             self.assertEqual(len(kept), 1)
             self.assertEqual(kept[0].specifier, 'total=1.5')
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15_3):
+            kept = apply_goals_desk_ticket_filter([make(11, 1.5, 1.18)])
+            self.assertEqual(len(kept), 1)
+            self.assertIn('3of4', kept[0].modelVersion)
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15):
             # 1.09–1.13 → Asian Over 2 (still O1.5 ticket lane)
@@ -89,6 +103,10 @@ class GoalsDeskPolicyTests(unittest.TestCase):
             kept = apply_goals_desk_ticket_filter([make(4, 2.5, 1.55), make(4, 1.5, 1.30)])
             self.assertEqual(len(kept), 1)
             self.assertEqual(kept[0].specifier, 'total=2.5')
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o25_3):
+            # O2.5 still requires all 4 Yes
+            self.assertEqual(apply_goals_desk_ticket_filter([make(9, 2.5, 1.55)]), [])
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o25):
             self.assertEqual(apply_goals_desk_ticket_filter([make(5, 2.5, 1.65)]), [])
