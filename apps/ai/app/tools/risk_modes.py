@@ -8,7 +8,8 @@ class ModeConstraintError(ValueError):
     pass
 
 MODES = (
-    (r'\bover\s*1\.?5\s+machines?\b', 'OVER15_MACHINE', 'VERY_LOW', 1.9, 3.15),
+    (r'\bover\s*1\.?5\s+machines?\b', 'OVER15_MACHINE', 'VERY_LOW', 4., 6.),
+    (r'\bgoals?\s+desk\s*v?2\b', 'GOALS_DESK_V2', 'VERY_LOW', 3., 6.),
     (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
     (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 6.1, 20.),
     (r'\bstatsman\s+modes?\b', 'STATSMAN', 'VERY_LOW', 3., 6.),
@@ -34,10 +35,11 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     """Fixed system modes use internal markets, counts and odds targets."""
     _, _, preference, minimum, maximum = next(entry for entry in MODES if entry[1] == mode)
     label = {
-        'OVER15_MACHINE': 'Over 1.5 Machine', 'INVESTOR': 'Investor', 'GAMBLER': 'Gambler', 'STATSMAN': 'Statsman',
+        'OVER15_MACHINE': 'Over 1.5 Machine', 'GOALS_DESK_V2': 'Goals Desk v2',
+        'INVESTOR': 'Investor', 'GAMBLER': 'Gambler', 'STATSMAN': 'Statsman',
     }.get(mode, mode.title())
     notices = list(config.unhandledRequests)
-    slips = 5 if mode == 'OVER15_MACHINE' else 10
+    slips = 10
 
     def note(message: str) -> None:
         if message not in notices:
@@ -47,12 +49,14 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     low, high = extract_odds_bounds(user)
     if has_explicit_odds_request(user) and not (low == minimum and high == maximum):
         note(f'{label} kept its fixed ticket odds band {minimum:g}–{maximum:g}. Requested odds were not applied.')
-    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE'):
+    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE', 'GOALS_DESK_V2'):
         note(f'{label} chooses the markets. Requested markets were not applied.')
     if mode == 'STATSMAN':
         note('Statsman Mode tickets goals ≥76%, side 58–65%→to score, side ≥66%→1/over 2.5 or win either half, corners/shots/SOT ≥76%.')
     if mode == 'OVER15_MACHINE':
-        note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · 5 tickets near 3.0 (near 2.0 if short) · legs ≤1.25.')
+        note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · week range by default · up to 10 tickets at 4–6 · no same-game repeat · legs ≤1.25.')
+    if mode == 'GOALS_DESK_V2':
+        note('Goals Desk v2: all-4 Yes only · O1.5 1.14–1.27 · Asian O2 when O1.5 is 1.09–1.13 (same O1.5 ticket lane) · O2.5 ≤1.60 · O1.5 lane 3–5 · O2.5 lane 4–6 · up to 10 tickets · thin days pull in the next 1–2 days.')
     tickets = requested_ticket_count(user)
     if (tickets is not None and tickets != slips) or extract_games_per_ticket(user) is not None:
         note(f'{label} chooses the ticket count and games per ticket. Requested counts were not applied.')
@@ -78,7 +82,7 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
     # Lock named system modes; inferred numeric requests retain their custom constraints until mode generation.
-    if mode in ('OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
         return lock_system_mode(config, instruction, mode)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
@@ -123,7 +127,7 @@ def configure_mode(config: Config, mode: str | None) -> Config:
     if config.riskMode is not None and config.riskMode != mode:
         raise ModeConstraintError('The selected route conflicts with the request risk mode.')
     pinned = config.fixtureMode == 'original_only' and config.preserveOriginalSelections
-    if mode in ('OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
         if config.fixtureMode == 'original_only':
             config = config.model_copy(update={'fixtureMode': 'adaptive'})
         return lock_system_mode(config, '', mode)

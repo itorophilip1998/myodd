@@ -7,7 +7,7 @@ export function systemConfig(mode: GenerationConfig['riskMode']): GenerationConf
   return generationConfigSchema.parse({ riskMode: mode,
     riskPreference: mode === 'GAMBLER' ? RiskPreference.MODERATE : RiskPreference.VERY_LOW,
     minimumOdds: band.minimum, maximumOdds: band.maximum,
-    numberOfSlips: mode === 'OVER15_MACHINE' ? 5 : 10,
+    numberOfSlips: 10,
     minimumSelections: 1, maximumSelections: 50, fixtureMode: 'upcoming',
     markets: [], marketRules: [], relatedMarketRules: [], marketQueries: [], marketPolicy: 'prefer',
     preserveOriginalSelections: false, allowOddsAdjustment: false,

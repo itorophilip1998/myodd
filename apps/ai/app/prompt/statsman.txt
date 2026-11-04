@@ -1,4 +1,4 @@
-Statsman Mode. Ticket odds 3–6 with the Investor-style mix (near 3 / 4 / 5 / 6). Each leg 1.10–1.35.
+Statsman Mode: riskMode=STATSMAN, riskPreference=VERY_LOW. Ticket odds 3–6 with the Investor-style mix (near 3 / 4 / 5 / 6). Each leg 1.10–1.35.
 
 The Statsman engine (Elo side + 21-day decayed attack/defence) scores every listed game. Only these picks may enter tickets:
 

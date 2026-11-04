@@ -6,10 +6,11 @@ from .japa import JapaAgent
 from .lagos_life import LagosLifeAgent
 from .prediction import PredictionAgent
 from .over15_machine import Over15MachineAgent
+from .goals_desk_v2 import GoalsDeskV2Agent
 from .statsman import StatsmanAgent
 
 AGENTS = {agent.mode: agent for agent in (
-    Over15MachineAgent(), InvestorAgent(), GamblerAgent(), StatsmanAgent(), JapaAgent(), LagosLifeAgent(),
+    Over15MachineAgent(), GoalsDeskV2Agent(), InvestorAgent(), GamblerAgent(), StatsmanAgent(), JapaAgent(), LagosLifeAgent(),
 )}
 # Unlabelled numeric requests retain their historical custom constraints.
 CUSTOM_AGENT = ModeAgent(None, 'investor')

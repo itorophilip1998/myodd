@@ -61,13 +61,19 @@ export const OVER15_LISTING_MARKET_IDS = [
   SPORTYBET_MARKET_IDS.OVER_UNDER,
 ];
 
+/** Goals Desk v2 — match totals (incl. Asian Over 2 / total=2). */
+export const GOALS_DESK_LISTING_MARKET_IDS = [
+  SPORTYBET_MARKET_IDS.OVER_UNDER,
+];
+
 export function isSystemMode(mode?: string | null) {
-  return mode === 'OVER15_MACHINE' || mode === 'INVESTOR' || mode === 'GAMBLER' || mode === 'STATSMAN';
+  return mode === 'OVER15_MACHINE' || mode === 'GOALS_DESK_V2' || mode === 'INVESTOR' || mode === 'GAMBLER' || mode === 'STATSMAN';
 }
 
 export function listingMarketIdsForMode(mode?: string | null) {
   if (mode === 'STATSMAN') return STATSMAN_LISTING_MARKET_IDS;
   if (mode === 'OVER15_MACHINE') return OVER15_LISTING_MARKET_IDS;
+  if (mode === 'GOALS_DESK_V2') return GOALS_DESK_LISTING_MARKET_IDS;
   return SYSTEM_LISTING_MARKET_IDS;
 }
 
@@ -93,9 +99,27 @@ function over15SelectionAllowed(market: BookmakerMarket, outcome: BookmakerOutco
   return false;
 }
 
+function goalsDeskSelectionAllowed(market: BookmakerMarket, outcome: BookmakerOutcome) {
+  const name = `${market.marketName} ${outcome.outcomeName}`.toLowerCase();
+  if (/half|corner|shot|card|kick|tackle|home|away|competitor|1x2|player|handicap/i.test(name)) return false;
+  if (!/^over/i.test(outcome.outcomeName.trim())) return false;
+  const line = /total=([\d.]+)/.exec(market.specifier ?? '')?.[1]
+    ?? /(\d+(?:\.\d+)?)/.exec(outcome.outcomeName)?.[1];
+  if (!line) return false;
+  const value = Number(line);
+  const odds = outcome.odds;
+  if (!Number.isFinite(odds)) return false;
+  // Keep O1.5 at 1.09–1.13 so the AI can switch that event to Asian Over 2 (O1.5 ticket lane).
+  if (value === 1.5) return odds >= 1.09 && odds <= 1.27;
+  if (value === 2) return odds >= 1.10;
+  if (value === 2.5) return odds >= 1.10 && odds <= 1.60;
+  return false;
+}
+
 export function systemSelectionAllowed(market: BookmakerMarket, outcome: BookmakerOutcome, mode?: string | null) {
   if (!['', '0', 'active', 'open'].includes((market.status ?? '').toLowerCase()) || !outcome.isActive) return false;
   if (mode === 'OVER15_MACHINE') return over15SelectionAllowed(market, outcome);
+  if (mode === 'GOALS_DESK_V2') return goalsDeskSelectionAllowed(market, outcome);
   if (!withinLegBand(outcome.odds)) return false;
   if (mode === 'STATSMAN') return statsmanSelectionAllowed(market, outcome);
   if (/half|minute|period|player|handicap|winner|1x2|\bor\b|&|\band\b/i.test(market.marketName)) return false;

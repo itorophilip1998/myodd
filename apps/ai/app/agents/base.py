@@ -46,7 +46,17 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Over 1.5 Machine kept {len(pool)} Aries-rising Over legs from {before} scored outcomes (O1.5, or O2.5 if O1.5 < 1.11; legs ≤1.25).',
+                    f'Over 1.5 Machine kept {len(pool)} Aries-rising Over legs from {before} scored outcomes (O1.5, or O2.5 if O1.5 < 1.11; legs ≤1.25; tickets 4–6; no same-game repeat).',
+                ],
+            })
+        elif config.riskMode == 'GOALS_DESK_V2':
+            from app.tools.goals_desk_picks import apply_goals_desk_ticket_filter
+            before = len(pool)
+            pool = apply_goals_desk_ticket_filter(pool)
+            config = config.model_copy(update={
+                'unhandledRequests': [
+                    *config.unhandledRequests,
+                    f'Goals Desk v2 kept {len(pool)} all-4 Yes Over legs from {before} scored outcomes (O1.5 1.14–1.27, Asian O2 when O1.5 is 1.09–1.13, O2.5 ≤1.60).',
                 ],
             })
         elif config.riskMode == 'STATSMAN' and isinstance(runtime.model, StatsmanModel):

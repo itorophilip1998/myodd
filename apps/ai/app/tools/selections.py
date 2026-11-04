@@ -2,6 +2,7 @@
 import hashlib
 from datetime import datetime, timezone
 
+from .goals_desk_picks import goals_desk_market_allowed
 from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
 from .over15_picks import over15_market_allowed
@@ -21,8 +22,12 @@ def selection_key(selection):
 
 def match_key(selection):
     """Normalize a fixture so the same game cannot appear twice under different event IDs."""
-    home = ' '.join((selection.homeTeam or '').casefold().split())
-    away = ' '.join((selection.awayTeam or '').casefold().split())
+    if isinstance(selection, dict):
+        home = ' '.join((selection.get('homeTeam') or '').casefold().split())
+        away = ' '.join((selection.get('awayTeam') or '').casefold().split())
+    else:
+        home = ' '.join((selection.homeTeam or '').casefold().split())
+        away = ' '.join((selection.awayTeam or '').casefold().split())
     return '|'.join(sorted((home, away)))
 
 
@@ -66,6 +71,8 @@ def eligible(selection, config):
             and (config.riskMode != 'STATSMAN' or config.fixtureMode == 'original_only' or statsman_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
             and (config.riskMode != 'OVER15_MACHINE' or config.fixtureMode == 'original_only' or over15_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
+            and (config.riskMode != 'GOALS_DESK_V2' or config.fixtureMode == 'original_only' or goals_desk_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds)))
 
 

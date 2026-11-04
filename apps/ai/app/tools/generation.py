@@ -86,12 +86,18 @@ def generate_report(pool: list[ScoredSelection], config: Config, original: list[
         effective.maximumOdds = max(config.maximumOdds, *(c['totalOdds'] for c in candidates)) if config.maximumOdds is not None else None
         notices.append(f'Used your nearest-odds option: returned totals span {min(c["totalOdds"] for c in candidates):g}–{max(c["totalOdds"] for c in candidates):g}.')
     if uses_system_plan(config) and len(candidates) < config.numberOfSlips:
-        grouped = []
-        for target, count in mode_plan(config):
-            low, high = target_odds_window(target, config)
-            got = sum(1 for c in candidates if low <= c['totalOdds'] <= high)
-            grouped.append(f'{got} of {count} at {target:g}')
-        notices.append(f'{config.riskMode.title()} mixed-odds plan (' + ', '.join(grouped) + '). Missing targets could not be filled within the available markets and search budget; no out-of-band tickets were added.')
+        if config.riskMode == 'GOALS_DESK_V2':
+            notices.append(
+                'Goals Desk v2 lane plan (O1.5 lane incl. Asian Over 2 at 3–5; O2.5 lane at 4–6; lanes never mixed). '
+                f'Found {len(candidates)} of {config.numberOfSlips}; missing targets could not be filled within the available markets and search budget.'
+            )
+        else:
+            grouped = []
+            for target, count in mode_plan(config):
+                low, high = target_odds_window(target, config)
+                got = sum(1 for c in candidates if low <= c['totalOdds'] <= high)
+                grouped.append(f'{got} of {count} at {target:g}')
+            notices.append(f'{config.riskMode.title()} mixed-odds plan (' + ', '.join(grouped) + '). Missing targets could not be filled within the available markets and search budget; no out-of-band tickets were added.')
     if len(candidates) < config.numberOfSlips:
         notices.append(f'Found {len(candidates)} of {config.numberOfSlips} requested unique combinations within the search budget.')
     if not candidates and bounds:
