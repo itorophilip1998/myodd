@@ -2,8 +2,8 @@ Goals Desk v2: riskMode=GOALS_DESK_V2, riskPreference=VERY_LOW. Up to 10 tickets
 Use the requested match day or date range; if none is set, use that calendar day. When a single day is too thin for up to 10 tickets, also include the next day, then the next two days.
 
 Eligibility: Zi Wei + Omikuji + Lenormand + Desk votes.
-- Over 1.5 lane: at least 3 of 4 say Yes (all 4 preferred / ranked higher).
-- Over 2.5 lane: all 4 must say Yes.
+- Over 1.5 lane: at least 3 of 4 say Yes (all 4 preferred), plus O2.5 pace (Zi Wei + Omikuji + Lenormand Yes on O2.5). Skip Omikuji lot 吉.
+- Over 2.5 lane: all 4 must say Yes. Skip Omikuji lot 吉.
 
 Markets:
 1. If Over 1.5 is priced between 1.09 and 1.13 inclusive, take Asian Over 2 (total goals Over 2.0) instead — that pick still belongs on the Over 1.5 ticket lane.

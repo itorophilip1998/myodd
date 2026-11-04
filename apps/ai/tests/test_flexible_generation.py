@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from app.tools.generation import generate_report
 from app.tools.intent import parse_intent
 from app.tools.market_preferences import resolve_preferences
+from app.tools.selections import is_virtual_game
 from app.llms.scoring import OddsModel, score_fixtures
 from app.schemas import Config, Fixture, Market, MarketRule, ScoredSelection, Selection
 
@@ -133,6 +134,16 @@ class CatalogTests(unittest.TestCase):
         self.assertAlmostEqual(scored[0].probability, 1 / 1.4, places=5)
         fixture.markets[0].status = '2'
         self.assertEqual(score_fixtures([fixture], OddsModel()), [])
+
+    def test_srl_virtual_games_are_omitted(self):
+        real = selection(1)
+        srl_home = real.model_copy(update={'homeTeam': 'Arsenal SRL'})
+        srl_league = real.model_copy(update={'league': 'SRL Argentina'})
+        self.assertTrue(is_virtual_game(srl_home))
+        self.assertTrue(is_virtual_game(srl_league))
+        self.assertTrue(is_virtual_game({'homeTeam': 'A', 'awayTeam': 'B', 'league': 'Simulated Reality'}))
+        self.assertFalse(is_virtual_game(real.model_copy(update={'homeTeam': 'Arsenal', 'awayTeam': 'Chelsea', 'league': 'Premier League'})))
+        self.assertFalse(is_virtual_game(real.model_copy(update={'homeTeam': 'Israel', 'awayTeam': 'Spain'})))
 
 
 if __name__ == '__main__':

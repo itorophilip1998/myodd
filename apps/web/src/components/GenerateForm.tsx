@@ -305,7 +305,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       modeBand.key === 'OVER15_MACHINE'
         ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Legs 1.10–1.25.'
         : modeBand.key === 'GOALS_DESK_V2'
-          ? 'Goals Desk v2: O1.5 needs at least 3 of 4 Yes (prefer all-4); O2.5 needs all-4 Yes. Use the selected match day or range (defaults to that day). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. Thin single days also pull in the next 1–2 days.'
+          ? 'Goals Desk v2: O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace), skips Omikuji 吉; O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (same O1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and ≤1.60. Never mix lanes. O1.5 tickets at 3–5; O2.5 at 4–6. Up to 10 tickets. Thin days pull in +1/+2 days.'
           : modeBand.key === 'STATSMAN'
             ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
             : modeBand.key === 'INVESTOR'

@@ -8,9 +8,11 @@ Ticket the dualman **goals desk v2** books (Zi Wei / Omikuji / Lenormand / Desk)
 
 | Signal | Market | Odds |
 | --- | --- | --- |
-| **≥3 of 4 Yes** on O1.5 (prefer all 4) and O1.5 priced **1.09–1.13** | Asian Over 2 (`total=2`) — **same O1.5 ticket lane** | Asian leg ≥ 1.10 |
-| **≥3 of 4 Yes** on O1.5 (prefer all 4) and O1.5 priced **1.14–1.27** | Over 1.5 | **1.14–1.27** |
-| **All 4 Yes** on O2.5 | Over 2.5 | **1.10–1.60** |
+| **≥3 of 4 Yes** on O1.5 **and** Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace), not Omikuji **吉**, O1.5 priced **1.09–1.13** | Asian Over 2 (`total=2`) — **same O1.5 ticket lane** | Asian leg ≥ 1.10 |
+| Same vote/pace gates, O1.5 priced **1.14–1.27** | Over 1.5 | **1.14–1.27** |
+| **All 4 Yes** on O2.5, not Omikuji **吉** | Over 2.5 | **1.10–1.60** |
+
+**Pace confirm + skip 吉:** Tue/Wed 3–4 Nov autopsy — plain O1.5 YYYY died on 0–0 / 0–1 games. Pace is **ZW + Omikuji + Lenormand Yes on O2.5** (same as the Flashscore canvas). Omikuji O2.5 is lot-locked (凶/大凶 → Pass), so pace only clears on lots that can Yes O2.5 (e.g. 中吉 / 末吉). Skipping Omikuji **吉** (weakest lot both days) stays.
 
 Prefer the O1.5 path (including the Asian Over 2 switch) over O2.5 on the same match. One pick per match. All-4 O1.5 picks rank ahead of 3-of-4 within the same lane.
 

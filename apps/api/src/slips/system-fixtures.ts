@@ -1,4 +1,4 @@
-import { listingMarketIdsForMode, systemFixture, type BookmakerFixture, type GenerationConfig, type MatchDayWindow } from '@myodd/shared';
+import { isVirtualGame, listingMarketIdsForMode, systemFixture, type BookmakerFixture, type GenerationConfig, type MatchDayWindow } from '@myodd/shared';
 import type { BookmakerProvider } from '../bookmaker/bookmaker.provider';
 
 const PAGE_SIZE = 100, MAX_PAGES = 20;
@@ -11,7 +11,8 @@ export interface SystemFixtureSnapshot {
 function inWindow(fixture: BookmakerFixture, window: MatchDayWindow) {
   const kickoff = Date.parse(fixture.kickoffAt);
   return kickoff > Date.now() && kickoff >= Date.parse(window.kickoffAfter) && kickoff < Date.parse(window.kickoffBefore)
-    && !/live|inplay|in play|finished|ended|closed|complete/i.test(fixture.matchStatus ?? '');
+    && !/live|inplay|in play|finished|ended|closed|complete/i.test(fixture.matchStatus ?? '')
+    && !isVirtualGame(fixture);
 }
 
 export class SystemFixtureLoader {

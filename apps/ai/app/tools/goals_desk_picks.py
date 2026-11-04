@@ -1,7 +1,12 @@
 """Goals desk v2 ticket gates.
 
-O1.5 lane: at least 3 of ZW / OMI / LEN / Desk say Yes (all 4 ranks higher).
-O2.5 lane: all 4 must say Yes.
+O1.5 lane: at least 3 of ZW / OMI / LEN / Desk say Yes (all 4 ranks higher),
+  plus an O2.5 pace confirm (Zi Wei + Omikuji + Lenormand Yes on O2.5). Soft-avoid Omikuji 吉.
+O2.5 lane: all 4 must say Yes; soft-avoid Omikuji 吉.
+
+Pace matches the Tue/Wed autopsy + Flashscore canvas: ZW+OMI+LEN Yes on O2.5
+cuts thin 0–0 / 0–1 O1.5 books. (Omikuji O2.5 is lot-locked — 凶/大凶 Pass — so
+pace only clears when the lot can say Yes on O2.5, e.g. 中吉 / 末吉.)
 
 Over 1.5 path (same ticket lane, combined odds 3–5):
   - If Over 1.5 is priced 1.09–1.13 → book Asian Over 2 instead.
@@ -35,6 +40,17 @@ O25_MAX = 1.60
 ASIAN_LINE = 2.0
 ASIAN_LEG_MIN = 1.10
 O15_MIN_YES = 3
+# Wed 4 Nov autopsy: lot 吉 was the weakest Omikuji bucket on O1.5/O2.5 YYYY books.
+WEAK_OMI_LOTS = frozenset({'吉'})
+
+
+def o25_pace_confirm(book_o25: dict) -> bool:
+    """Zi Wei + Omikuji + Lenormand Yes on O2.5 — filters thin O1.5 books that die 0–0 / 0–1."""
+    return (
+        book_o25.get('zw') == 'Yes'
+        and book_o25.get('omi') == 'Yes'
+        and book_o25.get('len') == 'Yes'
+    )
 
 
 def _line(specifier: str, name: str) -> float | None:
@@ -98,13 +114,16 @@ def goals_desk_market_allowed(market_id: str, market_name: str, specifier: str, 
     return False
 
 
-def _stamp(pick: ScoredSelection, line: float, lot: str, yes_count: int) -> ScoredSelection:
+def _stamp(pick: ScoredSelection, line: float, lot: str, yes_count: int, *, paced: bool = False) -> ScoredSelection:
     prob = goals_desk_probability(line, yes_count)
+    if paced and abs(line - 2.5) > 1e-6:
+        prob = min(0.92, prob + 0.04)
     tag = 'all4' if yes_count >= 4 else f'{yes_count}of4'
+    pace = '-pace' if paced else ''
     return pick.model_copy(update={
         'probability': round(prob, 6),
         'confidence': round(prob * 100, 2),
-        'modelVersion': f'goals-desk-v2-{tag}-{lot}',
+        'modelVersion': f'goals-desk-v2-{tag}{pace}-{lot}',
     })
 
 
@@ -120,20 +139,24 @@ def apply_goals_desk_ticket_filter(pool: list[ScoredSelection]) -> list[ScoredSe
         o15 = next((s for s in selections if is_goals_total_over(s, 1.5)), None)
         o20 = next((s for s in selections if is_goals_total_over(s, ASIAN_LINE)), None)
         o25 = next((s for s in selections if is_goals_total_over(s, 2.5)), None)
+        paced = o25_pace_confirm(desk.o25)
+        weak_lot = desk.lot in WEAK_OMI_LOTS
 
         o15_yes = desk_yes_count(desk.o15)
-        if at_least_n_yes(desk.o15, O15_MIN_YES) and o15 is not None:
+        took_o15 = False
+        # O1.5 needs vote gate + ZW/OMI/LEN O2.5 pace; skip soft Omikuji 吉.
+        if at_least_n_yes(desk.o15, O15_MIN_YES) and o15 is not None and paced and not weak_lot:
             price = _price(o15.odds)
             if in_asian_window(price):
                 # Cheap O1.5 (1.09–1.13) → Asian Over 2, still on the O1.5 ticket lane.
                 if o20 is not None and _price(o20.odds) >= ASIAN_LEG_MIN:
-                    kept.append(_stamp(o20, ASIAN_LINE, desk.lot, o15_yes))
-                continue
-            if O15_DIRECT_MIN <= price <= O15_MAX:
-                kept.append(_stamp(o15, 1.5, desk.lot, o15_yes))
-                continue
+                    kept.append(_stamp(o20, ASIAN_LINE, desk.lot, o15_yes, paced=True))
+                    took_o15 = True
+            elif O15_DIRECT_MIN <= price <= O15_MAX:
+                kept.append(_stamp(o15, 1.5, desk.lot, o15_yes, paced=True))
+                took_o15 = True
 
-        if all4_yes(desk.o25) and o25 is not None:
+        if not took_o15 and all4_yes(desk.o25) and o25 is not None and not weak_lot:
             price = _price(o25.odds)
             if O25_MIN <= price <= O25_MAX:
                 kept.append(_stamp(o25, 2.5, desk.lot, 4))

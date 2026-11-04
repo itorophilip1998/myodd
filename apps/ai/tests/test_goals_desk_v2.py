@@ -57,11 +57,19 @@ class GoalsDeskPolicyTests(unittest.TestCase):
                 kickoffAt=kickoff, marketName='Over/Under', selectionName=f'Over {line}',
             )
 
-        desk_o15 = type('D', (), {'o15': yes, 'o25': no, 'btts': no, 'lot': '吉'})()
-        desk_o15_3 = type('D', (), {'o15': three, 'o25': no, 'btts': no, 'lot': '吉'})()
+        # Pace = ZW+OMI+LEN Yes on O2.5. Skip Omikuji 吉.
+        paced_o25 = {'zw': 'Yes', 'omi': 'Yes', 'len': 'Yes', 'book': 'Yes', 'zw_gated': 'Pass'}
+        no_pace_o25 = {'zw': 'No', 'omi': 'Yes', 'len': 'No', 'book': 'Pass', 'zw_gated': 'No'}
+        omi_pass_o25 = {'zw': 'Yes', 'omi': 'Pass', 'len': 'Yes', 'book': 'Yes', 'zw_gated': 'Pass'}
+        desk_o15 = type('D', (), {'o15': yes, 'o25': paced_o25, 'btts': no, 'lot': '中吉'})()
+        desk_o15_3 = type('D', (), {'o15': three, 'o25': paced_o25, 'btts': no, 'lot': '末吉'})()
+        desk_o15_no_pace = type('D', (), {'o15': yes, 'o25': no_pace_o25, 'btts': no, 'lot': '中吉'})()
+        desk_o15_weak_lot = type('D', (), {'o15': yes, 'o25': paced_o25, 'btts': no, 'lot': '吉'})()
+        desk_o15_omi_pass = type('D', (), {'o15': yes, 'o25': omi_pass_o25, 'btts': no, 'lot': '凶'})()
         desk_o25 = type('D', (), {'o15': no, 'o25': yes, 'btts': no, 'lot': '中吉'})()
         desk_o25_3 = type('D', (), {'o15': no, 'o25': three, 'btts': no, 'lot': '中吉'})()
-        desk_both = type('D', (), {'o15': yes, 'o25': yes, 'btts': no, 'lot': '末吉'})()
+        desk_o25_weak = type('D', (), {'o15': no, 'o25': yes, 'btts': no, 'lot': '吉'})()
+        desk_both = type('D', (), {'o15': yes, 'o25': paced_o25, 'btts': no, 'lot': '末吉'})()
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15):
             kept = apply_goals_desk_ticket_filter([
@@ -69,11 +77,23 @@ class GoalsDeskPolicyTests(unittest.TestCase):
             ])
             self.assertEqual(len(kept), 1)
             self.assertEqual(kept[0].specifier, 'total=1.5')
+            self.assertIn('pace', kept[0].modelVersion)
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15_3):
             kept = apply_goals_desk_ticket_filter([make(11, 1.5, 1.18)])
             self.assertEqual(len(kept), 1)
             self.assertIn('3of4', kept[0].modelVersion)
+            self.assertIn('pace', kept[0].modelVersion)
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15_no_pace):
+            self.assertEqual(apply_goals_desk_ticket_filter([make(12, 1.5, 1.18)]), [])
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15_weak_lot):
+            self.assertEqual(apply_goals_desk_ticket_filter([make(13, 1.5, 1.18)]), [])
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15_omi_pass):
+            # 凶/大凶 Omikuji O2.5 is Pass → no ZW/OMI/LEN pace → O1.5 blocked.
+            self.assertEqual(apply_goals_desk_ticket_filter([make(15, 1.5, 1.18)]), [])
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o15):
             # 1.09–1.13 → Asian Over 2 (still O1.5 ticket lane)
@@ -110,6 +130,9 @@ class GoalsDeskPolicyTests(unittest.TestCase):
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o25):
             self.assertEqual(apply_goals_desk_ticket_filter([make(5, 2.5, 1.65)]), [])
+
+        with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_o25_weak):
+            self.assertEqual(apply_goals_desk_ticket_filter([make(14, 2.5, 1.55)]), [])
 
         with patch('app.tools.goals_desk_picks.cast_desk', return_value=desk_both):
             # Prefer O1.5 path when both qualify

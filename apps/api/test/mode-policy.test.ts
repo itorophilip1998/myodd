@@ -1,5 +1,19 @@
 import { expect, it } from 'vitest';
-import { clampOddsToMode, withinModeOdds, withinModeSelectionOdds } from '@myodd/shared';
+import { clampOddsToMode, isVirtualGame, omitVirtualGames, withinModeOdds, withinModeSelectionOdds } from '@myodd/shared';
+
+it('omits Simulated Reality / SRL virtual games from every mode slate', () => {
+  expect(isVirtualGame({ homeTeam: 'Arsenal SRL', awayTeam: 'Chelsea', league: 'England' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea srl', league: 'EPL' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'SRL Brazil' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Home', awayTeam: 'Away', league: 'Simulated Reality League' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'Premier League' })).toBe(false);
+  expect(isVirtualGame({ homeTeam: 'Israel', awayTeam: 'Spain', league: 'Nations' })).toBe(false);
+  expect(omitVirtualGames([
+    { homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'EPL' },
+    { homeTeam: 'Team A SRL', awayTeam: 'Team B', league: 'Cup' },
+  ])).toEqual([{ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'EPL' }]);
+});
+
 it('enforces every mode boundary, including no artificial Lagoslife ceiling', () => {
   expect(withinModeOdds(3, 'INVESTOR')).toBe(true);
   expect(withinModeOdds(6, 'INVESTOR')).toBe(true);
