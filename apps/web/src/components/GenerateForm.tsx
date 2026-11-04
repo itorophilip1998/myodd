@@ -25,7 +25,8 @@ import {
 } from '@/lib/prediction-book';
 
 const MODES = [
-  { name: 'Over 1.5 Machine', key: 'OVER15_MACHINE' as const, risk: 'Low risk · O1.5 card', detail: '5 tickets near 3.0 (or 2.0) · legs ≤1.25 · O2.5 if O1.5 <1.11', icon: '◇', tone: 'over15', recommended: false, termsHash: 'mode-over15-machine' },
+  { name: 'Over 1.5 Machine', key: 'OVER15_MACHINE' as const, risk: 'Low risk · O1.5 card', detail: 'Week by default · tickets 4–6 · legs ≤1.25 · no same-game repeat', icon: '◇', tone: 'over15', recommended: false, termsHash: 'mode-over15-machine' },
+  { name: 'Goals Desk v2', key: 'GOALS_DESK_V2' as const, risk: 'Low risk · all-4 Yes', detail: 'That day by default · date range OK · O1.5 lane 3–5 · O2.5 4–6', icon: '✦', tone: 'goalsdesk', recommended: false, termsHash: 'mode-goals-desk-v2' },
   { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · lower odds', detail: 'Mixed tickets 3–6 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
   { name: 'Statsman Mode', key: 'STATSMAN' as const, risk: 'Model engine · high-confidence gates', detail: 'goals/corners/shots ≥76% · side bands', icon: '▣', tone: 'statsman', recommended: false, termsHash: 'mode-statsman' },
   { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Mixed tickets 6.1–20 · each game ≤1.35', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
@@ -88,7 +89,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
-  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER' || modeBand.key === 'STATSMAN') && predictionBook.length === 0;
+  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'GOALS_DESK_V2' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER' || modeBand.key === 'STATSMAN') && predictionBook.length === 0;
   const wantsSplit = !systemMode && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
   const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
   const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
@@ -129,7 +130,11 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [dateEdited, setDateEdited] = useState(false);
   const promptDay = promptMatchDay(instruction);
   const [rangeStart, setRangeStart] = useState(() => lagosDateYmd());
-  const [rangeEnd, setRangeEnd] = useState(() => lagosDateYmd());
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const start = lagosDateYmd();
+    const key = initialControls.mode ?? modeKeyFromLabel(initialMode) ?? settings.defaultMode;
+    return key === 'OVER15_MACHINE' ? addLagosDays(start, 6) : start;
+  });
   const matchWindow = matchDayKickoffWindow(!dateEdited && promptDay ? promptDay.start : rangeStart, new Date(), !dateEdited && promptDay ? promptDay.end : rangeEnd);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
@@ -144,7 +149,12 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
     setStrict(settings.defaultStrict);
     setNearest(settings.defaultNearest);
     setOddsSource('manual');
-  }, [initialInstruction, initialSplitInto, settings.defaultMode, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest]);
+    if (!dateEdited && settings.defaultMode === 'OVER15_MACHINE') {
+      const start = lagosDateYmd();
+      setRangeStart(start);
+      setRangeEnd(addLagosDays(start, 6));
+    }
+  }, [initialInstruction, initialSplitInto, settings.defaultMode, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, dateEdited]);
   useEffect(() => {
     if (initialInstruction || edited.current) return;
     void api.preferences().then(({ preferences }) => {
@@ -185,17 +195,23 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   function chooseMode(name: string) {
     touch();
     setMode(name);
-    if (['OVER15_MACHINE', 'INVESTOR', 'GAMBLER', 'STATSMAN'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
+    if (['OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
     const nextMode = modeKeyFromLabel(name);
     if (nextMode !== 'GAMBLER') {
       const allowed = new Set(registryForMode(nextMode).map(item => item.id));
       setSelectedMarketIds(ids => ids.filter(id => allowed.has(id)));
     }
-    // Aries rising is only ~2h/day at a ground; a single day rarely fills 5×~3.0 tickets.
+    // Aries rising is only ~2h/day at a ground; default the match window to this week.
     if (nextMode === 'OVER15_MACHINE' && !dateEdited) {
       const start = lagosDateYmd();
       setRangeStart(start);
       setRangeEnd(addLagosDays(start, 6));
+    }
+    // Goals Desk defaults to that calendar day; user can still widen via the match-day picker.
+    if (nextMode === 'GOALS_DESK_V2' && !dateEdited) {
+      const today = lagosDateYmd();
+      setRangeStart(today);
+      setRangeEnd(today);
     }
     const band = bandForMode(name);
     setMinOdds(String(band.minimum));
@@ -287,12 +303,14 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       `${mode} system ticket. Choose the ticket count and games per ticket from the exclusive 19-market list. Ignore requested markets, odds, ticket counts, and game counts.`,
       modeBand.key === 'OVER15_MACHINE'
-        ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Build 5 tickets near 3.0; if the Aries pool cannot fill that band, near 2.0 is fine. Legs 1.10–1.25.'
-        : modeBand.key === 'STATSMAN'
-          ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
-          : modeBand.key === 'INVESTOR'
-            ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.'
-            : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
+        ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Legs 1.10–1.25.'
+        : modeBand.key === 'GOALS_DESK_V2'
+          ? 'Goals Desk v2: all-4 Yes only. Use the selected match day or range (defaults to that day). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. Thin single days also pull in the next 1–2 days.'
+          : modeBand.key === 'STATSMAN'
+            ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
+            : modeBand.key === 'INVESTOR'
+              ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.'
+              : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
       dateLine,
     ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',

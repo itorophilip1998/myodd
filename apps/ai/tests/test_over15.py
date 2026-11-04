@@ -1,4 +1,4 @@
-"""Over 1.5 Machine — Aries rising filter + line switch."""
+"""Over 1.5 Machine — Aries rising filter + line switch + 4–6 plan."""
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -12,14 +12,15 @@ from app.tools.over15_picks import (
     over15_market_allowed,
 )
 from app.tools.generation import generate_report
+from app.tools.selections import match_key
 from test_flexible_generation import selection
 
 
 class Over15PolicyTests(unittest.TestCase):
-    def test_mode_locks_five_tickets_near_three(self):
+    def test_mode_locks_ten_tickets_at_4_to_6(self):
         config = parse_rules('Over 1.5 Machine')
         self.assertEqual(config.riskMode, 'OVER15_MACHINE')
-        self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (1.9, 3.15, 5))
+        self.assertEqual((config.minimumOdds, config.maximumOdds, config.numberOfSlips), (4.0, 6.0, 10))
         self.assertTrue(any('Aries' in note for note in config.unhandledRequests))
 
     def test_leg_band_and_line_switch(self):
@@ -59,24 +60,27 @@ class Over15PolicyTests(unittest.TestCase):
         with patch('app.tools.over15_picks.cast_rising', return_value=ineligible):
             self.assertEqual(apply_over15_ticket_filter([make(9, 1.5, 1.18)]), [])
 
-    def test_plan_builds_five_tickets_near_three(self):
+    def test_plan_builds_ten_tickets_in_4_to_6(self):
         pool = [
             selection(event, price, 0.9 / price, market='18', outcome=str(i),
                       marketName='Over/Under', selectionName='Over 1.5',
                       supported=Market.OVER_1_5)
-            for event in range(40) for i, price in enumerate((1.12, 1.15, 1.18, 1.2, 1.22))
+            for event in range(120) for i, price in enumerate((1.12, 1.15, 1.18, 1.2, 1.22))
         ]
-        # Mark all as Aries-eligible by stubbing the filter already applied.
         config = parse_rules('Over 1.5 Machine')
         report = generate_report(pool, config, [])
-        self.assertEqual(len(report['candidates']), 5)
-        self.assertTrue(all(1.9 <= c['totalOdds'] <= 3.15 for c in report['candidates']))
-        self.assertTrue(all(2.85 <= c['totalOdds'] <= 3.15 for c in report['candidates']),
-                        'rich pool should fill the preferred ~3.0 band first')
+        self.assertEqual(len(report['candidates']), 10)
+        self.assertTrue(all(4.0 <= c['totalOdds'] <= 6.0 for c in report['candidates']))
         self.assertTrue(all(s['odds'] <= 1.25 for c in report['candidates'] for s in c['selections']))
+        used = set()
+        for candidate in report['candidates']:
+            for pick in candidate['selections']:
+                key = match_key(pick)
+                self.assertNotIn(key, used, f'same game repeated across tickets: {key}')
+                used.add(key)
 
-    def test_plan_falls_back_near_two_when_three_is_short(self):
-        # Six soft legs (~1.15) cannot reach ~3.0 (need ~8), but five reach ~2.0.
+    def test_short_pool_does_not_escape_4_to_6(self):
+        # Too few legs to reach 4.0 — return fewer tickets rather than a near-2 shortfall.
         pool = [
             selection(event, 1.15, 0.78, market='18', outcome='12',
                       marketName='Over/Under', selectionName='Over 1.5',
@@ -85,9 +89,8 @@ class Over15PolicyTests(unittest.TestCase):
         ]
         config = parse_rules('Over 1.5 Machine')
         report = generate_report(pool, config, [])
-        self.assertGreaterEqual(len(report['candidates']), 1)
-        self.assertTrue(all(1.9 <= c['totalOdds'] <= 2.15 for c in report['candidates']))
-        self.assertTrue(any('mixed-odds plan' in note for note in report['notices']))
+        self.assertTrue(all(4.0 <= c['totalOdds'] <= 6.0 for c in report['candidates']))
+        self.assertLess(len(report['candidates']), 10)
 
     def test_default_rising_sign_is_aries(self):
         self.assertEqual(O15_RISING_SIGN, 'Aries')

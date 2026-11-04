@@ -2,9 +2,17 @@
 
 ## Purpose
 
-Vedic Lahiri whole-sign chart at kickoff for the home ground. Only **Aries rising** games are eligible. Prefer **Over 1.5**; if that price is under **1.11**, take **Over 2.5** instead. Builds **5 tickets** near combined odds **3.0**; if that band cannot be filled, near **2.0** is fine (overall band **1.90–3.15**). Each leg **1.10–1.25**.
+Vedic Lahiri whole-sign chart at kickoff for the home ground. Only **Aries rising** games are eligible. Prefer **Over 1.5**; if that price is under **1.11**, take **Over 2.5** instead. Builds up to **10 tickets** at combined odds **4–6**. Each leg **1.10–1.25**.
 
-Aries lagna is only open for roughly two hours a day at a given ground, so a single match day rarely fills the plan. Choosing the mode on Create defaults the match window to **this week**; shortages still save whatever tickets the Aries pool can support.
+## Match day
+
+Defaults to **this week** (today through +6 Lagos days). The Create match-day control can narrow or widen the window. Aries lagna is only open for roughly two hours a day at a given ground, so a short window may return fewer than five tickets.
+
+## Ticket rules
+
+- Combined odds **4–6**
+- Same fixture (home/away) appears on **at most one ticket** in a single generation
+- One Over line per match (O1.5, or O2.5 when O1.5 &lt; 1.11)
 
 Placed on Create **before Investor Mode**.
 

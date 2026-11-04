@@ -29,7 +29,8 @@ def apply_preferences(config: Config, instruction: str, learned_defaults: dict |
         config.maximumOdds = high
     if memory.get('riskMode') and not re.search(r'\b(?:mode|modes|risk|odds|between|around|conservative|aggressive|safer|higher|lower|medium|moderate)\b', text):
         label = {
-            'OVER15_MACHINE': 'Over 1.5 Machine', 'INVESTOR': 'Investor Mode', 'GAMBLER': 'Gambler Mode',
+            'OVER15_MACHINE': 'Over 1.5 Machine', 'GOALS_DESK_V2': 'Goals Desk v2',
+            'INVESTOR': 'Investor Mode', 'GAMBLER': 'Gambler Mode',
             'STATSMAN': 'Statsman Mode', 'JAPA': 'Japa Mode', 'LAGOS_LIFE': 'Lagoslife Mode',
         }[memory['riskMode']]
         config = apply_named_mode(config, label)

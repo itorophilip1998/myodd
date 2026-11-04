@@ -48,6 +48,9 @@ export function registryForMode(mode?: string | null) {
   if (mode === 'OVER15_MACHINE') {
     return MARKET_REGISTRY.filter(item => item.id === 'goals.over.1.5' || item.id === 'goals.over.2.5');
   }
+  if (mode === 'GOALS_DESK_V2') {
+    return MARKET_REGISTRY.filter(item => item.id === 'goals.over.1.5' || item.id === 'goals.over.2.5');
+  }
   if (mode === 'STATSMAN') {
     return MARKET_REGISTRY.filter(item =>
       /^(?:goals\.|btts\.|corners\.|shots\.|home\.or\.over|away\.or\.over)/.test(item.id));

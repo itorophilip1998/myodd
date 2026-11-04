@@ -42,7 +42,7 @@ class Config(BaseModel):
     preserveOriginalSelections: bool = False
     allowOddsAdjustment: bool = False
     minimumProbability: float | None = Field(default=None, ge=0, le=1)
-    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE|STATSMAN)$')
+    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|GOALS_DESK_V2|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE|STATSMAN)$')
     riskPreference: str = Field(default='LOWER', pattern='^(VERY_LOW|LOWER|MODERATE|HIGHER|VERY_HIGH)$')
     excludedTeams: list[str] = Field(default_factory=list)
     includedTeams: list[str] = Field(default_factory=list)
@@ -67,7 +67,7 @@ class Config(BaseModel):
 
 
 class LearnedDefaults(BaseModel):
-    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE|STATSMAN)$')
+    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|GOALS_DESK_V2|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE|STATSMAN)$')
     ticketCount: int | None = Field(default=None, ge=1, le=10)
     gamesPerTicket: int | None = Field(default=None, ge=1, le=50)
 

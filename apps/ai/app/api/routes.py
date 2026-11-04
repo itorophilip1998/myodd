@@ -64,6 +64,11 @@ async def over15_machine(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'OVER15_MACHINE')
 
 
+@router.post('/generate/goals-desk-v2')
+async def goals_desk_v2(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'GOALS_DESK_V2')
+
+
 @router.post('/generate/investor')
 async def investor(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'INVESTOR')

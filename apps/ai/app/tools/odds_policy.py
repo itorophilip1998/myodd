@@ -7,6 +7,7 @@ MIN_SELECTION_ODDS = 1.1
 # Ticket totals still use risk_modes.MODES; these keep individual picks safer.
 MODE_SELECTION_ODDS = {
     'OVER15_MACHINE': (MIN_SELECTION_ODDS, 1.25),
+    'GOALS_DESK_V2': (1.09, 1.60),  # 1.09 kept for O1.5→Asian O2 conversion
     'INVESTOR': (MIN_SELECTION_ODDS, 1.35),
     'GAMBLER': (MIN_SELECTION_ODDS, 1.35),
     'STATSMAN': (MIN_SELECTION_ODDS, 1.35),

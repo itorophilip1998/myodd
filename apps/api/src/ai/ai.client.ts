@@ -145,6 +145,7 @@ export class AiClient {
     const route = config.riskMode
       ? {
         OVER15_MACHINE: 'over15-machine',
+        GOALS_DESK_V2: 'goals-desk-v2',
         INVESTOR: 'investor',
         GAMBLER: 'gambler',
         STATSMAN: 'statsman',

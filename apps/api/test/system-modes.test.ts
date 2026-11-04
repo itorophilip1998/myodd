@@ -20,7 +20,21 @@ it('over 1.5 machine allows totals with the O1.5→O2.5 price rule and 1.25 leg 
   expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.26 }, 'OVER15_MACHINE')).toBe(false);
   expect(systemSelectionAllowed({ ...ou, specifier: 'total=2.5' }, { ...outcome, outcomeName: 'Over 2.5', odds: 1.20 }, 'OVER15_MACHINE')).toBe(true);
   expect(systemSelectionAllowed({ marketId: '10', marketName: 'Double Chance', specifier: '', status: 'open', outcomes: [] }, outcome, 'OVER15_MACHINE')).toBe(false);
-  expect(systemConfig('OVER15_MACHINE')).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 5, minimumOdds: 1.9, maximumOdds: 3.15 });
+  expect(systemConfig('OVER15_MACHINE')).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 10, minimumOdds: 4, maximumOdds: 6 });
+});
+
+it('goals desk v2 allows O1.5 1.09–1.27 (for Asian switch), Asian Over 2, and O2.5 ≤1.60', () => {
+  const ou = { marketId: '18', marketName: 'Over/Under', specifier: 'total=1.5', status: 'open', outcomes: [] };
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.18 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.09 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.13 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.27 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.08 }, 'GOALS_DESK_V2')).toBe(false);
+  expect(systemSelectionAllowed(ou, { ...outcome, outcomeName: 'Over 1.5', odds: 1.28 }, 'GOALS_DESK_V2')).toBe(false);
+  expect(systemSelectionAllowed({ ...ou, specifier: 'total=2' }, { ...outcome, outcomeName: 'Over 2', odds: 1.22 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed({ ...ou, specifier: 'total=2.5' }, { ...outcome, outcomeName: 'Over 2.5', odds: 1.55 }, 'GOALS_DESK_V2')).toBe(true);
+  expect(systemSelectionAllowed({ ...ou, specifier: 'total=2.5' }, { ...outcome, outcomeName: 'Over 2.5', odds: 1.61 }, 'GOALS_DESK_V2')).toBe(false);
+  expect(systemConfig('GOALS_DESK_V2')).toMatchObject({ riskMode: 'GOALS_DESK_V2', numberOfSlips: 10, minimumOdds: 3, maximumOdds: 6 });
 });
 
 it('recognizes each provided market family and rejects unapproved or unavailable selections', () => {
@@ -99,7 +113,7 @@ it.each(['INVESTOR', 'GAMBLER'] as const)('%s uses direct internal planning and 
   expect(prisma.slipGroup.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ generationReport: expect.objectContaining({ fixtureCoverage: expect.objectContaining({ dayGames: 140, detailGames: 0 }) }) }) }));
 });
 
-it('OVER15_MACHINE plans five near-3 tickets from day-wide Over/Under listings', async () => {
+it('OVER15_MACHINE plans up to ten 4–6 tickets from day-wide Over/Under listings', async () => {
   const games = Array.from({ length: 40 }, (_, id) => ({
     eventId: String(id), homeTeam: `Home ${id}`, awayTeam: `Away ${id}`, league: `League ${id % 5}`,
     categoryName: 'Football', kickoffAt: '2099-01-01T12:00:00Z', matchStatus: 'Not started',
@@ -114,10 +128,40 @@ it('OVER15_MACHINE plans five near-3 tickets from day-wide Over/Under listings',
   const service = new SlipsService(bookmaker as any, { cacheScores: vi.fn() } as any, ai as any,
     { validate: vi.fn().mockResolvedValue(selections) } as any, prisma as any, {} as any, {} as any);
   const result = await service.prepareGeneration({ jobId: 'j', groupId: 'g', riskMode: 'OVER15_MACHINE', instruction: 'Create tickets', matchDate: '2099-01-01' });
-  expect(result?.config).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 5, minimumOdds: 1.9, maximumOdds: 3.15 });
+  expect(result?.config).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 10, minimumOdds: 4, maximumOdds: 6 });
   expect(ai.parse).not.toHaveBeenCalled();
   expect(ai.generate.mock.calls[0][0]).toHaveLength(40);
   expect(bookmaker.getFixtures.mock.calls.every(([q]) => q.systemMode === 'OVER15_MACHINE' && q.marketIds.includes('18'))).toBe(true);
+});
+
+it('GOALS_DESK_V2 extends a thin single day through the next two days for up to 10 tickets', async () => {
+  const ou = (odds = 1.18) => [{ marketId: '18', marketName: 'Over/Under', specifier: 'total=1.5', status: 'active',
+    outcomes: [{ outcomeId: '12', outcomeName: 'Over 1.5', odds, isActive: true }] }];
+  const dayGames = Array.from({ length: 4 }, (_, id) => ({
+    eventId: `d0-${id}`, homeTeam: `Home ${id}`, awayTeam: `Away ${id}`, league: 'League',
+    categoryName: 'Football', kickoffAt: '2099-01-01T12:00:00Z', matchStatus: 'Not started', markets: ou(),
+  }));
+  const nextDay = Array.from({ length: 8 }, (_, id) => ({
+    eventId: `d1-${id}`, homeTeam: `Home B ${id}`, awayTeam: `Away B ${id}`, league: 'League',
+    categoryName: 'Football', kickoffAt: '2099-01-02T15:00:00Z', matchStatus: 'Not started', markets: ou(),
+  }));
+  const dayAfter = Array.from({ length: 12 }, (_, id) => ({
+    eventId: `d2-${id}`, homeTeam: `Home C ${id}`, awayTeam: `Away C ${id}`, league: 'League',
+    categoryName: 'Football', kickoffAt: '2099-01-03T18:00:00Z', matchStatus: 'Not started', markets: ou(),
+  }));
+  const all = [...dayGames, ...nextDay, ...dayAfter];
+  const bookmaker = { getFixtures: vi.fn(async (query: any) => query.pageNum === 1 ? all : []) };
+  const selections = [{ eventId: 'd0-0', marketId: '18', outcomeId: '12', specifier: 'total=1.5', odds: 1.18 }];
+  const ai = { modelInfo: vi.fn(), parse: vi.fn().mockRejectedValue(new Error('No instruction LLM allowed')), resolve: vi.fn().mockRejectedValue(new Error('No market catalog resolution allowed')),
+    generate: vi.fn(async (_fixtures, plan) => ({ pool: [], candidates: [{ selections, slipScore: 1 }], notices: [], needsExpansion: false, effectiveConfig: plan, diagnostics: { foundSlips: 1 } })) };
+  const prisma = { generationJob: { findUniqueOrThrow: vi.fn().mockResolvedValue({ status: 'PENDING' }), update: vi.fn() }, slipGroup: { update: vi.fn() }, trainingEvent: { create: vi.fn() }, $transaction: (ops: unknown[]) => Promise.all(ops) };
+  const service = new SlipsService(bookmaker as any, { cacheScores: vi.fn() } as any, ai as any,
+    { validate: vi.fn().mockResolvedValue(selections) } as any, prisma as any, {} as any, {} as any);
+  const result = await service.prepareGeneration({ jobId: 'j', groupId: 'g', riskMode: 'GOALS_DESK_V2', instruction: 'Create tickets', matchDate: '2099-01-01', matchDateEnd: '2099-01-01' });
+  expect(result?.config).toMatchObject({ riskMode: 'GOALS_DESK_V2', numberOfSlips: 10, minimumOdds: 3, maximumOdds: 6 });
+  expect(result?.config.kickoffBefore).toBe(new Date('2099-01-03T23:00:00.000Z').toISOString());
+  expect(ai.generate.mock.calls[0][0]).toHaveLength(24);
+  expect(ai.generate.mock.calls[0][1].unhandledRequests.some((n: string) => /extended 2099-01-01 through 2099-01-03/i.test(n))).toBe(true);
 });
 
 it('drops live or optionless listing games without opening match boards', async () => {
