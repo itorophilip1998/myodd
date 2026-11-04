@@ -56,7 +56,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Goals Desk v2 kept {len(pool)} Over legs from {before} scored outcomes (O1.5 ≥3 Yes / prefer all-4; O2.5 all-4 only; O1.5 1.14–1.27, Asian O2 when O1.5 is 1.09–1.13, O2.5 ≤1.60).',
+                    f'Goals Desk v2 kept {len(pool)} Over legs from {before} scored outcomes (O1.5 ≥3 Yes + ZW/OMI/LEN O2.5 pace, skip 吉; O2.5 all-4; O1.5 1.14–1.27, Asian O2 when O1.5 is 1.09–1.13, O2.5 ≤1.60).',
                 ],
             })
         elif config.riskMode == 'STATSMAN' and isinstance(runtime.model, StatsmanModel):

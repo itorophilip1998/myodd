@@ -170,6 +170,7 @@ export function MatchDayPicker({
             <button type="button" onClick={() => apply(today, today)}>Today</button>
             <button type="button" onClick={() => { const t = addLagosDays(today, 1); apply(t, t); }}>Tomorrow</button>
             <button type="button" onClick={() => apply(today, addLagosDays(today, 2))}>3 days</button>
+            <button type="button" onClick={() => apply(today, addLagosDays(today, 4))}>5 days</button>
             <button type="button" onClick={() => apply(today, maxDate)}>This week</button>
           </div>
 

@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { addLagosDays, collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, isSystemMode, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type MatchDayWindow, type ScoredSelection } from '@myodd/shared';
+import { addLagosDays, collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, isSystemMode, matchDayKickoffWindow, omitVirtualGames, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type MatchDayWindow, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -293,6 +293,7 @@ export class SlipsService implements OnModuleInit {
       const upcoming = await this.upcomingFixtures(matchDay);
       fixtures = [...new Map([...fixtures, ...upcoming].map(fixture => [fixture.eventId, fixture])).values()];
     }
+    fixtures = omitVirtualGames(fixtures);
     const memory = !internalSystem && input.profileId ? await this.prisma.learningProfile.findUnique({ where: { id: input.profileId } }) : null;
     await this.audit(input, 'SOURCE_SNAPSHOT', { original, fixtures, matchDay, preferences: memory?.preferences ?? null, preferenceRevision: memory?.revision ?? null, fixtureCoverage: systemSnapshot?.coverage });
     const modelInfo = internalSystem ? { planner: 'internal-fixed-policy', riskMode: input.riskMode, options: 'provided-19-market-list' } : await this.ai.modelInfo();
@@ -306,7 +307,7 @@ export class SlipsService implements OnModuleInit {
         input.riskMode === 'OVER15_MACHINE'
           ? 'Over 1.5 Machine system ticket. Aries rising Vedic charts only. Prefer Over 1.5; if O1.5 price < 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Each leg 1.10–1.25.'
           : input.riskMode === 'GOALS_DESK_V2'
-            ? 'Goals Desk v2 system ticket. O1.5 needs at least 3 of 4 Yes (Zi Wei / Omikuji / Lenormand / Desk; prefer all-4). O2.5 needs all-4 Yes. If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. When a single day is thin, also include the next 1–2 days.'
+            ? 'Goals Desk v2 system ticket. O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace); skip Omikuji 吉. O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. When a single day is thin, also include the next 1–2 days.'
             : input.riskMode === 'STATSMAN'
               ? 'Statsman Mode system ticket. Scan all listed games with the Statsman engine. Ticket only goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
               : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.`
@@ -505,8 +506,8 @@ export class SlipsService implements OnModuleInit {
       listed.push(...page);
       if (page.length < pageSize) break;
     }
-    const fixtures = [...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
-      .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now());
+    const fixtures = omitVirtualGames([...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
+      .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now()));
     const start = new Date(matchDay.kickoffAfter).getTime();
     const end = new Date(matchDay.kickoffBefore).getTime();
     const onDay = fixtures.filter(fixture => {

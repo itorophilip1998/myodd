@@ -56,7 +56,7 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     if mode == 'OVER15_MACHINE':
         note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · week range by default · up to 10 tickets at 4–6 · no same-game repeat · legs ≤1.25.')
     if mode == 'GOALS_DESK_V2':
-        note('Goals Desk v2: O1.5 ≥3 of 4 Yes (prefer all-4) · O2.5 all-4 Yes · O1.5 1.14–1.27 · Asian O2 when O1.5 is 1.09–1.13 (same O1.5 ticket lane) · O2.5 ≤1.60 · O1.5 lane 3–5 · O2.5 lane 4–6 · up to 10 tickets · thin days pull in the next 1–2 days.')
+        note('Goals Desk v2: O1.5 ≥3 of 4 Yes + ZW/OMI/LEN O2.5 pace · skip Omikuji 吉 · O2.5 all-4 Yes · O1.5 1.14–1.27 · Asian O2 when O1.5 is 1.09–1.13 · O2.5 ≤1.60 · O1.5 lane 3–5 · O2.5 lane 4–6 · up to 10 tickets · thin days pull in +1/+2 days.')
     tickets = requested_ticket_count(user)
     if (tickets is not None and tickets != slips) or extract_games_per_ticket(user) is not None:
         note(f'{label} chooses the ticket count and games per ticket. Requested counts were not applied.')

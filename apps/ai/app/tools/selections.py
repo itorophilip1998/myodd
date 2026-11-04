@@ -1,5 +1,6 @@
 """Selection identity, eligibility and market filtering shared by generation and splitting."""
 import hashlib
+import re
 from datetime import datetime, timezone
 
 from .goals_desk_picks import goals_desk_market_allowed
@@ -7,6 +8,8 @@ from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
 from .over15_picks import over15_market_allowed
 from .statsman_picks import statsman_market_allowed
+
+_VIRTUAL_GAME = re.compile(r'\bSRL\b|simulated\s+reality', re.I)
 
 
 def fingerprint(selections):
@@ -53,11 +56,21 @@ def matches_related(selection, config):
                for rule in config.relatedMarketRules)
 
 
+def is_virtual_game(selection) -> bool:
+    """Simulated Reality League / SRL fixtures are virtual and never ticketed."""
+    if isinstance(selection, dict):
+        text = f'{selection.get("homeTeam") or ""} {selection.get("awayTeam") or ""} {selection.get("league") or ""}'
+    else:
+        text = f'{selection.homeTeam or ""} {selection.awayTeam or ""} {selection.league or ""}'
+    return bool(_VIRTUAL_GAME.search(text))
+
+
 def eligible(selection, config):
     teams = f'{selection.homeTeam} {selection.awayTeam}'.casefold()
     league = selection.league.casefold()
     now = datetime.now(timezone.utc)
     return (selection.isActive and selection.kickoffAt > now
+            and not is_virtual_game(selection)
             and within_mode_selection_odds(selection.odds, config.riskMode)
             and not any(t.casefold() in teams for t in config.excludedTeams)
             and not any(t.casefold() in league for t in config.excludedLeagues)
