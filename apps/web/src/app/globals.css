@@ -444,7 +444,7 @@ button, a, summary { transition: color .18s, background .18s, border-color .18s,
 .collection-save-hint { margin: 6px 0 0; color: #829584; font-size: 12px; line-height: 1.5; }
 .mode-option small { display: block; color: #8a9e8d; font-size: 10px; margin-top: 3px; }
 .mode-icon { font-size: 23px; line-height: 1; color: #c1ec9b; }
-.over15 .mode-icon { color: #8fd4e8; }.goalsdesk .mode-icon { color: #e8c98f; }.statsman .mode-icon { color: #9ee0c4; }
+.over15 .mode-icon { color: #8fd4e8; }.goalsdesk .mode-icon { color: #e8c98f; }.ggsp .mode-icon { color: #c4a8e8; }.statsman .mode-icon { color: #9ee0c4; }
 .gambler .mode-icon { color: #e3cf8b; }.japa .mode-icon { color: #d6b4ff; }.lagos .mode-icon { color: #f3a18b; }
 .mode-check { color: var(--accent); font-size: 10px; position: absolute; right: 6px; top: 4px; }
 .chat-input-box { border-radius: 18px; padding: 16px 20px; }

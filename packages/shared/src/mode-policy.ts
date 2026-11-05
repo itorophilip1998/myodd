@@ -39,6 +39,8 @@ export const MODE_ODDS = {
   /** Week-range Aries card; combined ticket band 4–6. */
   OVER15_MACHINE: { minimum: 4, maximum: 6 },
   GOALS_DESK_V2: { minimum: 3, maximum: 6 },
+  /** GGSP v1.1 Chaldean CLEAN O1.5; day by default; tickets 3–4. */
+  GGSP_V11: { minimum: 3, maximum: 4 },
   INVESTOR: { minimum: 3, maximum: 6 },
   STATSMAN: { minimum: 3, maximum: 6 },
   GAMBLER: { minimum: 6.1, maximum: 20 },
@@ -54,6 +56,8 @@ export const MODE_SELECTION_ODDS = {
   OVER15_MACHINE: { minimum: MIN_SELECTION_ODDS, maximum: 1.25 },
   /** 1.09 kept so cheap O1.5 can convert to Asian Over 2 on the O1.5 ticket lane. */
   GOALS_DESK_V2: { minimum: 1.09, maximum: 1.60 },
+  /** 1.09 kept so cheap O1.5 can convert to Asian Over 2. */
+  GGSP_V11: { minimum: 1.09, maximum: 1.30 },
   INVESTOR: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   STATSMAN: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   GAMBLER: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
@@ -88,6 +92,7 @@ export function modeKeyFromLabel(label?: string | null): ModeKey | null {
   if (text in MODE_ODDS) return text as ModeKey;
   if (/\bover\s*1\.?5\s*machine\b/.test(text)) return 'OVER15_MACHINE';
   if (/\bgoals?\s*desk\s*v?2\b/.test(text)) return 'GOALS_DESK_V2';
+  if (/\bggsp(?:\s*v?1\.?1)?\b/.test(text) || /\bgematria\b/.test(text)) return 'GGSP_V11';
   if (/\binvestor\b/.test(text)) return 'INVESTOR';
   if (/\bstatsman\b/.test(text)) return 'STATSMAN';
   if (/\bgam(?:b)?ler\b/.test(text)) return 'GAMBLER';

@@ -10,6 +10,7 @@ class ModeConstraintError(ValueError):
 MODES = (
     (r'\bover\s*1\.?5\s+machines?\b', 'OVER15_MACHINE', 'VERY_LOW', 4., 6.),
     (r'\bgoals?\s+desk\s*v?2\b', 'GOALS_DESK_V2', 'VERY_LOW', 3., 6.),
+    (r'\bggsp(?:\s*v?1\.?1)?(?:\s+modes?)?\b|\bgematria\b', 'GGSP_V11', 'VERY_LOW', 3., 4.),
     (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
     (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 6.1, 20.),
     (r'\bstatsman\s+modes?\b', 'STATSMAN', 'VERY_LOW', 3., 6.),
@@ -36,6 +37,7 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     _, _, preference, minimum, maximum = next(entry for entry in MODES if entry[1] == mode)
     label = {
         'OVER15_MACHINE': 'Over 1.5 Machine', 'GOALS_DESK_V2': 'Goals Desk v2',
+        'GGSP_V11': 'GGSP v1.1',
         'INVESTOR': 'Investor', 'GAMBLER': 'Gambler', 'STATSMAN': 'Statsman',
     }.get(mode, mode.title())
     notices = list(config.unhandledRequests)
@@ -49,7 +51,7 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     low, high = extract_odds_bounds(user)
     if has_explicit_odds_request(user) and not (low == minimum and high == maximum):
         note(f'{label} kept its fixed ticket odds band {minimum:g}–{maximum:g}. Requested odds were not applied.')
-    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE', 'GOALS_DESK_V2'):
+    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11'):
         note(f'{label} chooses the markets. Requested markets were not applied.')
     if mode == 'STATSMAN':
         note('Statsman Mode tickets goals ≥76%, side 58–65%→to score, side ≥66%→1/over 2.5 or win either half, corners/shots/SOT ≥76%.')
@@ -57,6 +59,8 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
         note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · week range by default · up to 10 tickets at 4–6 · no same-game repeat · legs ≤1.25.')
     if mode == 'GOALS_DESK_V2':
         note('Goals Desk v2: O1.5 ≥3 of 4 Yes + ZW/OMI/LEN O2.5 pace · skip Omikuji 吉 · O2.5 all-4 Yes · O1.5 1.14–1.27 · Asian O2 when O1.5 is 1.09–1.13 · O2.5 ≤1.60 · O1.5 lane 3–5 · O2.5 lane 4–6 · up to 10 tickets · thin days pull in +1/+2 days.')
+    if mode == 'GGSP_V11':
+        note('GGSP v1.1: Chaldean CLEAN roots 7–8 (Flashscore name aliases) · HARD/SOFT league skips · Over 1.5 or Asian Over 2 when O1.5 is 1.09–1.12 · that day by default · thin days pull in +1/+2 · up to 10 tickets at 3–4 · no same-game repeat · legs ≤1.30.')
     tickets = requested_ticket_count(user)
     if (tickets is not None and tickets != slips) or extract_games_per_ticket(user) is not None:
         note(f'{label} chooses the ticket count and games per ticket. Requested counts were not applied.')
@@ -82,7 +86,7 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
     # Lock named system modes; inferred numeric requests retain their custom constraints until mode generation.
-    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
         return lock_system_mode(config, instruction, mode)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
@@ -104,6 +108,11 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     return Config.model_validate(result.model_dump())
 
 
+# Freeform odds → mode mapping only. Do not auto-pick Over 1.5 / Goals Desk / GGSP / Statsman
+# from a bare "3–5 odds" prompt — those modes share Investor's band and must be named.
+_AUTO_ODDS_MODES = frozenset({'INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'})
+
+
 def apply_default_investor(config: Config, instruction: str) -> Config:
     """Recommend Investor Mode when the user did not name another mode."""
     if config.riskMode or any(re.search(pattern, instruction, re.I) for pattern, *_ in MODES):
@@ -114,6 +123,8 @@ def apply_default_investor(config: Config, instruction: str) -> Config:
         low, high = extract_odds_bounds(instruction)
         if low is not None and high is not None:
             for _, mode, preference, band_low, band_high in MODES:
+                if mode not in _AUTO_ODDS_MODES:
+                    continue
                 if low >= band_low and (band_high is None or high <= band_high):
                     return config.model_copy(update={'riskMode': mode, 'riskPreference': preference, 'minimumOdds': low, 'maximumOdds': high})
         return config.model_copy(update={'minimumOdds': low if low is not None else config.minimumOdds,
@@ -127,7 +138,7 @@ def configure_mode(config: Config, mode: str | None) -> Config:
     if config.riskMode is not None and config.riskMode != mode:
         raise ModeConstraintError('The selected route conflicts with the request risk mode.')
     pinned = config.fixtureMode == 'original_only' and config.preserveOriginalSelections
-    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
         if config.fixtureMode == 'original_only':
             config = config.model_copy(update={'fixtureMode': 'adaptive'})
         return lock_system_mode(config, '', mode)

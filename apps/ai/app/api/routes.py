@@ -69,6 +69,11 @@ async def goals_desk_v2(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'GOALS_DESK_V2')
 
 
+@router.post('/generate/ggsp-v11')
+async def ggsp_v11(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'GGSP_V11')
+
+
 @router.post('/generate/investor')
 async def investor(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'INVESTOR')

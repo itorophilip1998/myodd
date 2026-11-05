@@ -21,6 +21,11 @@ import { slipFingerprint } from './slip-fingerprint';
 const LISTING_MARKET_IDS = ['1', '10', '18', '19', '20', '29', '450004', '450005', '450006', '854', '856', '858'];
 /** Listed games with options needed before Goals Desk stops pulling in the next calendar days. */
 const GOALS_DESK_MIN_GAMES = 20;
+/**
+ * GGSP burns 4–8 unique CLEAN games per ~3–4 ticket. One day often only yields ~10–15 CLEAN
+ * after the cipher, so widen sooner than Goals Desk.
+ */
+const GGSP_MIN_GAMES = 40;
 
 export interface GenerateRequest {
   userId?: string;
@@ -126,7 +131,7 @@ export class SlipsService implements OnModuleInit {
   }
 
   private internalSystem(input: GenerateRequest) {
-    return (input.riskMode === 'OVER15_MACHINE' || input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER' || input.riskMode === 'STATSMAN')
+    return (input.riskMode === 'OVER15_MACHINE' || input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11' || input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER' || input.riskMode === 'STATSMAN')
       && !input.splitInto && !input.pinnedSelections?.length;
   }
 
@@ -136,8 +141,9 @@ export class SlipsService implements OnModuleInit {
       const locked = systemConfig(mode);
       const label = mode === 'OVER15_MACHINE' ? 'Over 1.5 Machine'
         : mode === 'GOALS_DESK_V2' ? 'Goals Desk v2'
-          : mode === 'STATSMAN' ? 'Statsman'
-            : mode === 'INVESTOR' ? 'Investor' : 'Gambler';
+          : mode === 'GGSP_V11' ? 'GGSP v1.1'
+            : mode === 'STATSMAN' ? 'Statsman'
+              : mode === 'INVESTOR' ? 'Investor' : 'Gambler';
       const band = MODE_ODDS[mode];
       const notices = [...config.unhandledRequests];
       const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
@@ -184,10 +190,10 @@ export class SlipsService implements OnModuleInit {
     const requestedCount = requestedTicketCount(req.instruction);
     if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
-    if ((req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN') && req.operation !== 'split' && !req.pinnedSelections?.length) {
+    if ((req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN') && req.operation !== 'split' && !req.pinnedSelections?.length) {
       req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
     }
-    const internalSystem = (req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN')
+    const internalSystem = (req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN')
       && req.operation === 'generate' && !req.pinnedSelections?.length;
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
@@ -281,8 +287,13 @@ export class SlipsService implements OnModuleInit {
     let systemSnapshot = internalSystem
       ? await this.systemFixtures.load(matchDay, detail => this.stage(input, 'READING', detail), input.riskMode)
       : null;
-    if (internalSystem && input.riskMode === 'GOALS_DESK_V2' && systemSnapshot) {
-      const widened = await this.widenGoalsDeskWindow(matchDay, systemSnapshot, detail => this.stage(input, 'READING', detail));
+    if (internalSystem && (input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11') && systemSnapshot) {
+      const widened = await this.widenThinDayWindow(
+        matchDay,
+        systemSnapshot,
+        input.riskMode,
+        detail => this.stage(input, 'READING', detail),
+      );
       matchDay = widened.matchDay;
       systemSnapshot = widened.snapshot;
     }
@@ -308,9 +319,11 @@ export class SlipsService implements OnModuleInit {
           ? 'Over 1.5 Machine system ticket. Aries rising Vedic charts only. Prefer Over 1.5; if O1.5 price < 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Each leg 1.10–1.25.'
           : input.riskMode === 'GOALS_DESK_V2'
             ? 'Goals Desk v2 system ticket. O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace); skip Omikuji 吉. O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. When a single day is thin, also include the next 1–2 days.'
-            : input.riskMode === 'STATSMAN'
-              ? 'Statsman Mode system ticket. Scan all listed games with the Statsman engine. Ticket only goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
-              : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.`
+            : input.riskMode === 'GGSP_V11'
+              ? 'GGSP v1.1 system ticket. Chaldean CLEAN roots 7–8 on home+away (Flashscore name aliases; skip toxic totals 54/62). Apply HARD and SOFT league skips. Over 1.5, or Asian Over 2 when Over 1.5 is 1.09–1.12. Use the selected match day or range (defaults to that calendar day; thin days pull in +1/+2). Build up to 10 tickets at combined odds 3–4. Never reuse the same game on another ticket. Each leg 1.10–1.30.'
+              : input.riskMode === 'STATSMAN'
+                ? 'Statsman Mode system ticket. Scan all listed games with the Statsman engine. Ticket only goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
+                : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.`
       ) : '',
       !internalSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
       !internalSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
@@ -461,31 +474,34 @@ export class SlipsService implements OnModuleInit {
   }
 
   /**
-   * Goals Desk defaults to one calendar day. When that day alone is too thin for up to 10 tickets,
-   * widen through the next day, then the next two days (still capped by the shared match-day max).
+   * Goals Desk / GGSP default to one calendar day. When that day alone is too thin for up to 10
+   * tickets, widen through the next day, then the next two days (shared match-day max still applies).
    * Multi-day ranges the user already chose are left alone.
    */
-  private async widenGoalsDeskWindow(
+  private async widenThinDayWindow(
     matchDay: MatchDayWindow,
     snapshot: SystemFixtureSnapshot,
+    mode: 'GOALS_DESK_V2' | 'GGSP_V11',
     onProgress?: (detail: string) => Promise<unknown>,
   ): Promise<{ matchDay: MatchDayWindow; snapshot: SystemFixtureSnapshot }> {
-    if (matchDay.matchDate !== matchDay.matchDateEnd || snapshot.fixtures.length >= GOALS_DESK_MIN_GAMES) {
+    const minGames = mode === 'GGSP_V11' ? GGSP_MIN_GAMES : GOALS_DESK_MIN_GAMES;
+    const label = mode === 'GGSP_V11' ? 'GGSP' : 'Goals Desk';
+    if (matchDay.matchDate !== matchDay.matchDateEnd || snapshot.fixtures.length >= minGames) {
       return { matchDay, snapshot };
     }
     const start = matchDay.matchDate;
     let current = matchDay;
     let currentSnapshot = snapshot;
     for (const extra of [1, 2] as const) {
-      if (currentSnapshot.fixtures.length >= GOALS_DESK_MIN_GAMES) break;
+      if (currentSnapshot.fixtures.length >= minGames) break;
       const widened = matchDayKickoffWindow(start, new Date(), addLagosDays(start, extra));
       if (widened.matchDateEnd === current.matchDateEnd && widened.kickoffBefore === current.kickoffBefore) break;
-      await onProgress?.(`Goals Desk day is thin — loading through ${widened.matchDateEnd}`);
-      currentSnapshot = await this.systemFixtures.load(widened, onProgress, 'GOALS_DESK_V2');
+      await onProgress?.(`${label} day is thin — loading through ${widened.matchDateEnd}`);
+      currentSnapshot = await this.systemFixtures.load(widened, onProgress, mode);
       current = widened;
     }
     if (current.matchDateEnd === start) return { matchDay, snapshot };
-    const notice = `Goals Desk extended ${start} through ${current.matchDateEnd} because that day alone did not have enough games for up to 10 tickets.`;
+    const notice = `${label} extended ${start} through ${current.matchDateEnd} because that day alone did not have enough games for up to 10 tickets.`;
     return {
       matchDay: current,
       snapshot: {

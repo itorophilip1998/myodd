@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { combinedOdds, isSystemMode, isVirtualGame, systemSelectionAllowed, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { combinedOdds, isSystemMode, isVirtualGame, MODE_ODDS, systemSelectionAllowed, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 
 @Injectable()
@@ -48,7 +48,12 @@ export class SlipValidatorService {
     }
     if (config.includedTeams?.some(team => !validated.some(s => `${s.homeTeam} ${s.awayTeam}`.toLowerCase().includes(team.toLowerCase())))) return null;
     const odds = combinedOdds(validated.map(s => s.odds!));
-    if (!withinModeOdds(odds, config.riskMode) || validated.length < config.minimumSelections || validated.length > config.maximumSelections || odds < config.minimumOdds || (config.maximumOdds != null && odds > config.maximumOdds)) return null;
+    if (validated.length < config.minimumSelections || validated.length > config.maximumSelections) return null;
+    if (odds < config.minimumOdds || (config.maximumOdds != null && odds > config.maximumOdds)) return null;
+    // Hard mode band when config still sits on it. Thin Goals Desk / nearest-odds soft floors
+    // lower config.minimumOdds below MODE_ODDS — those tickets must not be dropped here.
+    const modeBand = config.riskMode ? MODE_ODDS[config.riskMode as keyof typeof MODE_ODDS] : null;
+    if (modeBand && config.minimumOdds >= modeBand.minimum && !withinModeOdds(odds, config.riskMode)) return null;
     return validated;
   }
 }

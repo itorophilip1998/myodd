@@ -17,6 +17,7 @@ The AI service keeps the existing `api`, `agents`, `prompt`, `llms`, `memory`, a
 | --- | --- | --- |
 | `POST /generate/over15-machine` | `Over15MachineAgent` | Scoring → Aries rising O1.5 filter → constrained search/report; week window by default; up to 10 tickets at 4–6; no same-game repeat; legs 1.10–1.25. |
 | `POST /generate/goals-desk-v2` | `GoalsDeskV2Agent` | Scoring → goals desk filter (O1.5 ≥3 Yes + O2.5 ZW/OMI/LEN pace, skip Omikuji 吉; O2.5 all-4, skip 吉; O1.5 1.14–1.27 / Asian O2 when O1.5 is 1.09–1.13 / O2.5 ≤1.60) → lane search (O1.5 lane @3–5, O2.5 @4–6); up to 10 tickets; thin single days pull in +1/+2 days. |
+| `POST /generate/ggsp-v11` | `GgspV11Agent` | Scoring → GGSP CLEAN 7–8 + HARD/SOFT league skips → Over 1.5 only → constrained search; tickets 3–4; no same-game repeat; day by default. |
 | `POST /generate/statsman` | `StatsmanAgent` | Scoring → Statsman pick gates → constrained search/report; Investor-style 3–6 mix, legs 1.10–1.35. |
 | `POST /generate/investor` | `InvestorAgent` | Scoring → recent goal trends → accepted calibration → constrained search/report; ticket odds 3–6, legs 1.10–1.35. The explicit Investor system plan remains 3 near 3, 3 near 4, 2 near 5, and 2 near 6. |
 | `POST /generate/gambler` | `GamblerAgent` | Scoring → recent goal trends → accepted calibration → constrained search/report; mixed ticket odds 6.1–20, legs 1.10–1.35. |

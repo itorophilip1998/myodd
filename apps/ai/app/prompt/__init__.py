@@ -11,7 +11,7 @@ from app.tools.risk_modes import MODES
 
 @lru_cache(maxsize=8)
 def load_prompt(name: str) -> str:
-    if name not in {'common', 'investor', 'gambler', 'statsman', 'over15_machine', 'goals_desk_v2', 'japa', 'lagos_life', 'prediction', 'split'}:
+    if name not in {'common', 'investor', 'gambler', 'statsman', 'over15_machine', 'goals_desk_v2', 'ggsp_v11', 'japa', 'lagos_life', 'prediction', 'split'}:
         raise ValueError(f'Unknown prompt: {name}')
     return Path(__file__).with_name(f'{name}.txt').read_text().strip()
 

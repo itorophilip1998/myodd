@@ -48,6 +48,13 @@ it('enforces safe per-game odds inside named-mode tickets', () => {
   expect(withinModeOdds(6, 'OVER15_MACHINE')).toBe(true);
   expect(withinModeOdds(3.99, 'OVER15_MACHINE')).toBe(false);
   expect(withinModeOdds(6.01, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeSelectionOdds(1.09, 'GGSP_V11')).toBe(true);
+  expect(withinModeSelectionOdds(1.30, 'GGSP_V11')).toBe(true);
+  expect(withinModeSelectionOdds(1.31, 'GGSP_V11')).toBe(false);
+  expect(withinModeOdds(3, 'GGSP_V11')).toBe(true);
+  expect(withinModeOdds(4, 'GGSP_V11')).toBe(true);
+  expect(withinModeOdds(2.99, 'GGSP_V11')).toBe(false);
+  expect(withinModeOdds(4.01, 'GGSP_V11')).toBe(false);
   expect(withinModeSelectionOdds(2, 'JAPA')).toBe(true);
   expect(withinModeSelectionOdds(2.01, 'JAPA')).toBe(false);
   expect(withinModeSelectionOdds(2, 'LAGOS_LIFE')).toBe(true);

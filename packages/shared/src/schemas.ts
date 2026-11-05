@@ -23,7 +23,7 @@ export const generationConfigSchema = z.object({
   preserveOriginalSelections: z.boolean().default(false),
   allowOddsAdjustment: z.boolean().default(false),
   minimumProbability: z.number().min(0).max(1).nullable().default(null),
-  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().default(null),
+  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().default(null),
   riskPreference: z.nativeEnum(RiskPreference).default(RiskPreference.LOWER),
   excludedTeams: z.array(z.string()).default([]),
   includedTeams: z.array(z.string()).default([]),
@@ -68,7 +68,7 @@ export const pinnedSelectionSchema = z.object({
 
 export const generateFromCodeSchema = z.object({
   requestId: z.string().uuid().optional(),
-  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
+  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
   selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),
@@ -86,7 +86,7 @@ export const generateFromCodeSchema = z.object({
 
 export const generateFromPromptSchema = z.object({
   requestId: z.string().uuid().optional(),
-  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
+  riskMode: z.enum(['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE']).nullable().optional(),
   selectedMarketIds: z.array(z.string().min(1).max(300).refine(id => MARKET_REGISTRY.some(item => item.id === id) || id.startsWith('provider:'))).max(100).optional(),
   operation: z.enum(['generate', 'split']).optional(),
   profileId: z.string().uuid().optional(),

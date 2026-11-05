@@ -37,6 +37,7 @@ it('rejects malformed generation results at the AI boundary with an actionable m
 
 it.each([
   ['INVESTOR', 'investor'], ['GAMBLER', 'gambler'], ['JAPA', 'japa'], ['LAGOS_LIFE', 'lagos-life'],
+  ['OVER15_MACHINE', 'over15-machine'], ['GOALS_DESK_V2', 'goals-desk-v2'], ['GGSP_V11', 'ggsp-v11'],
 ] as const)('routes %s generation directly to its agent', async (riskMode, route) => {
   const fetch = vi.fn().mockResolvedValue(new Response('{}'));
   vi.stubGlobal('fetch', fetch);

@@ -1,0 +1,10 @@
+GGSP v1.1: riskMode=GGSP_V11, riskPreference=VERY_LOW. Up to 10 tickets. Combined ticket odds 3–4. Each leg 1.10–1.30.
+
+Date window: use the requested match day or range; if none is set, use that calendar day (today).
+
+Eligibility:
+1. Chaldean gematria on home+away — expand SportyBet names to Flashscore spellings via the alias table, then CLEAN Select only (digital root 7 or 8, combined total not 54 or 62).
+2. HARD league skips (Montenegro, Macedonia, Botola, Tanzania, Uganda, Ghana, ARG B/Nacional, Liga Alef, Azadegan, Copa del Rey, Tercera/RFEF, Serie D, Primavera 2, Non-League, Sergipano, Qatar 2, KSA Div2, etc.) and SOFT skips are never ticketed.
+3. Market path: if Over 1.5 is priced 1.09–1.12, book Asian Over 2 (total=2) instead; if Over 1.5 is 1.13–1.35, book Over 1.5. Never ticket O2.5, 1X2, BTTS, corners, or other markets.
+
+One pick per match. The same game must not appear on more than one ticket in a single generation. Same pick once per collection. Do not invent fixtures or markets.

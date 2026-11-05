@@ -50,10 +50,13 @@ STATSMAN_PLAN = INVESTOR_PLAN
 OVER15_PLAN = ((4.0, 4), (5.0, 4), (6.0, 2))
 # Goals Desk: O1.5 lane (O1.5 + Asian O2) at 3–5; O2.5 lane at 4–6. Never mix the two lanes.
 GOALS_DESK_PLAN = ((3.0, 4), (4.0, 4), (5.0, 2))  # notice fallback only; search uses lane bands
+# GGSP notice fallback only — search uses the full 3–4 band (see search_ggsp_plan).
+GGSP_PLAN = ((3.0, 4), (3.5, 3), (4.0, 3))
 GAMBLER_PLAN = tuple((round(6.1 + i * (20 - 6.1) / 9, 2), 1) for i in range(10))
 SYSTEM_ODDS_SPAN = 0.10
 OVER15_ODDS = (4.0, 6.0)
 GOALS_DESK_ODDS = (3.0, 6.0)
+GGSP_ODDS = (3.0, 4.0)
 
 
 def uses_system_plan(config) -> bool:
@@ -66,6 +69,8 @@ def uses_system_plan(config) -> bool:
         return (config.minimumOdds, config.maximumOdds) == OVER15_ODDS
     if config.riskMode == 'GOALS_DESK_V2':
         return (config.minimumOdds, config.maximumOdds) == GOALS_DESK_ODDS
+    if config.riskMode == 'GGSP_V11':
+        return (config.minimumOdds, config.maximumOdds) == GGSP_ODDS
     if config.riskMode in ('INVESTOR', 'STATSMAN'):
         return (config.minimumOdds, config.maximumOdds) == (3, 6)
     if config.riskMode == 'GAMBLER':
@@ -80,12 +85,14 @@ def mode_plan(config):
         return OVER15_PLAN
     if config.riskMode == 'GOALS_DESK_V2':
         return GOALS_DESK_PLAN
+    if config.riskMode == 'GGSP_V11':
+        return GGSP_PLAN
     return STATSMAN_PLAN if config.riskMode == 'STATSMAN' else INVESTOR_PLAN
 
 
 def _unique_matches_for(config) -> bool:
-    """Over 1.5 Machine never reuses the same fixture across tickets in one generation."""
-    return config.riskMode == 'OVER15_MACHINE'
+    """Over 1.5 Machine / GGSP never reuse the same fixture across tickets in one generation."""
+    return config.riskMode in ('OVER15_MACHINE', 'GGSP_V11')
 
 
 def _goals_total_line(selection) -> float | None:
@@ -105,6 +112,40 @@ def _goals_desk_lane_pool(pool, line: float):
     return [s for s in pool if (got := _goals_total_line(s)) is not None and abs(got - line) < 1e-6]
 
 
+def _unique_event_product(pool) -> float:
+    """Max combined odds using one pick per event (the priced leg already chosen)."""
+    by_event: dict[str, float] = {}
+    for selection in pool:
+        by_event[selection.eventId] = max(by_event.get(selection.eventId, 0.0), float(selection.odds))
+    if not by_event:
+        return 0.0
+    product = 1.0
+    for odds in by_event.values():
+        product *= odds
+    return product
+
+
+def _goals_desk_lane_band(lane_pool, nominal_low: float, nominal_high: float) -> tuple[float, float, str | None]:
+    """Keep nominal 3–5 / 4–6 when the slate can fill it; otherwise drop the floor to the pool product.
+
+    Short O1.5 legs (~1.15–1.25) need 5–6 uniques to clear 3.0. A thin desk day often only
+    clears 3–4 SportyBet legs after Flashscore + pace gates — without this, search returns 0.
+    """
+    product = _unique_event_product(lane_pool)
+    if product <= 1.0:
+        return nominal_low, nominal_high, None
+    if product + 1e-9 >= nominal_low:
+        return nominal_low, nominal_high, None
+    # Soft floor must stay ≤ pool product (max(1.5, …) used to block ultra-thin 1.1–1.4 products).
+    soft_low = max(1.1, round(product * 0.98, 2))
+    soft_high = max(nominal_high, round(product * 1.02, 2))
+    note = (
+        f'Goals Desk lane soft-floor {soft_low:g}–{soft_high:g} '
+        f'(pool product {product:.2f} < nominal {nominal_low:g}).'
+    )
+    return soft_low, soft_high, note
+
+
 def search_goals_desk_plan(pool, config, original, rng=None):
     """O1.5 lane (Over 1.5 + Asian Over 2) at 3–5, then O2.5 lane at 4–6. Never mix lanes."""
     rng = rng or random.Random()
@@ -118,11 +159,20 @@ def search_goals_desk_plan(pool, config, original, rng=None):
         (o15_lane, 3.0, 5.0),
         (o25_lane, 4.0, 6.0),
     )
-    for lane_pool, band_low, band_high in lanes:
+    soft_notes: list[str] = []
+    for lane_pool, nominal_low, nominal_high in lanes:
         need = config.numberOfSlips - len(found)
         if need <= 0 or not lane_pool:
             continue
+        band_low, band_high, soft_note = _goals_desk_lane_band(lane_pool, nominal_low, nominal_high)
+        if soft_note:
+            soft_notes.append(soft_note)
         least, most = target_leg_bounds(lane_pool, band_low, band_high)
+        # Thin soft-floor days: allow using every unique leg on one ticket.
+        events = len({s.eventId for s in lane_pool})
+        if soft_note:
+            least = max(1, min(least, events))
+            most = max(most, events)
         scoped = config.model_copy(update={
             'numberOfSlips': need, 'minimumOdds': band_low, 'maximumOdds': band_high,
             'minimumSelections': least, 'maximumSelections': most,
@@ -135,7 +185,32 @@ def search_goals_desk_plan(pool, config, original, rng=None):
         found.extend(tickets)
         for ticket in tickets:
             blocked.update(selection_key(s) for s in ticket['selections'])
+    # Stash soft-floor notes on bounds dict so generate_report can surface them if needed.
+    if soft_notes and isinstance(bounds, dict):
+        bounds = {**bounds, 'goalsDeskSoftFloor': soft_notes}
+    elif soft_notes and bounds is None:
+        bounds = {'goalsDeskSoftFloor': soft_notes}
     return found[:config.numberOfSlips], bounds
+
+def search_ggsp_plan(pool, config, original, rng=None):
+    """Fill up to 10 tickets across the full 3–4 band; never reuse a fixture.
+
+    Unlike Investor/Over15 sliced targets (±0.10), GGSP needs the whole band — CLEAN
+    O1.5 pools are thin and each ~3.0 ticket burns 5–10 unique games.
+    """
+    rng = rng or random.Random()
+    band_low, band_high = GGSP_ODDS
+    least, most = target_leg_bounds(pool, band_low, band_high)
+    scoped = config.model_copy(update={
+        'numberOfSlips': config.numberOfSlips,
+        'minimumOdds': band_low,
+        'maximumOdds': band_high,
+        'minimumSelections': least,
+        'maximumSelections': most,
+    })
+    return search(
+        pool, scoped, original, rng=rng, steer=True, attempt_limit=16000, unique_matches=True,
+    )
 
 
 def target_odds_window(target: float, config=None) -> tuple[float, float]:
@@ -160,6 +235,8 @@ def target_leg_bounds(pool, low: float, high: float) -> tuple[int, int]:
 def search_system_plan(pool, config, original, rng=None):
     if config.riskMode == 'GOALS_DESK_V2':
         return search_goals_desk_plan(pool, config, original, rng=rng)
+    if config.riskMode == 'GGSP_V11':
+        return search_ggsp_plan(pool, config, original, rng=rng)
     rng = rng or random.Random()
     blocked = set()
     used_matches = set()
