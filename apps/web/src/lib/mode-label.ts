@@ -3,6 +3,7 @@ import type { ModeKey } from '@myodd/shared';
 export const MODE_TAG: Record<ModeKey, string> = {
   OVER15_MACHINE: 'Over 1.5',
   GOALS_DESK_V2: 'Goals Desk',
+  GGSP_V11: 'GGSP',
   INVESTOR: 'Investor',
   STATSMAN: 'Statsman',
   GAMBLER: 'Gambler',

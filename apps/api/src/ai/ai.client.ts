@@ -146,6 +146,7 @@ export class AiClient {
       ? {
         OVER15_MACHINE: 'over15-machine',
         GOALS_DESK_V2: 'goals-desk-v2',
+        GGSP_V11: 'ggsp-v11',
         INVESTOR: 'investor',
         GAMBLER: 'gambler',
         STATSMAN: 'statsman',

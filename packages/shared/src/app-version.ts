@@ -2,7 +2,7 @@
  * Single source of truth for the product version shown in the UI and health checks.
  * Bump this (and root package.json) when you ship user-visible changes.
  */
-export const APP_VERSION = '0.2.29';
+export const APP_VERSION = '0.2.30';
 
 /** Format e.g. `v0.2.28` or `v0.2.28.a1b2c3d` when a real deploy git sha is provided. */
 export function formatAppVersion(gitSha?: string | null) {

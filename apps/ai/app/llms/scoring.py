@@ -156,7 +156,9 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
                 scored.append(ScoredSelection(
                     eventId=fixture.eventId, marketId=market.marketId, outcomeId=outcome.outcomeId,
                     specifier=market.specifier, odds=outcome.odds, homeTeam=fixture.homeTeam,
-                    awayTeam=fixture.awayTeam, league=fixture.league, marketName=market.marketName,
+                    awayTeam=fixture.awayTeam, league=fixture.league,
+                    categoryName=getattr(fixture, 'categoryName', '') or '',
+                    marketName=market.marketName,
                     selectionName=outcome.outcomeName, kickoffAt=fixture.kickoffAt,
                     supportedMarket=supported, probability=round(probability, 6),
                     confidence=round(probability * 100, 2), modelVersion=version, predictedAt=now,

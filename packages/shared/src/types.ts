@@ -14,6 +14,8 @@ export interface BookmakerSelection {
   homeTeam?: string;
   awayTeam?: string;
   league?: string;
+  /** SportyBet category (country / region). Used by GGSP league gate with `league`. */
+  categoryName?: string;
   kickoffAt?: string;
   /** Explicit event phase from the booking response, independent of bettability. */
   matchStatus?: string;

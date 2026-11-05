@@ -19,9 +19,9 @@ class AgentTests(unittest.TestCase):
         intent_cache.clear()
 
     def test_each_mode_has_a_distinct_prompt_and_only_required_trend_tool(self):
-        self.assertEqual(len(AGENTS), 7)
+        self.assertEqual(len(AGENTS), 8)
         self.assertEqual(set(AGENTS), {
-            'OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE',
+            'OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE',
         })
         for mode, agent in AGENTS.items():
             with self.subTest(mode=mode):

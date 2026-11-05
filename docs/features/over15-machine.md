@@ -4,6 +4,8 @@
 
 Vedic Lahiri whole-sign chart at kickoff for the home ground. Only **Aries rising** games are eligible. Prefer **Over 1.5**; if that price is under **1.11**, take **Over 2.5** instead. Builds up to **10 tickets** at combined odds **4–6**. Each leg **1.10–1.25**.
 
+**Flashscore first:** the day board is loaded from Flashscore and Aries-rising is graded on Flashscore home names; SportyBet is matched afterward for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`).
+
 ## Match day
 
 Defaults to **this week** (today through +6 Lagos days). The Create match-day control can narrow or widen the window. Aries lagna is only open for roughly two hours a day at a given ground, so a short window may return fewer than five tickets.
@@ -21,6 +23,7 @@ Placed on Create **before Investor Mode**.
 | Layer | Location |
 | --- | --- |
 | Chart | `apps/ai/app/llms/vedic_o15.py` (`pyswisseph`, Lahiri, whole-sign) |
+| Flashscore bridge | `apps/ai/app/tools/flashscore_feed.py` · `fs_sporty_bridge.py` |
 | Pick filter | `apps/ai/app/tools/over15_picks.py` |
 | Agent / route | `POST /generate/over15-machine` · `Over15MachineAgent` |
 | Web | Generate form → Over 1.5 Machine |

@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from .goals_desk_picks import goals_desk_market_allowed
+from .ggsp_picks import ggsp_market_allowed
 from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
 from .over15_picks import over15_market_allowed
@@ -86,6 +87,8 @@ def eligible(selection, config):
             and (config.riskMode != 'OVER15_MACHINE' or config.fixtureMode == 'original_only' or over15_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
             and (config.riskMode != 'GOALS_DESK_V2' or config.fixtureMode == 'original_only' or goals_desk_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
+            and (config.riskMode != 'GGSP_V11' or config.fixtureMode == 'original_only' or ggsp_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds)))
 
 

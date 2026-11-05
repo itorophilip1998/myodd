@@ -27,6 +27,7 @@ import {
 const MODES = [
   { name: 'Over 1.5 Machine', key: 'OVER15_MACHINE' as const, risk: 'Low risk · O1.5 card', detail: 'Week by default · tickets 4–6 · legs ≤1.25 · no same-game repeat', icon: '◇', tone: 'over15', recommended: false, termsHash: 'mode-over15-machine' },
   { name: 'Goals Desk v2', key: 'GOALS_DESK_V2' as const, risk: 'Low risk · ≥3 Yes O1.5 · all-4 O2.5', detail: 'That day by default · date range OK · O1.5 lane 3–5 · O2.5 4–6', icon: '✦', tone: 'goalsdesk', recommended: false, termsHash: 'mode-goals-desk-v2' },
+  { name: 'GGSP v1.1', key: 'GGSP_V11' as const, risk: 'Low risk · Chaldean CLEAN O1.5', detail: 'That day · thin +1/+2 · tickets 3–4 · Asian O2 on 1.09–1.12', icon: '⬡', tone: 'ggsp', recommended: false, termsHash: 'mode-ggsp-v11' },
   { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · lower odds', detail: 'Mixed tickets 3–6 · each game 1.10–1.35', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
   { name: 'Statsman Mode', key: 'STATSMAN' as const, risk: 'Model engine · high-confidence gates', detail: 'goals/corners/shots ≥76% · side bands', icon: '▣', tone: 'statsman', recommended: false, termsHash: 'mode-statsman' },
   { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Mixed tickets 6.1–20 · each game ≤1.35', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
@@ -89,7 +90,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   const [strict, setStrict] = useState(settings.defaultStrict);
   const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
-  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'GOALS_DESK_V2' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER' || modeBand.key === 'STATSMAN') && predictionBook.length === 0;
+  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'GOALS_DESK_V2' || modeBand.key === 'GGSP_V11' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER' || modeBand.key === 'STATSMAN') && predictionBook.length === 0;
   const wantsSplit = !systemMode && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
   const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
   const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
@@ -195,7 +196,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
   function chooseMode(name: string) {
     touch();
     setMode(name);
-    if (['OVER15_MACHINE', 'GOALS_DESK_V2', 'INVESTOR', 'GAMBLER', 'STATSMAN'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
+    if (['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
     const nextMode = modeKeyFromLabel(name);
     if (nextMode !== 'GAMBLER') {
       const allowed = new Set(registryForMode(nextMode).map(item => item.id));
@@ -207,8 +208,8 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
       setRangeStart(start);
       setRangeEnd(addLagosDays(start, 6));
     }
-    // Goals Desk defaults to that calendar day; user can still widen via the match-day picker.
-    if (nextMode === 'GOALS_DESK_V2' && !dateEdited) {
+    // Goals Desk / GGSP default to that calendar day; user can still widen via the match-day picker.
+    if ((nextMode === 'GOALS_DESK_V2' || nextMode === 'GGSP_V11') && !dateEdited) {
       const today = lagosDateYmd();
       setRangeStart(today);
       setRangeEnd(today);
@@ -306,11 +307,13 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
         ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Legs 1.10–1.25.'
         : modeBand.key === 'GOALS_DESK_V2'
           ? 'Goals Desk v2: O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace), skips Omikuji 吉; O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (same O1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and ≤1.60. Never mix lanes. O1.5 tickets at 3–5; O2.5 at 4–6. Up to 10 tickets. Thin days pull in +1/+2 days.'
-          : modeBand.key === 'STATSMAN'
-            ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
-            : modeBand.key === 'INVESTOR'
-              ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.'
-              : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
+          : modeBand.key === 'GGSP_V11'
+            ? 'GGSP v1.1: Chaldean CLEAN roots 7–8 on home+away (Flashscore name aliases; skip toxic 54/62). HARD/SOFT league skips. Over 1.5, or Asian Over 2 when Over 1.5 is 1.09–1.12. Use the selected match day or range (defaults to that day; thin days pull in +1/+2). Build up to 10 tickets at combined odds 3–4. Never reuse the same game on another ticket. Legs 1.10–1.30.'
+            : modeBand.key === 'STATSMAN'
+              ? 'Statsman Mode: scan all games; ticket goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
+              : modeBand.key === 'INVESTOR'
+                ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Each selection between 1.10 and 1.35.'
+                : 'Build 10 tickets with mixed targets across 6.1–20 odds. Each selection between 1.10 and 1.35.',
       dateLine,
     ] : [
       predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',

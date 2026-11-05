@@ -4,6 +4,8 @@
 
 Ticket the dualman **goals desk v2** books (Zi Wei / Omikuji / Lenormand / Desk) against SportyBet goal totals.
 
+**Flashscore first:** the day board is loaded from Flashscore and desk-cast on Flashscore team names; SportyBet is matched afterward for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`).
+
 ## Pick gates
 
 | Signal | Market | Odds |

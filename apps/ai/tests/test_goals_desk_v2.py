@@ -191,6 +191,30 @@ class GoalsDeskPolicyTests(unittest.TestCase):
             else:
                 self.assertTrue(lines <= {1.5, 2.0})
 
+    def test_thin_o15_pool_still_builds_under_soft_floor(self):
+        """4 short O1.5 legs cannot clear 3.0 — soft-floor must still return a ticket."""
+        from app.tools.search import search_goals_desk_plan
+        import random
+
+        kickoff = datetime(2099, 1, 1, 15, 0, tzinfo=timezone.utc)
+
+        def make(event, odds):
+            return ScoredSelection(
+                eventId=str(event), marketId='18', outcomeId='12', specifier='total=1.5',
+                odds=odds, probability=0.8, confidence=80, modelVersion='goals-desk-v2-all4-pace-末吉',
+                supportedMarket=Market.OVER_1_5,
+                homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='League',
+                kickoffAt=kickoff, marketName='Over/Under', selectionName='Over 1.5',
+            )
+
+        # 1.18^4 ≈ 1.94 < 3.0 — previously returned 0 tickets and failed the job.
+        pool = [make(i, 1.18) for i in range(4)]
+        config = parse_rules('Goals Desk v2')
+        tickets, bounds = search_goals_desk_plan(pool, config, [], rng=random.Random(3))
+        self.assertGreaterEqual(len(tickets), 1, bounds)
+        self.assertLess(tickets[0]['totalOdds'], 3.0)
+        self.assertTrue(isinstance(bounds, dict) and bounds.get('goalsDeskSoftFloor'))
+
 
 if __name__ == '__main__':
     unittest.main()
