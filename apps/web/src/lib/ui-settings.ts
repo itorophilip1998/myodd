@@ -46,7 +46,7 @@ export function readUiSettings(): UiSettings {
       soundVolume: clampVolume(Number(parsed.soundVolume ?? DEFAULT_UI_SETTINGS.soundVolume)),
       progressSounds: parsed.progressSounds !== false,
       toastSounds: parsed.toastSounds !== false,
-      defaultMode: parsed.defaultsVersion === 3 && ['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'].includes(parsed.defaultMode ?? '') ? parsed.defaultMode! : 'INVESTOR',
+      defaultMode: parsed.defaultsVersion === 3 && ['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'STATSMAN', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'].includes(parsed.defaultMode ?? '') ? parsed.defaultMode! : 'INVESTOR',
       defaultOperation: parsed.defaultOperation === 'split' ? 'split' : 'generate',
       defaultTickets: clampTickets(tickets === undefined ? DEFAULT_UI_SETTINGS.defaultTickets : tickets),
       defaultGames: clampTickets(parsed.defaultGames, MAX_GAMES_PER_TICKET),

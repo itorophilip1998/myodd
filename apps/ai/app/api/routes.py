@@ -59,6 +59,21 @@ async def generate(body: GenerateInput, request: Request):
     return await run_generation(body, request, body.config.riskMode)
 
 
+@router.post('/generate/over15-machine')
+async def over15_machine(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'OVER15_MACHINE')
+
+
+@router.post('/generate/goals-desk-v2')
+async def goals_desk_v2(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'GOALS_DESK_V2')
+
+
+@router.post('/generate/ggsp-v11')
+async def ggsp_v11(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'GGSP_V11')
+
+
 @router.post('/generate/investor')
 async def investor(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'INVESTOR')
@@ -77,6 +92,11 @@ async def japa(body: GenerateInput, request: Request):
 @router.post('/generate/lagos-life')
 async def lagos_life(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'LAGOS_LIFE')
+
+
+@router.post('/generate/statsman')
+async def statsman(body: GenerateInput, request: Request):
+    return await run_generation(body, request, 'STATSMAN')
 
 
 @router.post('/tools/split')

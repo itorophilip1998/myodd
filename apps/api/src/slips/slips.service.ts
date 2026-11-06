@@ -5,7 +5,7 @@ import { assessBooking, codeExpiry } from '../catalog/catalog.policy';
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, RiskPreference, classifyVariance, clampOddsToMode, generatePublicId, isSystemMode, matchDayKickoffWindow, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { addLagosDays, collectionTitle, MARKET_REGISTRY, MARKET_REGISTRY_VERSION, resolveMarketIds, MODE_ODDS, classifyVariance, clampOddsToMode, generatePublicId, isSystemMode, matchDayKickoffWindow, omitVirtualGames, promptMatchDay, readChatRequest, requestedTicketCount, previewOddsFromPrompt, type BookmakerBooking, type GenerationConfig, type MatchDayWindow, type ScoredSelection } from '@myodd/shared';
 import { JobStatus, VarianceLevel, Prisma } from '@prisma/client';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 import { PredictionsService } from '../predictions/predictions.service';
@@ -14,11 +14,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SlipValidatorService } from './slip-validator.service';
 import { CREATE_BOOKING_QUEUE } from '../jobs/job.constants';
 import { systemConfig } from './system-config';
-import { SystemFixtureLoader } from './system-fixtures';
+import { SystemFixtureLoader, type SystemFixtureSnapshot } from './system-fixtures';
 import { slipFingerprint } from './slip-fingerprint';
 
 /** Markets the upcoming feed can return for every game, without one request per match. */
 const LISTING_MARKET_IDS = ['1', '10', '18', '19', '20', '29', '450004', '450005', '450006', '854', '856', '858'];
+/** Listed games with options needed before Goals Desk stops pulling in the next calendar days. */
+const GOALS_DESK_MIN_GAMES = 20;
+/**
+ * GGSP burns 4–8 unique CLEAN games per ~3–4 ticket. One day often only yields ~10–15 CLEAN
+ * after the cipher, so widen sooner than Goals Desk.
+ */
+const GGSP_MIN_GAMES = 40;
 
 export interface GenerateRequest {
   userId?: string;
@@ -124,44 +131,32 @@ export class SlipsService implements OnModuleInit {
   }
 
   private internalSystem(input: GenerateRequest) {
-    return (input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER') && !input.splitInto && !input.pinnedSelections?.length;
+    return (input.riskMode === 'OVER15_MACHINE' || input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11' || input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER' || input.riskMode === 'STATSMAN')
+      && !input.splitInto && !input.pinnedSelections?.length;
   }
 
   private explicitControls(config: GenerationConfig, input: GenerateRequest, fixtures: import('@myodd/shared').BookmakerFixture[]): GenerationConfig {
     if (this.internalSystem(input)) {
       const mode = input.riskMode!;
-      const label = mode === 'INVESTOR' ? 'Investor' : 'Gambler';
+      const locked = systemConfig(mode);
+      const label = mode === 'OVER15_MACHINE' ? 'Over 1.5 Machine'
+        : mode === 'GOALS_DESK_V2' ? 'Goals Desk v2'
+          : mode === 'GGSP_V11' ? 'GGSP v1.1'
+            : mode === 'STATSMAN' ? 'Statsman'
+              : mode === 'INVESTOR' ? 'Investor' : 'Gambler';
       const band = MODE_ODDS[mode];
       const notices = [...config.unhandledRequests];
       const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
       if (input.selectedMarketIds?.length) {
-        note(`${label} Mode chooses the markets. Requested markets were not applied.`);
+        note(`${label} chooses the markets. Requested markets were not applied.`);
       }
       if (input.ticketCount || input.gamesPerTicket) {
-        note(`${label} Mode chooses the ticket count and games per ticket. Requested counts were not applied.`);
+        note(`${label} chooses the ticket count and games per ticket. Requested counts were not applied.`);
       }
       if (input.minimumOdds != null || input.maximumOdds !== undefined) {
-        note(`${label} Mode uses mixed ticket odds across ${band.minimum}–${band.maximum}. Requested odds were not applied.`);
+        note(`${label} uses mixed ticket odds across ${band.minimum}–${band.maximum}. Requested odds were not applied.`);
       }
-      return {
-        ...config,
-        riskMode: mode,
-        riskPreference: mode === 'INVESTOR' ? RiskPreference.VERY_LOW : RiskPreference.MODERATE,
-        fixtureMode: 'upcoming',
-        preserveOriginalSelections: false,
-        minimumOdds: band.minimum,
-        maximumOdds: band.maximum,
-        allowOddsAdjustment: false,
-        numberOfSlips: 10,
-        minimumSelections: 1,
-        maximumSelections: 50,
-        markets: [],
-        marketQueries: [],
-        marketRules: [],
-        relatedMarketRules: [],
-        marketPolicy: 'prefer',
-        unhandledRequests: notices,
-      };
+      return { ...config, ...locked, unhandledRequests: notices };
     }
     if (input.riskMode) {
       const band = MODE_ODDS[input.riskMode];
@@ -195,10 +190,11 @@ export class SlipsService implements OnModuleInit {
     const requestedCount = requestedTicketCount(req.instruction);
     if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
-    if ((req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER') && req.operation !== 'split' && !req.pinnedSelections?.length) {
+    if ((req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN') && req.operation !== 'split' && !req.pinnedSelections?.length) {
       req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
     }
-    const internalSystem = (req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER') && req.operation === 'generate' && !req.pinnedSelections?.length;
+    const internalSystem = (req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN')
+      && req.operation === 'generate' && !req.pinnedSelections?.length;
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
     if (req.operation !== 'generate' && (req.operation === 'split' || parsed.isSplit) && splitInto === undefined) throw new BadRequestException('How many parts should this code be split into? Add “into 5 parts”, or use the split count option.');
@@ -232,7 +228,9 @@ export class SlipsService implements OnModuleInit {
         originalBookingCode: req.bookingCode?.toUpperCase() ?? null,
         expiresAt: codeExpiry(new Date()),
       } });
-      const count = internalSystem ? 10 : req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
+      const count = internalSystem
+        ? 10
+        : req.splitInto ?? req.ticketCount ?? requestedCount ?? 10;
       const job = await tx.generationJob.create({ data: { groupId: group.id, requestKey, requestId: req.requestId, payloadHash, requestedCount: Math.min(10, Math.max(1, count)) } });
       await tx.trainingEvent.create({ data: { eventKey: `${job.id}:request`, groupId: group.id, jobId: job.id, profileId: req.profileId,
         kind: 'REQUEST_ACCEPTED', payload: { ...req, engineVersion: 'myodd-v5', acceptedAt: new Date().toISOString() } as Prisma.InputJsonValue } });
@@ -285,8 +283,20 @@ export class SlipsService implements OnModuleInit {
     if (input.bookingCode && original && !input.userId) await this.catalog.remember(input.bookingCode, 'private', undefined, original);
     const internalSystem = this.internalSystem(input);
     const promptDay = promptMatchDay(input.instruction);
-    const matchDay = matchDayKickoffWindow(input.matchDate ?? promptDay?.start, new Date(), input.matchDateEnd ?? promptDay?.end);
-    const systemSnapshot = internalSystem ? await this.systemFixtures.load(matchDay, detail => this.stage(input, 'READING', detail)) : null;
+    let matchDay = matchDayKickoffWindow(input.matchDate ?? promptDay?.start, new Date(), input.matchDateEnd ?? promptDay?.end);
+    let systemSnapshot = internalSystem
+      ? await this.systemFixtures.load(matchDay, detail => this.stage(input, 'READING', detail), input.riskMode)
+      : null;
+    if (internalSystem && (input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11') && systemSnapshot) {
+      const widened = await this.widenThinDayWindow(
+        matchDay,
+        systemSnapshot,
+        input.riskMode,
+        detail => this.stage(input, 'READING', detail),
+      );
+      matchDay = widened.matchDay;
+      systemSnapshot = widened.snapshot;
+    }
     let fixtures = systemSnapshot ? systemSnapshot.fixtures : original?.selections.length
       ? await this.bookmaker.getFixtures({ eventIds: original.selections.map(selection => selection.eventId) })
       : await this.upcomingFixtures(matchDay, detail => this.stage(input, 'READING', detail));
@@ -294,6 +304,7 @@ export class SlipsService implements OnModuleInit {
       const upcoming = await this.upcomingFixtures(matchDay);
       fixtures = [...new Map([...fixtures, ...upcoming].map(fixture => [fixture.eventId, fixture])).values()];
     }
+    fixtures = omitVirtualGames(fixtures);
     const memory = !internalSystem && input.profileId ? await this.prisma.learningProfile.findUnique({ where: { id: input.profileId } }) : null;
     await this.audit(input, 'SOURCE_SNAPSHOT', { original, fixtures, matchDay, preferences: memory?.preferences ?? null, preferenceRevision: memory?.revision ?? null, fixtureCoverage: systemSnapshot?.coverage });
     const modelInfo = internalSystem ? { planner: 'internal-fixed-policy', riskMode: input.riskMode, options: 'provided-19-market-list' } : await this.ai.modelInfo();
@@ -303,7 +314,17 @@ export class SlipsService implements OnModuleInit {
       ? (input.maximumOdds == null ? `Ticket odds at least ${input.minimumOdds ?? 1.1}. No maximum ticket odds.` : `Ticket odds between ${input.minimumOdds ?? 1.1} and ${input.maximumOdds}.`)
       : '';
     const countSettings = [
-      internalSystem ? `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.` : '',
+      internalSystem ? (
+        input.riskMode === 'OVER15_MACHINE'
+          ? 'Over 1.5 Machine system ticket. Aries rising Vedic charts only. Prefer Over 1.5; if O1.5 price < 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Each leg 1.10–1.25.'
+          : input.riskMode === 'GOALS_DESK_V2'
+            ? 'Goals Desk v2 system ticket. O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace); skip Omikuji 吉. O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. When a single day is thin, also include the next 1–2 days.'
+            : input.riskMode === 'GGSP_V11'
+              ? 'GGSP v1.1 system ticket. Chaldean CLEAN roots 7–8 on home+away (Flashscore name aliases; skip toxic totals 54/62). Apply HARD and SOFT league skips. Over 1.5, or Asian Over 2 when Over 1.5 is 1.09–1.12. Use the selected match day or range (defaults to that calendar day; thin days pull in +1/+2). Build up to 10 tickets at combined odds 3–4. Never reuse the same game on another ticket. Each leg 1.10–1.30.'
+              : input.riskMode === 'STATSMAN'
+                ? 'Statsman Mode system ticket. Scan all listed games with the Statsman engine. Ticket only goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
+                : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.`
+      ) : '',
       !internalSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
       !internalSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',
       oddsSettings,
@@ -452,6 +473,44 @@ export class SlipsService implements OnModuleInit {
     ]);
   }
 
+  /**
+   * Goals Desk / GGSP default to one calendar day. When that day alone is too thin for up to 10
+   * tickets, widen through the next day, then the next two days (shared match-day max still applies).
+   * Multi-day ranges the user already chose are left alone.
+   */
+  private async widenThinDayWindow(
+    matchDay: MatchDayWindow,
+    snapshot: SystemFixtureSnapshot,
+    mode: 'GOALS_DESK_V2' | 'GGSP_V11',
+    onProgress?: (detail: string) => Promise<unknown>,
+  ): Promise<{ matchDay: MatchDayWindow; snapshot: SystemFixtureSnapshot }> {
+    const minGames = mode === 'GGSP_V11' ? GGSP_MIN_GAMES : GOALS_DESK_MIN_GAMES;
+    const label = mode === 'GGSP_V11' ? 'GGSP' : 'Goals Desk';
+    if (matchDay.matchDate !== matchDay.matchDateEnd || snapshot.fixtures.length >= minGames) {
+      return { matchDay, snapshot };
+    }
+    const start = matchDay.matchDate;
+    let current = matchDay;
+    let currentSnapshot = snapshot;
+    for (const extra of [1, 2] as const) {
+      if (currentSnapshot.fixtures.length >= minGames) break;
+      const widened = matchDayKickoffWindow(start, new Date(), addLagosDays(start, extra));
+      if (widened.matchDateEnd === current.matchDateEnd && widened.kickoffBefore === current.kickoffBefore) break;
+      await onProgress?.(`${label} day is thin — loading through ${widened.matchDateEnd}`);
+      currentSnapshot = await this.systemFixtures.load(widened, onProgress, mode);
+      current = widened;
+    }
+    if (current.matchDateEnd === start) return { matchDay, snapshot };
+    const notice = `${label} extended ${start} through ${current.matchDateEnd} because that day alone did not have enough games for up to 10 tickets.`;
+    return {
+      matchDay: current,
+      snapshot: {
+        ...currentSnapshot,
+        notices: currentSnapshot.notices.includes(notice) ? currentSnapshot.notices : [...currentSnapshot.notices, notice],
+      },
+    };
+  }
+
   private async upcomingFixtures(matchDay = matchDayKickoffWindow(), onProgress?: (detail: string) => Promise<unknown>) {
     const hoursUntilEnd = Math.max(1, Math.ceil((new Date(matchDay.kickoffBefore).getTime() - Date.now()) / 3600000));
     const timelineHours = Math.min(168, Math.max(24, hoursUntilEnd + 6));
@@ -463,8 +522,8 @@ export class SlipsService implements OnModuleInit {
       listed.push(...page);
       if (page.length < pageSize) break;
     }
-    const fixtures = [...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
-      .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now());
+    const fixtures = omitVirtualGames([...new Map(listed.map(fixture => [fixture.eventId, fixture])).values()]
+      .filter(fixture => new Date(fixture.kickoffAt).getTime() > Date.now()));
     const start = new Date(matchDay.kickoffAfter).getTime();
     const end = new Date(matchDay.kickoffBefore).getTime();
     const onDay = fixtures.filter(fixture => {
@@ -481,7 +540,7 @@ export class SlipsService implements OnModuleInit {
       ...matchDay,
       kickoffAfter: config.kickoffAfter ?? matchDay.kickoffAfter,
       kickoffBefore: config.kickoffBefore ?? matchDay.kickoffBefore,
-    })).fixtures;
+    }, undefined, config.riskMode)).fixtures;
   }
 
   async enqueueBookings(input: PrepareJob, config: GenerationConfig, candidates: RankedCandidate[]) {

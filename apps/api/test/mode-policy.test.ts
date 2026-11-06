@@ -1,5 +1,19 @@
 import { expect, it } from 'vitest';
-import { clampOddsToMode, withinModeOdds, withinModeSelectionOdds } from '@myodd/shared';
+import { clampOddsToMode, isVirtualGame, omitVirtualGames, withinModeOdds, withinModeSelectionOdds } from '@myodd/shared';
+
+it('omits Simulated Reality / SRL virtual games from every mode slate', () => {
+  expect(isVirtualGame({ homeTeam: 'Arsenal SRL', awayTeam: 'Chelsea', league: 'England' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea srl', league: 'EPL' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'SRL Brazil' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Home', awayTeam: 'Away', league: 'Simulated Reality League' })).toBe(true);
+  expect(isVirtualGame({ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'Premier League' })).toBe(false);
+  expect(isVirtualGame({ homeTeam: 'Israel', awayTeam: 'Spain', league: 'Nations' })).toBe(false);
+  expect(omitVirtualGames([
+    { homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'EPL' },
+    { homeTeam: 'Team A SRL', awayTeam: 'Team B', league: 'Cup' },
+  ])).toEqual([{ homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'EPL' }]);
+});
+
 it('enforces every mode boundary, including no artificial Lagoslife ceiling', () => {
   expect(withinModeOdds(3, 'INVESTOR')).toBe(true);
   expect(withinModeOdds(6, 'INVESTOR')).toBe(true);
@@ -23,6 +37,24 @@ it('enforces safe per-game odds inside named-mode tickets', () => {
   expect(withinModeSelectionOdds(1.36, 'INVESTOR')).toBe(false);
   expect(withinModeSelectionOdds(1.35, 'GAMBLER')).toBe(true);
   expect(withinModeSelectionOdds(1.36, 'GAMBLER')).toBe(false);
+  expect(withinModeSelectionOdds(1.25, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeSelectionOdds(1.26, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeSelectionOdds(1.09, 'GOALS_DESK_V2')).toBe(true);
+  expect(withinModeSelectionOdds(1.08, 'GOALS_DESK_V2')).toBe(false);
+  expect(withinModeSelectionOdds(1.60, 'GOALS_DESK_V2')).toBe(true);
+  expect(withinModeSelectionOdds(1.61, 'GOALS_DESK_V2')).toBe(false);
+  expect(withinModeOdds(4, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(5, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(6, 'OVER15_MACHINE')).toBe(true);
+  expect(withinModeOdds(3.99, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeOdds(6.01, 'OVER15_MACHINE')).toBe(false);
+  expect(withinModeSelectionOdds(1.09, 'GGSP_V11')).toBe(true);
+  expect(withinModeSelectionOdds(1.30, 'GGSP_V11')).toBe(true);
+  expect(withinModeSelectionOdds(1.31, 'GGSP_V11')).toBe(false);
+  expect(withinModeOdds(3, 'GGSP_V11')).toBe(true);
+  expect(withinModeOdds(4, 'GGSP_V11')).toBe(true);
+  expect(withinModeOdds(2.99, 'GGSP_V11')).toBe(false);
+  expect(withinModeOdds(4.01, 'GGSP_V11')).toBe(false);
   expect(withinModeSelectionOdds(2, 'JAPA')).toBe(true);
   expect(withinModeSelectionOdds(2.01, 'JAPA')).toBe(false);
   expect(withinModeSelectionOdds(2, 'LAGOS_LIFE')).toBe(true);

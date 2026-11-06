@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { canAccessGroup } from './group-access';
 import { PlayCheckService } from './play-check.service';
 
-const MODE_KEYS = new Set(['INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']);
+const MODE_KEYS = new Set(['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'STATSMAN', 'GAMBLER', 'JAPA', 'LAGOS_LIFE']);
 
 function accessibleGroups(userId?: string): Prisma.SlipGroupWhereInput {
   return { deletedAt: null, OR: [

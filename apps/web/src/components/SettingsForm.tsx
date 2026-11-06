@@ -36,7 +36,7 @@ export function SettingsForm() {
           <label>
             Default mode
             <select value={settings.defaultMode ?? 'INVESTOR'} onChange={e => update({ defaultMode: (e.target.value || null) as UiSettings['defaultMode'] })}>
-              <option value="INVESTOR">Investor</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
+              <option value="OVER15_MACHINE">Over 1.5 Machine</option><option value="GOALS_DESK_V2">Goals Desk v2</option><option value="GGSP_V11">GGSP v1.1</option><option value="INVESTOR">Investor</option><option value="STATSMAN">Statsman</option><option value="GAMBLER">Gambler</option><option value="JAPA">Japa</option><option value="LAGOS_LIFE">Lagos Life</option>
             </select>
           </label>
           <label>

@@ -86,12 +86,28 @@ def generate_report(pool: list[ScoredSelection], config: Config, original: list[
         effective.maximumOdds = max(config.maximumOdds, *(c['totalOdds'] for c in candidates)) if config.maximumOdds is not None else None
         notices.append(f'Used your nearest-odds option: returned totals span {min(c["totalOdds"] for c in candidates):g}–{max(c["totalOdds"] for c in candidates):g}.')
     if uses_system_plan(config) and len(candidates) < config.numberOfSlips:
-        grouped = []
-        for target, count in mode_plan(config):
-            low, high = target_odds_window(target, config)
-            got = sum(1 for c in candidates if low <= c['totalOdds'] <= high)
-            grouped.append(f'{got} of {count} at {target:g}')
-        notices.append(f'{config.riskMode.title()} mixed-odds plan (' + ', '.join(grouped) + '). Missing targets could not be filled within the available markets and search budget; no out-of-band tickets were added.')
+        if config.riskMode == 'GOALS_DESK_V2':
+            soft = (bounds or {}).get('goalsDeskSoftFloor') if isinstance(bounds, dict) else None
+            soft_bit = (' ' + ' '.join(soft)) if soft else ''
+            notices.append(
+                'Goals Desk v2 lane plan (O1.5 lane incl. Asian Over 2 at 3–5; O2.5 lane at 4–6; lanes never mixed). '
+                f'Found {len(candidates)} of {config.numberOfSlips}; missing targets could not be filled within the available markets and search budget.'
+                f'{soft_bit}'
+            )
+        elif config.riskMode == 'GGSP_V11':
+            eligible_events = len({s.eventId for s in filtered})
+            notices.append(
+                'GGSP v1.1 fills the 3–4 band with unique matches only (a ~3.0 ticket needs ~4–6 CLEAN legs). '
+                f'CLEAN pool had {eligible_events} games; found {len(candidates)} of {config.numberOfSlips}. '
+                'Widen the match day or wait for a deeper CLEAN slate to fill more tickets.'
+            )
+        else:
+            grouped = []
+            for target, count in mode_plan(config):
+                low, high = target_odds_window(target, config)
+                got = sum(1 for c in candidates if low <= c['totalOdds'] <= high)
+                grouped.append(f'{got} of {count} at {target:g}')
+            notices.append(f'{config.riskMode.title()} mixed-odds plan (' + ', '.join(grouped) + '). Missing targets could not be filled within the available markets and search budget; no out-of-band tickets were added.')
     if len(candidates) < config.numberOfSlips:
         notices.append(f'Found {len(candidates)} of {config.numberOfSlips} requested unique combinations within the search budget.')
     if not candidates and bounds:

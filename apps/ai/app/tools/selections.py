@@ -1,9 +1,16 @@
 """Selection identity, eligibility and market filtering shared by generation and splitting."""
 import hashlib
+import re
 from datetime import datetime, timezone
 
+from .goals_desk_picks import goals_desk_market_allowed
+from .ggsp_picks import ggsp_market_allowed
 from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
+from .over15_picks import over15_market_allowed
+from .statsman_picks import statsman_market_allowed
+
+_VIRTUAL_GAME = re.compile(r'\bSRL\b|simulated\s+reality', re.I)
 
 
 def fingerprint(selections):
@@ -19,8 +26,12 @@ def selection_key(selection):
 
 def match_key(selection):
     """Normalize a fixture so the same game cannot appear twice under different event IDs."""
-    home = ' '.join((selection.homeTeam or '').casefold().split())
-    away = ' '.join((selection.awayTeam or '').casefold().split())
+    if isinstance(selection, dict):
+        home = ' '.join((selection.get('homeTeam') or '').casefold().split())
+        away = ' '.join((selection.get('awayTeam') or '').casefold().split())
+    else:
+        home = ' '.join((selection.homeTeam or '').casefold().split())
+        away = ' '.join((selection.awayTeam or '').casefold().split())
     return '|'.join(sorted((home, away)))
 
 
@@ -46,11 +57,21 @@ def matches_related(selection, config):
                for rule in config.relatedMarketRules)
 
 
+def is_virtual_game(selection) -> bool:
+    """Simulated Reality League / SRL fixtures are virtual and never ticketed."""
+    if isinstance(selection, dict):
+        text = f'{selection.get("homeTeam") or ""} {selection.get("awayTeam") or ""} {selection.get("league") or ""}'
+    else:
+        text = f'{selection.homeTeam or ""} {selection.awayTeam or ""} {selection.league or ""}'
+    return bool(_VIRTUAL_GAME.search(text))
+
+
 def eligible(selection, config):
     teams = f'{selection.homeTeam} {selection.awayTeam}'.casefold()
     league = selection.league.casefold()
     now = datetime.now(timezone.utc)
     return (selection.isActive and selection.kickoffAt > now
+            and not is_virtual_game(selection)
             and within_mode_selection_odds(selection.odds, config.riskMode)
             and not any(t.casefold() in teams for t in config.excludedTeams)
             and not any(t.casefold() in league for t in config.excludedLeagues)
@@ -60,7 +81,15 @@ def eligible(selection, config):
             and (config.minimumProbability is None or selection.probability >= config.minimumProbability)
             and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config))
             and (config.riskMode not in ('INVESTOR', 'GAMBLER') or config.fixtureMode == 'original_only' or investor_market_allowed(
-                selection.marketId, selection.marketName, selection.specifier, selection.selectionName)))
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
+            and (config.riskMode != 'STATSMAN' or config.fixtureMode == 'original_only' or statsman_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
+            and (config.riskMode != 'OVER15_MACHINE' or config.fixtureMode == 'original_only' or over15_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
+            and (config.riskMode != 'GOALS_DESK_V2' or config.fixtureMode == 'original_only' or goals_desk_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
+            and (config.riskMode != 'GGSP_V11' or config.fixtureMode == 'original_only' or ggsp_market_allowed(
+                selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds)))
 
 
 def event_choices(pool, config):

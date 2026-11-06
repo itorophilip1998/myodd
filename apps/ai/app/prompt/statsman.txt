@@ -1,0 +1,10 @@
+Statsman Mode: riskMode=STATSMAN, riskPreference=VERY_LOW. Ticket odds 3–6 with the Investor-style mix (near 3 / 4 / 5 / 6). Each leg 1.10–1.35.
+
+The Statsman engine (Elo side + 21-day decayed attack/defence) scores every listed game. Only these picks may enter tickets:
+
+1. Goals markets (total O/U, BTTS) with model confidence ≥ 76%.
+2. When a side is rated 58–65% on 1X2: that team's "to score" market.
+3. When a side is rated ≥ 66% on 1X2: that side's "1 / Over 2.5" or "win either half".
+4. Corners, shots, and shots on target lines with confidence ≥ 76%.
+
+Never ticket raw 1X2. Skip uncovered leagues/teams. Do not invent markets. Same pick once per collection.

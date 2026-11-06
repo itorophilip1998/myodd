@@ -31,9 +31,15 @@ Create ranked booking-code variations from a SportyBet share code and/or a natur
 
 Hard ticket bands and safer per-leg odds (see `MODE_ODDS` / `MODE_SELECTION_ODDS` in shared). Modes also work as typed keywords. Explicit numeric targets narrow the band; contradictory targets fail clearly.
 
-Typical labels: Investor, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
+Typical labels: Over 1.5 Machine, Goals Desk v2, Investor, Statsman, Gambler (incl. “Gamler”), Japa, Lagoslife / Lagos-Lifes.
 
-Investor and Gambler are system tickets. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. The system matches the exclusive 19-option list to the day’s listed SportyBet markets and ranks them with the numerical scoring path — it does not ask a language model to browse extra board options. Investor builds mixed tickets near 3, 4, 5, and 6 (band 3–6) and stays recommended for those lower odds. Gambler uses the same options across 6.1–20. Each selection is 1.10–1.35. Prompt text and saved defaults do not move that band or add markets. See [investor-system-mode.md](./investor-system-mode.md).
+**Over 1.5 Machine** sits before Investor on Create. Vedic Aries rising only; Over 1.5 (or Over 2.5 when O1.5 &lt; 1.11); week range by default (date filter allowed); up to 10 tickets at 4–6; no same-game repeat across tickets; legs ≤1.25. See [over15-machine.md](./over15-machine.md).
+
+**Goals Desk v2** sits beside it. O1.5 needs ≥3 of 4 Yes plus O2.5 ZW/OMI/LEN pace, skips Omikuji 吉; O2.5 needs all-4 Yes (also skips 吉); O1.5 at 1.14–1.27; Asian Over 2 when O1.5 is 1.09–1.13 (same O1.5 ticket lane); O2.5 ≤1.60; never mix lanes; O1.5 tickets at 3–5, O2.5 at 4–6; up to 10 tickets; thin single days auto-extend +1/+2 days. See [goals-desk-v2.md](./goals-desk-v2.md).
+
+**GGSP v1.1** sits with them. Chaldean CLEAN roots 7–8 on home+away (skip toxic 54/62); HARD/SOFT league skips; Over 1.5 only; that day by default (date range OK); up to 10 tickets at 3–4; no same-game repeat; legs 1.10–1.30. See [ggsp-v11.md](./ggsp-v11.md).
+
+Investor, Statsman, and Gambler are system tickets. The Create form keeps the match day (one day or a range) and hides tickets, games, odds, markets, and split. Investor and Gambler match the exclusive 19-option list to the day’s listed SportyBet markets. Investor builds mixed tickets near 3, 4, 5, and 6 (band 3–6) and stays recommended for those lower odds. Gambler uses the same options across 6.1–20. Each selection is 1.10–1.35. Prompt text and saved defaults do not move that band or add markets. See [investor-system-mode.md](./investor-system-mode.md) and [statsman-mode.md](./statsman-mode.md).
 
 ## Fixture scope
 

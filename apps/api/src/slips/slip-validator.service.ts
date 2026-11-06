@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { combinedOdds, isSystemMode, systemSelectionAllowed, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
+import { combinedOdds, isSystemMode, isVirtualGame, MODE_ODDS, systemSelectionAllowed, withinModeOdds, withinModeSelectionOdds, type BookmakerFixture, type GenerationConfig, type ScoredSelection } from '@myodd/shared';
 import { BOOKMAKER_PROVIDER, type BookmakerProvider } from '../bookmaker/bookmaker.provider';
 
 @Injectable()
@@ -19,8 +19,9 @@ export class SlipValidatorService {
       const outcome = market?.outcomes.find(o => o.outcomeId === leg.outcomeId && o.isActive);
       if (!event || !market || !outcome || seenEvents.has(leg.eventId) || !Number.isFinite(outcome.odds) || !withinModeSelectionOdds(outcome.odds, config.riskMode)) return null;
       if (!['', '0', 'active', 'open'].includes(market.status.toLowerCase())) return null;
+      if (isVirtualGame(event)) return null;
       if (isSystemMode(config.riskMode) && !config.preserveOriginalSelections
-        && (!systemSelectionAllowed(market, outcome) || /live|inplay|in play|finished|ended|closed|complete/i.test(event.matchStatus ?? ''))) return null;
+        && (!systemSelectionAllowed(market, outcome, config.riskMode) || /live|inplay|in play|finished|ended|closed|complete/i.test(event.matchStatus ?? ''))) return null;
       const kickoff = new Date(event.kickoffAt).getTime();
       if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return null;
       if (config.kickoffBefore && kickoff > new Date(config.kickoffBefore).getTime()) return null;
@@ -47,7 +48,12 @@ export class SlipValidatorService {
     }
     if (config.includedTeams?.some(team => !validated.some(s => `${s.homeTeam} ${s.awayTeam}`.toLowerCase().includes(team.toLowerCase())))) return null;
     const odds = combinedOdds(validated.map(s => s.odds!));
-    if (!withinModeOdds(odds, config.riskMode) || validated.length < config.minimumSelections || validated.length > config.maximumSelections || odds < config.minimumOdds || (config.maximumOdds != null && odds > config.maximumOdds)) return null;
+    if (validated.length < config.minimumSelections || validated.length > config.maximumSelections) return null;
+    if (odds < config.minimumOdds || (config.maximumOdds != null && odds > config.maximumOdds)) return null;
+    // Hard mode band when config still sits on it. Thin Goals Desk / nearest-odds soft floors
+    // lower config.minimumOdds below MODE_ODDS — those tickets must not be dropped here.
+    const modeBand = config.riskMode ? MODE_ODDS[config.riskMode as keyof typeof MODE_ODDS] : null;
+    if (modeBand && config.minimumOdds >= modeBand.minimum && !withinModeOdds(odds, config.riskMode)) return null;
     return validated;
   }
 }
