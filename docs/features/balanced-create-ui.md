@@ -26,3 +26,9 @@ Markets is collapsed by default inside Options. Opening it loads provider availa
 Each mode has an edge-aligned info button with a 44px touch target. It opens an anchored explanation with a pointer to that exact button, brings it into view, and focuses the explanation. Escape or Close restores focus; clicking outside dismisses it. Learn more opens the matching Terms anchor. The Terms sections now explain each mode’s exact ticket and selection bands, relative risk, control precedence, availability limits, and the distinction between code generation and placing bets. Odds bands come from the shared product constants.
 
 Validation for the markets and mode refinement: all 20 browser tests passed. Four targeted cases passed again after refining automatic scrolling and exact pointer positioning. Mobile and desktop screenshots were visually checked; web type checks and the production build passed. Provider responses in these browser tests are controlled fixtures.
+
+## Four-column mode cards (v0.2.31)
+
+The eight modes form two rows of four from 768px upward and switch to two columns on phones. Cards use vertical icon tiles, subtle gradient surfaces, consistent spacing, and an accent border and checkmark for the selected mode. The Recommended badge has its own space beside or below the icon. Keyboard focus is explicit; the existing 44px information targets, explanations, mode settings, and reduced-motion preference remain supported. Desktop cards retain the detailed summaries; compact cards show the mode name and risk summary.
+
+Validation: shared build and web type checks passed. All 10 targeted browser checks passed, covering generation, mode controls, explanation dialogs, and screen widths from 320px to 1280px. Screenshots at 320px, 375px, 768px, and 1280px confirmed the responsive columns without horizontal overflow; desktop, tablet, and phone previews were visually inspected. Browser checks used controlled provider responses.
