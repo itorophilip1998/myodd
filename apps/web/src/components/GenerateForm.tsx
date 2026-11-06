@@ -399,7 +399,7 @@ export function GenerateForm({ initialBookingCode = '', initialInstruction = '',
               className={`mode-option ${item.tone}${mode === item.name ? ' selected' : ''}`}
             >
               <span className="mode-icon" aria-hidden>{item.icon}</span>
-              <span>
+              <span className="mode-copy">
                 <strong>
                   {item.name}
                   {item.recommended ? <em className="mode-recommended">Recommended</em> : null}
