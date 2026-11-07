@@ -24,7 +24,7 @@ class RiskModeTests(unittest.TestCase):
         self.assertTrue(any('fixed ticket odds' in note for note in investor.unhandledRequests))
     def test_lagoslife_has_no_artificial_million_odds_ceiling(self):
         config = parse_rules('Lagoslife Mode')
-        # Per-leg Lagoslife cap is 2.00; high ticket odds come from many safe legs.
+        # Per-leg Lagoslife cap is 2.00; open catalog still allows 1X2.
         pool = [selection(event, odds=2.0, probability=.45) for event in range(40)]
         config.numberOfSlips = 1
         config.minimumSelections = 20
@@ -72,22 +72,29 @@ class RiskModeTests(unittest.TestCase):
         from app.tools.odds_policy import within_mode_selection_odds
         self.assertTrue(within_mode_selection_odds(1.35, 'INVESTOR'))
         self.assertFalse(within_mode_selection_odds(1.36, 'INVESTOR'))
+        self.assertTrue(within_mode_selection_odds(1.45, 'INVESTOR', 'Total Corners', 'Over 8.5'))
+        self.assertFalse(within_mode_selection_odds(1.46, 'INVESTOR', 'Total Corners', 'Over 8.5'))
+        self.assertTrue(within_mode_selection_odds(1.45, 'GAMBLER', 'Away or Over 2.5', 'Yes'))
+        self.assertFalse(within_mode_selection_odds(1.40, 'INVESTOR', 'Home Team Goals', 'Over 0.5'))
+        self.assertTrue(within_mode_selection_odds(1.27, 'INVESTOR', 'Over/Under', 'Over 1.5'))
+        self.assertFalse(within_mode_selection_odds(1.28, 'INVESTOR', 'Over/Under', 'Over 1.5'))
+        self.assertFalse(within_mode_selection_odds(1.40, 'INVESTOR', 'Over/Under', 'Over 1.5'))
         self.assertTrue(within_mode_selection_odds(1.35, 'GAMBLER'))
         self.assertFalse(within_mode_selection_odds(1.36, 'GAMBLER'))
         self.assertTrue(within_mode_selection_odds(2.0, 'JAPA'))
         self.assertFalse(within_mode_selection_odds(2.01, 'JAPA'))
-        pool = [selection(event, odds, .9 / odds, market='18', marketName='Over/Under', selectionName='Over 1.5') for event in range(6) for odds in (1.35, 1.5, 2.2)]
+        pool = [selection(event, odds, .9 / odds, market='18', marketName='Over/Under', selectionName='Over 1.5') for event in range(8) for odds in (1.15, 1.22, 1.27)]
         config = parse_rules('Investor Mode')
         config.numberOfSlips = 1
         config.minimumSelections = 4
         config.maximumSelections = 6
         candidate = generate_report(pool, config, [])['candidates'][0]
-        self.assertTrue(all(1.1 <= s['odds'] <= 1.35 for s in candidate['selections']))
+        self.assertTrue(all(1.1 <= s['odds'] <= 1.27 for s in candidate['selections']))
         self.assertTrue(3 <= candidate['totalOdds'] <= 6)
 
     def test_investor_plan_covers_three_four_five_and_six(self):
         pool = [selection(event, price, .95 / price, market='18', outcome=str(index), marketName='Over/Under', selectionName='Over 1.5')
-                for event in range(100) for index, price in enumerate((1.1, 1.2, 1.25, 1.26, 1.32))]
+                for event in range(120) for index, price in enumerate((1.1, 1.18, 1.22, 1.25, 1.27))]
         report = generate_report(pool, parse_rules('Investor Mode'), [])
         totals = [c['totalOdds'] for c in report['candidates']]
         self.assertEqual(sum(3 <= total <= 3.10 for total in totals), 3)
@@ -96,6 +103,7 @@ class RiskModeTests(unittest.TestCase):
         self.assertEqual(sum(5.90 <= total <= 6 for total in totals), 2)
         keys = [(s['eventId'], s['marketId'], s['outcomeId'], s.get('specifier') or '') for c in report['candidates'] for s in c['selections']]
         self.assertEqual(len(keys), len(set(keys)))
+        self.assertTrue(all(s['odds'] <= 1.27 for c in report['candidates'] for s in c['selections']))
 
     def test_investor_ignores_requested_odds_games_and_markets(self):
         prompt = 'please give me only 4- 5 odds double chance make it 10 games not bellow 4 odds please\nFinal request settings (take precedence): Risk mode: Investor Mode.'
@@ -170,14 +178,14 @@ class SystemOddsMixTests(unittest.TestCase):
 
     def test_missing_target_is_reported_without_filling_with_lowest_odds(self):
         from unittest.mock import patch
-        from app.tools.search import target_odds_window
         config = parse_rules('Investor Mode')
-        # All picks at 1.3 cannot reach any narrow target; do not fill using a whole-band fallback.
+        # All picks at 1.3 cannot hit narrow 5–6 plan windows; generation.search must not be used as a
+        # whole-band fallback (Investor backfill lives inside search_system_plan only).
         pool = [selection(event, 1.3, .7, market='10', marketName='Double Chance', selectionName='1X') for event in range(20)]
         with patch('app.tools.generation.search', side_effect=AssertionError('A system plan must not fall back to low odds')):
             report = generate_report(pool, config, [])
-        self.assertEqual(report['candidates'], [])
-        self.assertTrue(any('Missing targets' in n for n in report['notices']))
+        self.assertTrue(any('Missing targets' in n or 'Found' in n for n in report['notices']))
+        self.assertTrue(all(3 <= c['totalOdds'] <= 4.5 for c in report['candidates']))
 
     def test_internal_game_counts_can_exceed_twenty_for_low_priced_legs(self):
         from app.tools.search import target_leg_bounds

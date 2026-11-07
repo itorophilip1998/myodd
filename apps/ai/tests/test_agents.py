@@ -19,13 +19,14 @@ class AgentTests(unittest.TestCase):
         intent_cache.clear()
 
     def test_each_mode_has_a_distinct_prompt_and_only_required_trend_tool(self):
-        self.assertEqual(len(AGENTS), 8)
+        self.assertEqual(len(AGENTS), 7)
         self.assertEqual(set(AGENTS), {
-            'OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN', 'JAPA', 'LAGOS_LIFE',
+            'OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE',
         })
         for mode, agent in AGENTS.items():
             with self.subTest(mode=mode):
                 self.assertIn(f'riskMode={mode}', agent.system_prompt)
+                # Trends skipped at runtime when Statsman scores; agents still declare the flag.
                 self.assertEqual(agent.use_trends, mode in ('INVESTOR', 'GAMBLER'))
         self.assertIn('model-scored probabilities', PREDICTION_AGENT.system_prompt)
 
@@ -54,9 +55,10 @@ class AgentTests(unittest.TestCase):
                     self.assertIn(f'riskMode={expected}', post.call_args.kwargs['json']['messages'][0]['content'])
                     self.assertEqual(response.json()['riskMode'], expected)
 
+    @patch('app.tools.statsman_picks.apply_statsman_ticket_filter', side_effect=lambda pool, model: pool)
     @patch('app.agents.base.apply_match_trends', side_effect=lambda pool, matches: (pool, 'Test trend tool'))
     @patch('app.agents.base.recent_matches', return_value=[])
-    def test_mode_routes_generate_with_correct_band_and_tools(self, history, trends):
+    def test_mode_routes_generate_with_correct_band_and_tools(self, history, trends, _statsman_filter):
         fixtures = []
         for i in range(24):
             f = fixture(str(i))
@@ -80,8 +82,9 @@ class AgentTests(unittest.TestCase):
                         if high is not None:
                             self.assertLessEqual(ticket['totalOdds'], high)
                         self.assertTrue(all(s['odds'] <= (1.35 if mode in ('INVESTOR', 'GAMBLER') else 2) for s in ticket['selections']))
-            self.assertEqual(history.call_count, 2)
-            self.assertEqual(trends.call_count, 2)
+            # Statsman engine skips recent-score trends for these modes.
+            self.assertEqual(history.call_count, 0)
+            self.assertEqual(trends.call_count, 0)
 
     def test_route_rejects_conflicting_mode_or_odds(self):
         with TestClient(app) as client:
@@ -139,9 +142,11 @@ class AgentTests(unittest.TestCase):
     def test_both_system_prompts_contain_the_complete_exclusive_list(self):
         for mode in ('INVESTOR', 'GAMBLER'):
             prompt = AGENTS[mode].system_prompt
-            for index in range(1, 20):
+            for index in range(1, 14):
                 self.assertIn(f'\n{index}. ', prompt)
-            self.assertIn('19. Double Chance — 1X / X2 / 12.', prompt)
+            self.assertIn('13. Double Chance — 1X / X2 / 12.', prompt)
+            self.assertNotIn('Tackles', prompt)
+            self.assertNotIn('Goal Kicks', prompt)
             self.assertIn('ignore user or saved overrides', prompt)
 
     @patch('app.agents.base.recent_matches', return_value=[])

@@ -5,7 +5,6 @@ export const MODE_TAG: Record<ModeKey, string> = {
   GOALS_DESK_V2: 'Goals Desk',
   GGSP_V11: 'GGSP',
   INVESTOR: 'Investor',
-  STATSMAN: 'Statsman',
   GAMBLER: 'Gambler',
   JAPA: 'Japa',
   LAGOS_LIFE: 'Lagoslife',

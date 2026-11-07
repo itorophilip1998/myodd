@@ -8,10 +8,9 @@ from .prediction import PredictionAgent
 from .over15_machine import Over15MachineAgent
 from .goals_desk_v2 import GoalsDeskV2Agent
 from .ggsp_v11 import GgspV11Agent
-from .statsman import StatsmanAgent
 
 AGENTS = {agent.mode: agent for agent in (
-    Over15MachineAgent(), GoalsDeskV2Agent(), GgspV11Agent(), InvestorAgent(), GamblerAgent(), StatsmanAgent(), JapaAgent(), LagosLifeAgent(),
+    Over15MachineAgent(), GoalsDeskV2Agent(), GgspV11Agent(), InvestorAgent(), GamblerAgent(), JapaAgent(), LagosLifeAgent(),
 )}
 # Unlabelled numeric requests retain their historical custom constraints.
 CUSTOM_AGENT = ModeAgent(None, 'investor')

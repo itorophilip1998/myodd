@@ -8,7 +8,7 @@ from .ggsp_picks import ggsp_market_allowed
 from .investor_markets import investor_market_allowed
 from .odds_policy import within_mode_selection_odds
 from .over15_picks import over15_market_allowed
-from .statsman_picks import statsman_market_allowed
+from .statsman_picks import STATSMAN_ENGINE_MODES, removed_specialty_market, statsman_market_allowed
 
 _VIRTUAL_GAME = re.compile(r'\bSRL\b|simulated\s+reality', re.I)
 
@@ -72,7 +72,9 @@ def eligible(selection, config):
     now = datetime.now(timezone.utc)
     return (selection.isActive and selection.kickoffAt > now
             and not is_virtual_game(selection)
-            and within_mode_selection_odds(selection.odds, config.riskMode)
+            and not removed_specialty_market(selection.marketId, selection.marketName, selection.selectionName)
+            and within_mode_selection_odds(
+                selection.odds, config.riskMode, selection.marketName, selection.selectionName)
             and not any(t.casefold() in teams for t in config.excludedTeams)
             and not any(t.casefold() in league for t in config.excludedLeagues)
             and (not config.includedLeagues or any(t.casefold() in league for t in config.includedLeagues))
@@ -82,7 +84,8 @@ def eligible(selection, config):
             and (config.marketPolicy != 'only' or matches_preference(selection, config) or matches_related(selection, config))
             and (config.riskMode not in ('INVESTOR', 'GAMBLER') or config.fixtureMode == 'original_only' or investor_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
-            and (config.riskMode != 'STATSMAN' or config.fixtureMode == 'original_only' or statsman_market_allowed(
+            # Investor / Gambler: every pick Statsman-priced and gated. Japa / Lagos keep open catalog (incl. 1X2).
+            and (config.riskMode not in STATSMAN_ENGINE_MODES or config.fixtureMode == 'original_only' or statsman_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName))
             and (config.riskMode != 'OVER15_MACHINE' or config.fixtureMode == 'original_only' or over15_market_allowed(
                 selection.marketId, selection.marketName, selection.specifier, selection.selectionName, selection.odds))
@@ -105,8 +108,19 @@ def event_choices(pool, config):
     for selection in deduped:
         events.setdefault(selection.eventId, []).append(selection)
     # Preserve market diversity, rather than letting near-identical favourites fill every slot.
+    # Investor/Gambler: surface goals-path legs ahead of corners/cards/shots when ranking.
+    from .statsman_picks import STATSMAN_ENGINE_MODES, statsman_search_boost
+    statsman_mode = config.riskMode in STATSMAN_ENGINE_MODES
     for event, choices in events.items():
-        ranked = sorted(choices, key=lambda s: (matches_preference(s, config), s.probability), reverse=True)
+        ranked = sorted(
+            choices,
+            key=lambda s: (
+                matches_preference(s, config),
+                statsman_search_boost(s) if statsman_mode else 1.0,
+                s.probability,
+            ),
+            reverse=True,
+        )
         by_market = {}
         for s in ranked:
             by_market.setdefault((s.marketId, s.specifier), []).append(s)

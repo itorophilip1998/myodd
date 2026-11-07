@@ -1,5 +1,6 @@
 """Agent graph: interpret → score → optional trends → generate or exact split."""
 import asyncio
+import os
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -31,6 +32,20 @@ def _flashscore_bridge(
     )
 
 
+def _ensure_statsman(runtime):
+    """Lazy-load Statsman when PREDICTION_MODEL is not statsman but a Statsman-engine mode runs."""
+    from app.llms.statsman import StatsmanModel
+    cached = getattr(runtime, 'statsman', None)
+    if isinstance(cached, StatsmanModel):
+        return cached
+    model = StatsmanModel(os.getenv('STATSMAN_DATA_DIR', './data/statsman'))
+    try:
+        runtime.statsman = model
+    except Exception:
+        pass
+    return model
+
+
 @dataclass(frozen=True)
 class ModeAgent:
     mode: str | None
@@ -47,7 +62,7 @@ class ModeAgent:
     async def generate(self, body: GenerateInput, runtime):
         from app.llms.statsman import StatsmanModel
         from app.tools.over15_picks import apply_over15_ticket_filter
-        from app.tools.statsman_picks import apply_statsman_ticket_filter
+        from app.tools.statsman_picks import STATSMAN_ENGINE_MODES, apply_statsman_ticket_filter
 
         config = configure_mode(body.config, self.mode)
         fixtures = body.fixtures
@@ -65,9 +80,14 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [*config.unhandledRequests, bridge.notice],
             })
-        pool = await score(fixtures, runtime)
+
+        scoring_model = runtime.model
+        if config.riskMode in STATSMAN_ENGINE_MODES and not isinstance(scoring_model, StatsmanModel):
+            scoring_model = _ensure_statsman(runtime)
+        pool = await score(fixtures, runtime, model=scoring_model)
         loop = asyncio.get_running_loop()
-        if self.use_trends and config.fixtureMode != 'original_only':
+        # Statsman is the ranking engine for Investor/Gambler/Japa/Lagos — skip trend overwrite.
+        if self.use_trends and config.fixtureMode != 'original_only' and not isinstance(scoring_model, StatsmanModel):
             matches = await recent_matches(runtime)
             pool, note = apply_match_trends(pool, matches)
             config = config.model_copy(update={'unhandledRequests': [*config.unhandledRequests, note]})
@@ -101,18 +121,18 @@ class ModeAgent:
                     f'GGSP v1.1 kept {len(pool)} CLEAN Over 1.5 legs from {before} scored outcomes (Chaldean roots 7–8; HARD/SOFT league skips; tickets 3–4; no same-game repeat).',
                 ],
             })
-        elif config.riskMode == 'STATSMAN' and isinstance(runtime.model, StatsmanModel):
+        elif config.riskMode in STATSMAN_ENGINE_MODES and isinstance(scoring_model, StatsmanModel):
             before = len(pool)
-            pool = apply_statsman_ticket_filter(pool, runtime.model)
+            pool = apply_statsman_ticket_filter(pool, scoring_model)
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals≥76%, side bands, corners/shots/SOT≥76%).',
+                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals/DC≥76%; team O0.5 at 58–65% fav; team O1.5 at ≥70% fav; 2UP at ≥80% fav; 1·over at ≥66% fav + map≥70%; WEH at ≥66% fav; corners/shots/cards≥76%; excluded≥42% rare).',
                 ],
             })
         report = await loop.run_in_executor(runtime.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)
         version = next((s.modelVersion for s in pool if '@cal-v1-' in s.modelVersion),
-                       TREND_VERSION if any(s.modelVersion == TREND_VERSION for s in pool) else runtime.model.version)
+                       TREND_VERSION if any(s.modelVersion == TREND_VERSION for s in pool) else scoring_model.version)
         return {'pool': [s.model_dump(mode='json') for s in pool], **report, 'modelVersion': version}
 
     async def split(self, body: SplitInput, runtime):

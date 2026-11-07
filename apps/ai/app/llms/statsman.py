@@ -1,4 +1,5 @@
-"""Statsman shop engine — Elo 1X2 + decayed attack/defence for goals, corners, shots, SOT.
+"""Statsman shop engine — Elo 1X2 + decayed attack/defence for goals, corners, shots, SOT,
+cards; fouls→tackles and shots-faced→goal kicks proxies; Poisson exact/excluded goals.
 
 Confidence is the model probability × 100 for the SportyBet outcome being priced.
 Train files live under STATSMAN_DATA_DIR (football-data.co.uk CSVs).
@@ -19,11 +20,18 @@ HALF_LIFE = 21.0
 SHRINK = 8.0
 GOALS_FLOOR = 76.0
 COUNT_FLOOR = 76.0
+EXACT_FLOOR = 42.0  # Exact / excluded goals — higher than old 30% so they do not flood tickets
 TO_SCORE_LO = 58.0
 TO_SCORE_HI = 65.0
 STRONG_SIDE = 66.0
+# 1·over / 2·over map floor (WEH only needs strong side; team O0.5 only needs to-score band).
+STRONG_MAP_FLOOR = 70.0
+# Team Over 1.5: favourite win ≥70% (side only — no extra map floor).
+TEAM_O15_SIDE = 70.0
+# Sporty 2UP (team to win / early payout): favourite win ≥80%.
+TWO_UP_SIDE = 80.0
 
-# Display league / path fragment → CSV filename under data dir
+# Display league / path fragment → CSV filename under data dir (full match stats).
 LEAGUE_FILES = {
     'premier league': 'E0.csv',
     'championship': 'E1.csv',
@@ -46,6 +54,27 @@ LEAGUE_FILES = {
     'süper lig': 'T1.csv',
     'super lig': 'T1.csv',
     'premiership': 'SC0.csv',
+}
+
+# football-data.co.uk/new/ — results + odds only (goals Elo strong; corners/shots/cards use priors).
+# value = (csv filename, League column filter)
+NEW_LEAGUE_FILES = {
+    'denmark superliga': ('DNK.csv', 'Superliga'),
+    'superligaen': ('DNK.csv', 'Superliga'),
+    'allsvenskan': ('SWE.csv', 'Allsvenskan'),
+    'eliteserien': ('NOR.csv', 'Eliteserien'),
+    'mls': ('USA.csv', 'MLS'),
+    'major league soccer': ('USA.csv', 'MLS'),
+    'brazil serie a': ('BRA.csv', 'Serie A'),
+    'brasileirao': ('BRA.csv', 'Serie A'),
+    'ekstraklasa': ('POL.csv', 'Ekstraklasa'),
+    'romania superliga': ('ROU.csv', 'Superliga'),
+    'liga 1 romania': ('ROU.csv', 'Superliga'),
+}
+
+ALL_LEAGUE_FILES = {
+    **LEAGUE_FILES,
+    **{key: filename for key, (filename, _) in NEW_LEAGUE_FILES.items()},
 }
 
 TEAM_ALIASES = {
@@ -149,6 +178,49 @@ TEAM_ALIASES = {
     'aston villa fc': 'aston villa',
     'lille osc': 'lille',
     'villarreal cf': 'villarreal',
+    # Extra leagues (SportyBet → football-data /new/)
+    'fc copenhagen': 'fc copenhagen',
+    'kobenhavn': 'fc copenhagen',
+    'f.c. copenhagen': 'fc copenhagen',
+    'fc københavn': 'fc copenhagen',
+    'fc kobenhavn': 'fc copenhagen',
+    'brøndby': 'brondby',
+    'brondby if': 'brondby',
+    'nordsjælland': 'nordsjaelland',
+    'fc nordsjaelland': 'nordsjaelland',
+    'sønderjyske': 'sonderjyske',
+    'malmö ff': 'malmo ff',
+    'malmo': 'malmo ff',
+    'djurgårdens if': 'djurgarden',
+    'djurgardens if': 'djurgarden',
+    'bk häcken': 'hacken',
+    'bk hacken': 'hacken',
+    'ifk göteborg': 'goteborg',
+    'ifk goteborg': 'goteborg',
+    'bodø/glimt': 'bodo/glimt',
+    'vålerenga': 'valerenga',
+    'strømsgodset': 'stromsgodset',
+    'tromsø': 'tromso',
+    'inter miami cf': 'inter miami',
+    'la galaxy': 'los angeles galaxy',
+    'lafc': 'los angeles fc',
+    'ny red bulls': 'new york red bulls',
+    'nycfc': 'new york city',
+    'flamengo': 'flamengo rj',
+    'botafogo': 'botafogo rj',
+    'red bull bragantino': 'bragantino',
+    'rb bragantino': 'bragantino',
+    'são paulo': 'sao paulo',
+    'atletico mineiro': 'atletico-mg',
+    'atlético mineiro': 'atletico-mg',
+    'athletico paranaense': 'athletico-pr',
+    'legia warsaw': 'legia',
+    'legia warszawa': 'legia',
+    'rakow czestochowa': 'rakow',
+    'fcsb': 'fcsb',
+    'steaua': 'fcsb',
+    'universitatea craiova': 'univ. craiova',
+    'dinamo bucharest': 'dinamo bucuresti',
 }
 
 # Blend weight for UEFA Champions League: UCL form vs domestic form.
@@ -175,6 +247,12 @@ class MatchRow:
     ash: float | None = None
     hst: float | None = None
     ast: float | None = None
+    hy: float | None = None  # yellow cards
+    ay: float | None = None
+    hr: float | None = None  # red cards
+    ar: float | None = None
+    hf: float | None = None  # fouls → tackle intensity proxy
+    af: float | None = None
 
 
 @dataclass
@@ -199,8 +277,14 @@ class Forecast:
     shots_mu: float
     sot_lam: float
     sot_mu: float
-    league_key: str
-    covered: bool
+    cards_lam: float = 2.1
+    cards_mu: float = 2.0
+    tackles_lam: float = 16.0
+    tackles_mu: float = 15.0
+    kicks_lam: float = 8.5
+    kicks_mu: float = 8.0
+    league_key: str = ''
+    covered: bool = False
 
 
 def _canon(name: str) -> str:
@@ -294,7 +378,17 @@ class StatsmanEngine:
         self.known: dict[str, set[str]] = {}
         self._load_all()
 
+    @staticmethod
+    def _parse_match_date(value: str) -> datetime | None:
+        for fmt in ('%d/%m/%Y', '%d/%m/%y'):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+        return None
+
     def _load_csv(self, path: Path) -> list[MatchRow]:
+        """Classic football-data season CSVs (HomeTeam/FTHG + match stats)."""
         if not path.exists():
             return []
         rows: list[MatchRow] = []
@@ -302,11 +396,8 @@ class StatsmanEngine:
             for r in csv.DictReader(handle):
                 if not r.get('FTHG') or not r.get('Date'):
                     continue
-                try:
-                    d = datetime.strptime(r['Date'], '%d/%m/%Y')
-                except ValueError:
-                    continue
-                if d >= self.asof:
+                d = self._parse_match_date(r['Date'])
+                if d is None or d >= self.asof:
                     continue
                 rows.append(MatchRow(
                     d=d, h=_canon(r['HomeTeam']), a=_canon(r['AwayTeam']),
@@ -314,12 +405,52 @@ class StatsmanEngine:
                     hc=_fnum(r, 'HC'), ac=_fnum(r, 'AC'),
                     hsh=_fnum(r, 'HS'), ash=_fnum(r, 'AS'),
                     hst=_fnum(r, 'HST'), ast=_fnum(r, 'AST'),
+                    hy=_fnum(r, 'HY'), ay=_fnum(r, 'AY'),
+                    hr=_fnum(r, 'HR'), ar=_fnum(r, 'AR'),
+                    hf=_fnum(r, 'HF'), af=_fnum(r, 'AF'),
+                ))
+        return rows
+
+    def _load_new_csv(self, path: Path, league_name: str) -> list[MatchRow]:
+        """Extra /new/ CSVs — Home/Away/HG/AG; filter on League column; no count stats."""
+        if not path.exists():
+            return []
+        want = ' '.join(league_name.casefold().split())
+        rows: list[MatchRow] = []
+        with path.open(encoding='utf-8-sig', newline='') as handle:
+            for r in csv.DictReader(handle):
+                if not r.get('HG') or not r.get('Date') or not r.get('Home') or not r.get('Away'):
+                    continue
+                label = ' '.join((r.get('League') or '').casefold().split())
+                if label != want:
+                    continue
+                d = self._parse_match_date(r['Date'])
+                if d is None or d >= self.asof:
+                    continue
+                try:
+                    hs, as_ = int(float(r['HG'])), int(float(r['AG']))
+                except ValueError:
+                    continue
+                rows.append(MatchRow(
+                    d=d, h=_canon(r['Home']), a=_canon(r['Away']),
+                    hs=hs, as_=as_,
                 ))
         return rows
 
     def _load_all(self) -> None:
         for key, filename in LEAGUE_FILES.items():
             rows = self._load_csv(self.data_dir / filename)
+            if not rows:
+                continue
+            self.train[key] = rows
+            self.elo[key] = self._fit_elo(rows)
+            self.known[key] = {m.h for m in rows} | {m.a for m in rows}
+        new_cache: dict[tuple[str, str], list[MatchRow]] = {}
+        for key, (filename, league_name) in NEW_LEAGUE_FILES.items():
+            cache_key = (filename, league_name)
+            if cache_key not in new_cache:
+                new_cache[cache_key] = self._load_new_csv(self.data_dir / filename, league_name)
+            rows = new_cache[cache_key]
             if not rows:
                 continue
             self.train[key] = rows
@@ -341,12 +472,30 @@ class StatsmanEngine:
             R[m.a] += 20 * ((1 - s) - (1 - eh))
         return dict(R)
 
+    @staticmethod
+    def _league_text(league: str) -> str:
+        text = re.sub(r'[-–_/|]', ' ', league.casefold())
+        return ' '.join(text.split())
+
     def resolve_league(self, league: str) -> str | None:
-        text = ' '.join(league.casefold().split())
+        text = self._league_text(league)
         # Cups / youth / reserves are not the domestic league CSVs.
         if re.search(r'\b(?:cup|trophy|youth|women|u21|u19|u23|reserve|friendl)', text):
             return None
-        for key in sorted(LEAGUE_FILES, key=len, reverse=True):
+        # Disambiguate Brazil Serie A vs Italy Serie A, Denmark vs Romania Superliga.
+        if 'brazil' in text and 'serie a' in text and 'brazil serie a' in self.train:
+            return 'brazil serie a'
+        if 'brasileirao' in text and 'brasileirao' in self.train:
+            return 'brasileirao'
+        if 'denmark' in text and 'superliga' in text and 'denmark superliga' in self.train:
+            return 'denmark superliga'
+        if 'romania' in text and (
+            'superliga' in text or re.search(r'\bliga\s*i\b', text) or 'liga 1' in text
+        ) and 'romania superliga' in self.train:
+            return 'romania superliga'
+        if ('mls' in text or 'major league soccer' in text) and 'mls' in self.train:
+            return 'mls'
+        for key in sorted(ALL_LEAGUE_FILES, key=len, reverse=True):
             if key in text and key in self.train:
                 return key
         return None
@@ -363,9 +512,9 @@ class StatsmanEngine:
         seen_files: set[str] = set()
         hits: list[tuple[str, str]] = []
         for lg, known in self.known.items():
-            if lg == 'ucl' or lg not in LEAGUE_FILES:
+            if lg == 'ucl' or lg not in ALL_LEAGUE_FILES:
                 continue
-            filename = LEAGUE_FILES.get(lg)
+            filename = ALL_LEAGUE_FILES.get(lg)
             if filename in seen_files:
                 continue
             team = resolve_team(name, known)
@@ -382,6 +531,7 @@ class StatsmanEngine:
         prefer = (
             'premier league', 'la liga', 'laliga', 'serie a', 'bundesliga',
             'ligue 1', 'eredivisie', 'liga portugal', 'süper lig', 'super lig',
+            'brazil serie a', 'mls', 'eliteserien', 'allsvenskan', 'denmark superliga',
         )
         for key in prefer:
             for hit in hits:
@@ -390,8 +540,19 @@ class StatsmanEngine:
         return hits[0]
 
     def _rate_pair(self, ms: list[MatchRow], h: str, a: str, field: str) -> tuple[float, float]:
-        """Decayed home/away attack × opponent defence for goals|corners|shots|sot."""
+        """Decayed home/away attack × opponent defence for goals|corners|shots|sot|cards|fouls."""
         return self._rate_cross(ms, h, ms, a, field)
+
+    @staticmethod
+    def _card_count(m: MatchRow, venue: str) -> float | None:
+        """Sporty-style card units: yellow=1, red≈2."""
+        if venue == 'h':
+            if m.hy is None and m.hr is None:
+                return None
+            return float(m.hy or 0) + 2.0 * float(m.hr or 0)
+        if m.ay is None and m.ar is None:
+            return None
+        return float(m.ay or 0) + 2.0 * float(m.ar or 0)
 
     def _rate_cross(
         self,
@@ -420,9 +581,17 @@ class StatsmanEngine:
                 elif field == 'shots':
                     gf = m.hsh if venue == 'h' else m.ash
                     ga = m.ash if venue == 'h' else m.hsh
-                else:  # sot
+                elif field == 'sot':
                     gf = m.hst if venue == 'h' else m.ast
                     ga = m.ast if venue == 'h' else m.hst
+                elif field == 'cards':
+                    gf = self._card_count(m, venue)
+                    ga = self._card_count(m, 'a' if venue == 'h' else 'h')
+                elif field == 'fouls':
+                    gf = m.hf if venue == 'h' else m.af
+                    ga = m.af if venue == 'h' else m.hf
+                else:
+                    continue
                 if gf is None or ga is None:
                     continue
                 out.append((float(gf if which == 'gf' else ga), w))
@@ -434,10 +603,20 @@ class StatsmanEngine:
                     float(sum(m.hs for m in ms) / len(ms)) if ms else 1.35,
                     float(sum(m.as_ for m in ms) / len(ms)) if ms else 1.15,
                 )
+            if field == 'cards':
+                vals_h = [self._card_count(m, 'h') for m in ms]
+                vals_a = [self._card_count(m, 'a') for m in ms]
+                vals_h = [v for v in vals_h if v is not None]
+                vals_a = [v for v in vals_a if v is not None]
+                return (
+                    float(sum(vals_h) / len(vals_h)) if vals_h else 2.1,
+                    float(sum(vals_a) / len(vals_a)) if vals_a else 2.0,
+                )
             key_h, key_a, fallback = {
                 'corners': ('hc', 'ac', (5.2, 4.6)),
                 'shots': ('hsh', 'ash', (12.0, 10.0)),
                 'sot': ('hst', 'ast', (4.2, 3.6)),
+                'fouls': ('hf', 'af', (11.0, 10.5)),
             }[field]
             vals_h = [getattr(m, key_h) for m in ms if getattr(m, key_h) is not None]
             vals_a = [getattr(m, key_a) for m in ms if getattr(m, key_a) is not None]
@@ -454,6 +633,16 @@ class StatsmanEngine:
         hd = wmean(values(home_ms, h, 'h', 'ga'), prior_a) / max(prior_a, 1e-6)
         return max(ha * ad, 0.05), max(aa * hd, 0.05)
 
+    @staticmethod
+    def _proxy_kicks(shots_lam: float, shots_mu: float) -> tuple[float, float]:
+        """Goal kicks ≈ shots faced (defending side clears after misses)."""
+        return max(3.0, shots_mu * 0.72 + 2.5), max(3.0, shots_lam * 0.72 + 2.5)
+
+    @staticmethod
+    def _proxy_tackles(foul_lam: float, foul_mu: float) -> tuple[float, float]:
+        """Tackles scaled from fouls intensity (football-data has HF/AF, not tackles)."""
+        return max(8.0, foul_lam * 1.45), max(8.0, foul_mu * 1.45)
+
     def _uncovered(self, league_key: str = '') -> Forecast:
         return Forecast(
             ph=.45, pd=.26, pa=.29, lam=1.35, mu=1.15,
@@ -461,7 +650,9 @@ class StatsmanEngine:
             home_or_o25=.70, away_or_o25=.62,
             home_either_half=.55, away_either_half=.48,
             corners_lam=5.2, corners_mu=4.6, shots_lam=12.0, shots_mu=10.0,
-            sot_lam=4.2, sot_mu=3.6, league_key=league_key, covered=False,
+            sot_lam=4.2, sot_mu=3.6,
+            cards_lam=2.1, cards_mu=2.0, tackles_lam=16.0, tackles_mu=15.0,
+            kicks_lam=8.5, kicks_mu=8.0, league_key=league_key, covered=False,
         )
 
     def _forecast(
@@ -478,10 +669,18 @@ class StatsmanEngine:
         t_lam: float,
         t_mu: float,
         league_key: str,
+        cards_lam: float = 2.1,
+        cards_mu: float = 2.0,
+        tackles_lam: float = 16.0,
+        tackles_mu: float = 15.0,
+        kicks_lam: float | None = None,
+        kicks_mu: float | None = None,
     ) -> Forecast:
         goals = score_matrix(lam, mu)
         home_either = min(.95, max(ph, goals['H']) * 1.08)
         away_either = min(.95, max(pa, goals['A']) * 1.08)
+        if kicks_lam is None or kicks_mu is None:
+            kicks_lam, kicks_mu = self._proxy_kicks(s_lam, s_mu)
         return Forecast(
             ph=ph, pd=pd, pa=pa, lam=lam, mu=mu,
             o15=goals['o15'], o25=goals['o25'], btts=goals['btts'],
@@ -489,7 +688,11 @@ class StatsmanEngine:
             home_or_o25=goals['home_or_o25'], away_or_o25=goals['away_or_o25'],
             home_either_half=home_either, away_either_half=away_either,
             corners_lam=c_lam, corners_mu=c_mu, shots_lam=s_lam, shots_mu=s_mu,
-            sot_lam=t_lam, sot_mu=t_mu, league_key=league_key, covered=True,
+            sot_lam=t_lam, sot_mu=t_mu,
+            cards_lam=cards_lam, cards_mu=cards_mu,
+            tackles_lam=tackles_lam, tackles_mu=tackles_mu,
+            kicks_lam=kicks_lam, kicks_mu=kicks_mu,
+            league_key=league_key, covered=True,
         )
 
     def _ucl_team(self, name: str, domestic_key: str | None = None) -> str | None:
@@ -521,6 +724,9 @@ class StatsmanEngine:
             c_lam_d, c_mu_d = self._rate_cross(home_ms, hk, away_ms, ak, 'corners')
             s_lam_d, s_mu_d = self._rate_cross(home_ms, hk, away_ms, ak, 'shots')
             t_lam_d, t_mu_d = self._rate_cross(home_ms, hk, away_ms, ak, 'sot')
+            card_h, card_a = self._rate_cross(home_ms, hk, away_ms, ak, 'cards')
+            foul_h, foul_a = self._rate_cross(home_ms, hk, away_ms, ak, 'fouls')
+            tac_h, tac_a = self._proxy_tackles(foul_h, foul_a)
             if has_ucl:
                 rh_u = self.elo['ucl'].get(uk_h, 1500.0)
                 ra_u = self.elo['ucl'].get(uk_a, 1500.0)
@@ -539,11 +745,15 @@ class StatsmanEngine:
                     ph, pd, pa, lam, mu,
                     c_lam_d, c_mu_d, s_lam_d, s_mu_d, t_lam_d, t_mu_d,
                     f'ucl-blend:{hlg}/{alg}',
+                    cards_lam=card_h, cards_mu=card_a,
+                    tackles_lam=tac_h, tackles_mu=tac_a,
                 )
             return self._forecast(
                 ph_d, pd_d, pa_d, lam_d, mu_d,
                 c_lam_d, c_mu_d, s_lam_d, s_mu_d, t_lam_d, t_mu_d,
                 f'ucl:{hlg}/{alg}',
+                cards_lam=card_h, cards_mu=card_a,
+                tackles_lam=tac_h, tackles_mu=tac_a,
             )
 
         if has_ucl:
@@ -580,7 +790,81 @@ class StatsmanEngine:
         c_lam, c_mu = self._rate_pair(ms, hk, ak, 'corners')
         s_lam, s_mu = self._rate_pair(ms, hk, ak, 'shots')
         t_lam, t_mu = self._rate_pair(ms, hk, ak, 'sot')
-        return self._forecast(ph, pd, pa, lam, mu, c_lam, c_mu, s_lam, s_mu, t_lam, t_mu, lg)
+        card_h, card_a = self._rate_pair(ms, hk, ak, 'cards')
+        foul_h, foul_a = self._rate_pair(ms, hk, ak, 'fouls')
+        tac_h, tac_a = self._proxy_tackles(foul_h, foul_a)
+        return self._forecast(
+            ph, pd, pa, lam, mu, c_lam, c_mu, s_lam, s_mu, t_lam, t_mu, lg,
+            cards_lam=card_h, cards_mu=card_a,
+            tackles_lam=tac_h, tackles_mu=tac_a,
+        )
+
+
+def resolve_team_market_side(market_name: str, home_team: str = '', away_team: str = '') -> str | None:
+    """Map a Sporty market title to home/away.
+
+    SportyBet often titles team lines with the club name
+    (\"Degerfors IF Over/Under\", \"US Catanzaro Corners\") instead of Home/Away.
+    Without this, team lines are mispriced as match totals or odds-implied.
+    """
+    name = ' '.join((market_name or '').casefold().split())
+    if not name:
+        return None
+    if re.search(r'\b(?:home|competitor1)\b', name) and not re.search(r'\baway\b', name):
+        return 'home'
+    if re.search(r'\b(?:away|competitor2)\b', name) and not re.search(r'\bhome\b', name):
+        return 'away'
+
+    def _club_hit(team: str) -> float:
+        team = ' '.join((team or '').casefold().split())
+        if len(team) < 3:
+            return 0.0
+        if team in name:
+            return float(len(team))
+        tokens = [
+            t for t in re.split(r'[^a-z0-9]+', team)
+            if len(t) >= 3 and t not in {'the', 'afc', 'ifc', 'us', 'sc', 'cf', 'ac'}
+        ]
+        if not tokens:
+            return 0.0
+        matched = sum(1 for t in tokens if t in name)
+        if matched == 0:
+            return 0.0
+        # Require most tokens so short noise cannot flip sides alone.
+        if matched < max(1, len(tokens) - 1) and matched < 2 and len(tokens) > 1:
+            return 0.0
+        return float(sum(len(t) for t in tokens if t in name))
+
+    home_score = _club_hit(home_team)
+    away_score = _club_hit(away_team)
+    if home_score > away_score and home_score > 0:
+        return 'home'
+    if away_score > home_score and away_score > 0:
+        return 'away'
+    return None
+
+
+def resolve_team_goals_side(market_name: str, home_team: str = '', away_team: str = '') -> str | None:
+    """Goals O/U / to-score side helper (skips non-goals specialty markets)."""
+    name = ' '.join((market_name or '').casefold().split())
+    if re.search(r'corner|shot|card|booking|kick|tackle|btts|both teams|clean\s*sheet', name):
+        return None
+    if not re.search(r'over/?under|total|goals?|excluded|exact', name):
+        return None
+    if re.fullmatch(r'(?:over/?under|total(?:\s+goals)?)', name):
+        return None
+    return resolve_team_market_side(market_name, home_team, away_team)
+
+
+def _is_pure_match_total(name: str) -> bool:
+    """True for match-level totals with no club / home / away cue."""
+    return bool(re.fullmatch(
+        r'(?:over/?under|total(?:\s+goals)?|total\s+corners?|corners?(?:\s+over/?under)?|'
+        r'total\s+shots?(?:\s+on\s+target)?|shots?(?:\s+on\s+target)?(?:\s+over/?under)?|'
+        r'total\s+(?:cards?|bookings?)|(?:cards?|bookings?)(?:\s+over/?under)?|'
+        r'excluded(?:\s+number\s+of)?\s+goals|exact(?:\s+number\s+of)?\s+goals)',
+        name,
+    ))
 
 
 def _line(specifier: str, outcome_name: str) -> float | None:
@@ -655,74 +939,132 @@ class StatsmanModel:
             }
             return mapping[supported]
 
-        # Team to score
-        if re.search(r'to score|scores?\b|team score', name) and not re.search(r'both|btts|gg', name):
-            home = bool(re.search(r'\b(?:home|competitor1)\b', name + ' ' + oname))
-            away = bool(re.search(r'\b(?:away|competitor2)\b', name + ' ' + oname))
-            yes = oname in ('yes', 'gg') or 'yes' in oname or outcome.outcomeId in ('74', 'yes')
-            no = oname in ('no', 'ng') or outcome.outcomeId in ('76', 'no')
-            p = fc.home_scores if home and not away else fc.away_scores if away and not home else None
-            if p is not None:
-                if yes:
-                    return p
-                if no:
-                    return 1 - p
+        home_team = getattr(fixture, 'homeTeam', '')
+        away_team = getattr(fixture, 'awayTeam', '')
+        side = resolve_team_market_side(market.marketName, home_team, away_team)
 
-        # Home/Away or Over 2.5
+        # Clean sheet (Yes = that side concedes 0)
+        if re.search(r'clean\s*sheet', name):
+            yes = oname in ('yes', 'gg') or outcome.outcomeId in ('74', 'yes')
+            no = oname in ('no', 'ng') or outcome.outcomeId in ('76', 'no')
+            # Home CS Yes = away scores 0 = 1 - away_scores
+            if side == 'home':
+                p_yes = 1 - fc.away_scores
+            elif side == 'away':
+                p_yes = 1 - fc.home_scores
+            else:
+                return 0.5  # club/title unresolved — do not use short-odds implied
+            if yes:
+                return p_yes
+            if no:
+                return 1 - p_yes
+
+        # Home/Away or Over 2.5 (also \"Arsenal or Over 2.5\")
         if re.search(r'\bor\b', name) and re.search(r'over', name) and (line == 2.5 or '2.5' in name + oname):
-            if re.search(r'\b(?:home|competitor1)\b', name) and not re.search(r'\baway\b', name):
+            if side == 'home':
                 return fc.home_or_o25
-            if re.search(r'\b(?:away|competitor2)\b', name) and not re.search(r'\bhome\b', name):
+            if side == 'away':
                 return fc.away_or_o25
+            return 0.5
 
         # Win either half
         if re.search(r'either half|win (?:a |one )?half', name):
-            if re.search(r'\b(?:home|competitor1)\b', name):
+            if side == 'home':
                 return fc.home_either_half
-            if re.search(r'\b(?:away|competitor2)\b', name):
+            if side == 'away':
                 return fc.away_either_half
+            return 0.5
 
-        # Corners / shots / SOT totals
+        # Exact / excluded goals (exact integer line)
+        if re.search(r'excluded|exact number of goals|\bexact goals\b', name) and not re.search(
+            r'correct score|exact score|half|handicap|player', name
+        ):
+            exact = _exact_line(market.specifier, outcome.outcomeName)
+            if exact is not None:
+                if side == 'home':
+                    return max(.001, min(.999, _pois(exact, fc.lam)))
+                if side == 'away':
+                    return max(.001, min(.999, _pois(exact, fc.mu)))
+                leftover = re.sub(
+                    r'\b(?:excluded|exact|number|of|goals?|total|over|under|team)\b', ' ', name,
+                )
+                if not _is_pure_match_total(name) and re.search(r'[a-z]{3,}', leftover):
+                    return 0.5  # club-titled but unresolved
+                return max(.001, min(.999, sum(
+                    _pois(i, fc.lam) * _pois(j, fc.mu)
+                    for i in range(12) for j in range(12) if i + j == exact
+                )))
+
+        # Corners / shots / SOT / cards totals
         if over is not None and line is not None:
-            if re.search(r'\bcorners?\b', name) and not re.search(r'\b(?:home|away|competitor)\b', name):
-                total = fc.corners_lam + fc.corners_mu
-                p_over = over_prob(total, line)
+            if re.search(r'\bcorners?\b', name):
+                if side == 'home':
+                    p_over = over_prob(fc.corners_lam, line)
+                elif side == 'away':
+                    p_over = over_prob(fc.corners_mu, line)
+                elif _is_pure_match_total(name) or not re.search(r'[a-z]{3,}', re.sub(
+                    r'\b(?:total|corners?|over/?under)\b', ' ', name,
+                )):
+                    p_over = over_prob(fc.corners_lam + fc.corners_mu, line)
+                else:
+                    return 0.5
                 return p_over if over else 1 - p_over
-            if re.search(r'\bcorners?\b', name) and re.search(r'\b(?:home|competitor1)\b', name):
-                p_over = over_prob(fc.corners_lam, line)
+            if re.search(r'\bshots?\b', name):
+                use_sot = 'on target' in name
+                lam = fc.sot_lam if use_sot else fc.shots_lam
+                mu = fc.sot_mu if use_sot else fc.shots_mu
+                if side == 'home':
+                    p_over = over_prob(lam, line)
+                elif side == 'away':
+                    p_over = over_prob(mu, line)
+                elif _is_pure_match_total(name) or not re.search(r'[a-z]{3,}', re.sub(
+                    r'\b(?:total|shots?|on|target|over/?under)\b', ' ', name,
+                )):
+                    p_over = over_prob(lam + mu, line)
+                else:
+                    return 0.5
                 return p_over if over else 1 - p_over
-            if re.search(r'\bcorners?\b', name) and re.search(r'\b(?:away|competitor2)\b', name):
-                p_over = over_prob(fc.corners_mu, line)
+            if re.search(r'\b(?:cards?|bookings?)\b', name):
+                if side == 'home':
+                    p_over = over_prob(fc.cards_lam, line)
+                elif side == 'away':
+                    p_over = over_prob(fc.cards_mu, line)
+                elif _is_pure_match_total(name) or not re.search(r'[a-z]{3,}', re.sub(
+                    r'\b(?:total|cards?|bookings?|over/?under)\b', ' ', name,
+                )):
+                    p_over = over_prob(fc.cards_lam + fc.cards_mu, line)
+                else:
+                    return 0.5
                 return p_over if over else 1 - p_over
-            if re.search(r'\bshots?\b', name) and 'on target' not in name and not re.search(r'\b(?:home|away|competitor)\b', name):
-                total = fc.shots_lam + fc.shots_mu
-                p_over = over_prob(total, line)
+            # Match / team goals O/U (exclusive Investor list + alternate lines; team O0.5 = to-score proxy)
+            if re.search(r'over/under|total(?:\s+goals)?|\bgoals?\b', name) and not re.search(
+                r'corner|shot|card|kick|tackle|excluded|exact', name
+            ):
+                goals_side = resolve_team_goals_side(market.marketName, home_team, away_team) or side
+                if goals_side == 'home':
+                    p_over = over_prob(fc.lam, line)
+                elif goals_side == 'away':
+                    p_over = over_prob(fc.mu, line)
+                elif re.fullmatch(r'(?:over/?under|total(?:\s+goals)?)', name):
+                    p_over = over_prob(fc.lam + fc.mu, line)
+                else:
+                    # Club-titled line we could not map — do not inflate with match totals.
+                    return 0.5
                 return p_over if over else 1 - p_over
-            if re.search(r'\bshots?\b', name) and 'on target' in name and not re.search(r'\b(?:home|away|competitor)\b', name):
-                total = fc.sot_lam + fc.sot_mu
-                p_over = over_prob(total, line)
-                return p_over if over else 1 - p_over
-            # Generic team goals O/U already handled via supported; team shots:
-            if re.search(r'\bshots?\b', name) and 'on target' not in name:
-                if re.search(r'\b(?:home|competitor1)\b', name):
-                    p_over = over_prob(fc.shots_lam, line)
-                    return p_over if over else 1 - p_over
-                if re.search(r'\b(?:away|competitor2)\b', name):
-                    p_over = over_prob(fc.shots_mu, line)
-                    return p_over if over else 1 - p_over
-            if re.search(r'\bshots?\b', name) and 'on target' in name:
-                if re.search(r'\b(?:home|competitor1)\b', name):
-                    p_over = over_prob(fc.sot_lam, line)
-                    return p_over if over else 1 - p_over
-                if re.search(r'\b(?:away|competitor2)\b', name):
-                    p_over = over_prob(fc.sot_mu, line)
-                    return p_over if over else 1 - p_over
-            # Match goals O/U alternate lines
-            if re.search(r'over/under|total(?:\s+goals)?', name) and not re.search(r'corner|shot|card|kick|tackle', name):
-                if not re.search(r'\b(?:home|away|competitor)\b', name):
-                    total_lam = fc.lam + fc.mu
-                    p_over = over_prob(total_lam, line)
-                    return p_over if over else 1 - p_over
 
         # Uncovered specialty → mild bookmaker-implied fallback marker via low confidence
         return max(.001, min(.999, 1 / max(outcome.odds, 1.01)))
+
+
+def _exact_line(specifier: str, outcome_name: str) -> int | None:
+    for part in (specifier or '').split('|'):
+        if part.startswith('total=') or part.startswith('exact=') or part.startswith('goals='):
+            try:
+                return int(float(part.split('=', 1)[1]))
+            except ValueError:
+                return None
+    match = re.search(r'(?:^|\s)(\d+)(?:\s|$)', outcome_name or '')
+    if match:
+        return int(match.group(1))
+    match = re.search(r'exact(?:ly)?\s+(\d+)', (outcome_name or '').casefold())
+    return int(match.group(1)) if match else None

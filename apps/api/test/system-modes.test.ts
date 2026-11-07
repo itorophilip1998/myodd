@@ -45,21 +45,38 @@ it('goals desk v2 allows O1.5 1.09–1.27 (for Asian switch), Asian Over 2, and 
 });
 
 it('recognizes each provided market family and rejects unapproved or unavailable selections', () => {
-  const names = ['Excluded Goals', 'Excluded Goals – Home', 'Excluded Goals – Away', 'Total Goal Kicks', 'Home Team Goal Kicks', 'Away Team Goal Kicks', 'Total Cards', 'Home Team Cards', 'Away Team Cards', 'Total Corners', 'Home Team Corners', 'Away Team Corners', 'Total Tackles', 'Home Team Tackles', 'Away Team Tackles', 'Total Goals', 'Home Team Goals', 'Away Team Goals', 'Double Chance'];
+  const names = ['Excluded Goals', 'Excluded Goals – Home', 'Excluded Goals – Away', 'Total Cards', 'Home Team Cards', 'Away Team Cards', 'Total Corners', 'Home Team Corners', 'Away Team Corners', 'Total Goals', 'Home Team Goals', 'Away Team Goals', 'Double Chance'];
   for (const [index, marketName] of names.entries()) {
-    const market = { marketId: index === 18 ? '10' : String(100 + index), marketName, specifier: '', status: 'open', outcomes: [] };
-    const pick = { ...outcome, outcomeName: index < 3 ? '2' : index === 18 ? '1X' : 'Under 2.5' };
-    expect(systemSelectionAllowed(market, pick), marketName).toBe(true);
+    const market = { marketId: index === 12 ? '10' : String(100 + index), marketName, specifier: '', status: 'open', outcomes: [] };
+    const overOnly = index >= 3 && index <= 11; // cards + corners + goals: Over only
+    const pick = { ...outcome, outcomeName: index < 3 ? '2' : index === 12 ? '1X' : overOnly ? 'Over 2.5' : 'Under 2.5' };
+    expect(systemSelectionAllowed(market, pick, 'INVESTOR'), marketName).toBe(true);
   }
-  expect(systemSelectionAllowed({ marketId: '139', marketName: 'Bookings Over/Under', specifier: 'total=3.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Under 3.5' })).toBe(true);
-  expect(systemSelectionAllowed({ marketId: '900300', marketName: 'Home Team Total Corners', specifier: 'total=4.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Over 4.5' })).toBe(true);
-  expect(systemSelectionAllowed({ marketId: '450004', marketName: 'Excluded Number of Goals', specifier: '', status: 'open', outcomes: [] }, { ...outcome, outcomeName: '1' })).toBe(true);
-  for (const marketName of ['Both teams to score', 'Total shots', 'Home or Over 2.5', '1st half Total Cards', 'Player tackles']) {
-    expect(systemSelectionAllowed({ marketId: '99', marketName, specifier: '', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Under 2.5' })).toBe(false);
+  expect(systemSelectionAllowed({ marketId: '139', marketName: 'Bookings Over/Under', specifier: 'total=3.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Over 3.5' }, 'INVESTOR')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '900300', marketName: 'Home Team Total Corners', specifier: 'total=4.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Over 4.5' }, 'INVESTOR')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '450004', marketName: 'Excluded Number of Goals', specifier: '', status: 'open', outcomes: [] }, { ...outcome, outcomeName: '1' }, 'INVESTOR')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '29', marketName: 'Both teams to score', specifier: '', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Yes' }, 'INVESTOR')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '200', marketName: 'Total shots', specifier: 'total=20.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Over 20.5' }, 'INVESTOR')).toBe(true);
+  expect(systemSelectionAllowed({ marketId: '81', marketName: 'Home or Over 2.5', specifier: '', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Yes' }, 'INVESTOR')).toBe(true);
+  for (const market of [
+    { marketId: '18', marketName: 'Over/Under', outcomeName: 'Under 2.5' },
+    { marketId: '19', marketName: 'Home Team Goals', outcomeName: 'Under 0.5' },
+    { marketId: '20', marketName: 'Away Team Goals', outcomeName: 'Under 1.5' },
+    { marketId: '166', marketName: 'Total Corners', outcomeName: 'Under 8.5' },
+    { marketId: '167', marketName: 'Home Team Corners', outcomeName: 'Under 4.5' },
+    { marketId: '168', marketName: 'Away Team Corners', outcomeName: 'Under 3.5' },
+    { marketId: '139', marketName: 'Total Cards', outcomeName: 'Under 3.5' },
+    { marketId: '900304', marketName: 'Home Team Cards', outcomeName: 'Under 2.5' },
+    { marketId: '900305', marketName: 'Away Team Cards', outcomeName: 'Under 1.5' },
+  ]) {
+    expect(systemSelectionAllowed({ ...market, specifier: 'total=2.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: market.outcomeName }, 'INVESTOR')).toBe(false);
+  }
+  for (const marketName of ['1st half Total Cards', 'Total Goal Kicks', 'Total Tackles', 'Player tackles']) {
+    expect(systemSelectionAllowed({ marketId: '99', marketName, specifier: 'total=2.5', status: 'open', outcomes: [] }, { ...outcome, outcomeName: 'Under 2.5' }, 'INVESTOR')).toBe(false);
   }
   expect(systemFixture(fixture(1, false)).markets).toEqual([]);
-  expect(systemSelectionAllowed(fixture(1).markets[0], { ...outcome, odds: 1.36 })).toBe(false);
-  expect(systemSelectionAllowed(fixture(1).markets[0], { ...outcome, isActive: false })).toBe(false);
+  expect(systemSelectionAllowed(fixture(1).markets[0], { ...outcome, odds: 1.36 }, 'INVESTOR')).toBe(false);
+  expect(systemSelectionAllowed(fixture(1).markets[0], { ...outcome, isActive: false }, 'INVESTOR')).toBe(false);
 });
 
 it('covers games beyond the first 100 from the provided-option listing and shares concurrent mode reads', async () => {
@@ -79,7 +96,8 @@ it('covers games beyond the first 100 from the provided-option listing and share
   expect(provider.getFixtures.mock.calls.filter(([q]) => q.pageNum)).toHaveLength(4);
   expect(provider.getFixtures.mock.calls.every(([q]) => q.systemOnly && !q.eventIds)).toBe(true);
   expect(provider.getFixtures.mock.calls.find(([q]) => q.pageNum)?.[0].marketIds).toEqual(SYSTEM_LISTING_MARKET_IDS);
-  expect(SYSTEM_LISTING_MARKET_IDS).toEqual(expect.arrayContaining(['10', '18', '19', '20', '139', '166', '167', '168', '450004', '900614', '900622']));
+  expect(SYSTEM_LISTING_MARKET_IDS).toEqual(expect.arrayContaining(['10', '18', '19', '20', '139', '166', '167', '168', '450004', '900300', '900301', '900304', '900305']));
+  expect(SYSTEM_LISTING_MARKET_IDS.some(id => ['900614', '900615', '900616', '900622', '900623', '900624'].includes(id))).toBe(false);
 });
 
 it('keeps listed approved options only and reports partial pages without hunting match boards', async () => {
