@@ -42,7 +42,6 @@ export const MODE_ODDS = {
   /** GGSP v1.1 Chaldean CLEAN O1.5; day by default; tickets 3–4. */
   GGSP_V11: { minimum: 3, maximum: 4 },
   INVESTOR: { minimum: 3, maximum: 6 },
-  STATSMAN: { minimum: 3, maximum: 6 },
   GAMBLER: { minimum: 6.1, maximum: 20 },
   JAPA: { minimum: 20.01, maximum: 100 },
   LAGOS_LIFE: { minimum: 100, maximum: null },
@@ -51,7 +50,14 @@ export const MODE_ODDS = {
 /**
  * Safe per-game / per-leg odds inside a ticket for named modes.
  * Ticket totals still use MODE_ODDS; these bounds keep individual picks in a safer band.
+ *
+ * Investor / Gambler default leg max is 1.35. Corners, shots / SOT, and 1·over / 2·over
+ * (Home/Away or Over 2.5) may go up to {@link INVESTOR_EXTENDED_LEG_ODDS_MAX}.
  */
+export const INVESTOR_EXTENDED_LEG_ODDS_MAX = 1.45;
+/** Match Over 1.5 goals — Investor/Gambler leg max. */
+export const O15_LEG_ODDS_MAX = 1.27;
+
 export const MODE_SELECTION_ODDS = {
   OVER15_MACHINE: { minimum: MIN_SELECTION_ODDS, maximum: 1.25 },
   /** 1.09 kept so cheap O1.5 can convert to Asian Over 2 on the O1.5 ticket lane. */
@@ -59,11 +65,30 @@ export const MODE_SELECTION_ODDS = {
   /** 1.09 kept so cheap O1.5 can convert to Asian Over 2. */
   GGSP_V11: { minimum: 1.09, maximum: 1.30 },
   INVESTOR: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
-  STATSMAN: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   GAMBLER: { minimum: MIN_SELECTION_ODDS, maximum: 1.35 },
   JAPA: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
   LAGOS_LIFE: { minimum: MIN_SELECTION_ODDS, maximum: 2 },
 } as const;
+
+/** Corners, shots/SOT, Home or Over 2.5, Away or Over 2.5 — Investor/Gambler leg max 1.45. */
+export function isExtendedLegOddsMarket(marketName = '', outcomeName = '') {
+  const name = `${marketName} ${outcomeName}`.toLowerCase();
+  if (/\bcorners?\b/.test(name)) return true;
+  if (/\bshots?\b/.test(name)) return true;
+  // 1/over or 2/over — not draw/over, not team Over 0.5
+  if (/\bor\b/.test(name) && /\bover\b/.test(name) && /2\.5/.test(name) && !/\bdraw\b/.test(name)) return true;
+  return false;
+}
+
+/** Match totals Over 1.5 — not team / club-titled goals, corners, shots, or 1·over. */
+export function isMatchGoalsOver15(marketName = '', outcomeName = '') {
+  const market = marketName.toLowerCase().replace(/\s+/g, ' ').trim();
+  const outcome = outcomeName.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!/^over/.test(outcome)) return false;
+  if (!/^(?:over\/?under|total(?:\s+goals)?)$/.test(market)) return false;
+  const line = Number(/(\d+(?:\.\d+)?)/.exec(outcome)?.[1]);
+  return line === 1.5;
+}
 
 export function withinModeOdds(odds: number, mode?: string | null) {
   if (!Number.isFinite(odds)) return false;
@@ -72,15 +97,23 @@ export function withinModeOdds(odds: number, mode?: string | null) {
   return !!bounds && odds >= bounds.minimum && (bounds.maximum === null || odds <= bounds.maximum);
 }
 
-export function selectionOddsBounds(mode?: string | null) {
+export function selectionOddsBounds(mode?: string | null, marketName = '', outcomeName = '') {
   if (!mode) return { minimum: MIN_SELECTION_ODDS, maximum: null as number | null };
   const bounds = MODE_SELECTION_ODDS[mode as keyof typeof MODE_SELECTION_ODDS];
-  return bounds ? { minimum: bounds.minimum, maximum: bounds.maximum as number | null } : { minimum: MIN_SELECTION_ODDS, maximum: null };
+  if (!bounds) return { minimum: MIN_SELECTION_ODDS, maximum: null };
+  let maximum: number | null = bounds.maximum;
+  if ((mode === 'INVESTOR' || mode === 'GAMBLER') && isExtendedLegOddsMarket(marketName, outcomeName)) {
+    maximum = INVESTOR_EXTENDED_LEG_ODDS_MAX;
+  }
+  if ((mode === 'INVESTOR' || mode === 'GAMBLER') && isMatchGoalsOver15(marketName, outcomeName)) {
+    maximum = maximum == null ? O15_LEG_ODDS_MAX : Math.min(maximum, O15_LEG_ODDS_MAX);
+  }
+  return { minimum: bounds.minimum, maximum };
 }
 
-export function withinModeSelectionOdds(odds: number, mode?: string | null) {
+export function withinModeSelectionOdds(odds: number, mode?: string | null, marketName = '', outcomeName = '') {
   if (!Number.isFinite(odds)) return false;
-  const { minimum, maximum } = selectionOddsBounds(mode);
+  const { minimum, maximum } = selectionOddsBounds(mode, marketName, outcomeName);
   return odds >= minimum && (maximum === null || odds <= maximum);
 }
 
@@ -94,7 +127,8 @@ export function modeKeyFromLabel(label?: string | null): ModeKey | null {
   if (/\bgoals?\s*desk\s*v?2\b/.test(text)) return 'GOALS_DESK_V2';
   if (/\bggsp(?:\s*v?1\.?1)?\b/.test(text) || /\bgematria\b/.test(text)) return 'GGSP_V11';
   if (/\binvestor\b/.test(text)) return 'INVESTOR';
-  if (/\bstatsman\b/.test(text)) return 'STATSMAN';
+  // Legacy “Statsman Mode” label → Investor (engine lives inside Investor/Gambler/Japa/Lagos).
+  if (/\bstatsman\b/.test(text)) return 'INVESTOR';
   if (/\bgam(?:b)?ler\b/.test(text)) return 'GAMBLER';
   if (/\bjapa\b/.test(text)) return 'JAPA';
   if (/\blagos/.test(text)) return 'LAGOS_LIFE';

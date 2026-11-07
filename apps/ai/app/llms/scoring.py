@@ -166,5 +166,5 @@ def score_fixtures(fixtures: list[Fixture], model) -> list[ScoredSelection]:
     if isinstance(model, StatsmanModel):
         from app.tools.statsman_picks import apply_statsman_ticket_filter
         # Predictions explorer still wants the full scored pool; ticket filter runs in generation.
-        model._last_pool_unfiltered = scored  # noqa: SLF001 — shared with Statsman Mode
+        model._last_pool_unfiltered = scored  # noqa: SLF001 — shared with Statsman-engine modes
     return scored

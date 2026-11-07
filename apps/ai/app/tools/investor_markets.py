@@ -1,8 +1,23 @@
-"""Markets Investor Mode and Gambler Mode are allowed to use."""
+"""Markets Investor Mode and Gambler Mode are allowed to use.
+
+Exclusive list (no tackles / goal kicks) plus Statsman ticket markets
+(BTTS, shots, team Over 0.5 / clean sheet, 1/over 2.5, win either half).
+"""
 import re
+
+from app.tools.statsman_picks import removed_specialty_market, statsman_market_allowed
 
 
 def investor_market_allowed(market_id: str, market_name: str, specifier: str, outcome_name: str) -> bool:
+    """True for Investor/Gambler exclusive list or Statsman ticket markets."""
+    if removed_specialty_market(market_id, market_name, outcome_name):
+        return False
+    if _investor_core_allowed(market_id, market_name, specifier, outcome_name):
+        return True
+    return statsman_market_allowed(market_id, market_name, specifier, outcome_name)
+
+
+def _investor_core_allowed(market_id: str, market_name: str, specifier: str, outcome_name: str) -> bool:
     """True only for the shared Investor and Gambler market list."""
     name = ' '.join((market_name or '').casefold().split())
     outcome = ' '.join((outcome_name or '').casefold().split())
@@ -18,11 +33,18 @@ def investor_market_allowed(market_id: str, market_name: str, specifier: str, ou
     family = _family(name)
     if family is None:
         return False
-    if family in {'goals', 'corners', 'cards', 'goalkicks', 'tackles'}:
+    # Investor / Gambler: goals, corners, and cards Overs only — never Under.
+    if family in {
+        'goals', 'goals_home', 'goals_away',
+        'corners', 'corners_home', 'corners_away',
+        'cards', 'cards_home', 'cards_away',
+    } and outcome.startswith('under'):
+        return False
+    if family in {'goals', 'corners', 'cards'}:
         return _side(name) == 'match'
-    if family in {'goals_home', 'corners_home', 'cards_home', 'goalkicks_home', 'tackles_home'}:
+    if family in {'goals_home', 'corners_home', 'cards_home'}:
         return _side(name) == 'home'
-    if family in {'goals_away', 'corners_away', 'cards_away', 'goalkicks_away', 'tackles_away'}:
+    if family in {'goals_away', 'corners_away', 'cards_away'}:
         return _side(name) == 'away'
     return False
 
@@ -89,15 +111,13 @@ def _excluded_goals(name: str) -> bool:
 def _family(name: str) -> str | None:
     if re.search(r'half|handicap|1x2|winner|player|shots?|\bor\b|&|\band\b', name):
         return None
+    if 'goal kick' in name or 'goal-kick' in name or re.search(r'\btackles?\b', name):
+        return None
     side = _side(name)
-    if 'goal kick' in name or 'goal-kick' in name:
-        return { 'match': 'goalkicks', 'home': 'goalkicks_home', 'away': 'goalkicks_away' }.get(side)
     if re.search(r'\bcorners?\b', name):
         return { 'match': 'corners', 'home': 'corners_home', 'away': 'corners_away' }.get(side)
     if re.search(r'\b(?:cards?|bookings?)\b', name):
         return { 'match': 'cards', 'home': 'cards_home', 'away': 'cards_away' }.get(side)
-    if re.search(r'\btackles?\b', name):
-        return { 'match': 'tackles', 'home': 'tackles_home', 'away': 'tackles_away' }.get(side)
     if re.search(r'corner|card|booking|shot|kick|tackle', name):
         return None
     if side == 'match' and (re.search(r'over/under|total goals', name) or name in {'over/under', 'total'}):

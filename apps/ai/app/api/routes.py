@@ -94,11 +94,6 @@ async def lagos_life(body: GenerateInput, request: Request):
     return await run_generation(body, request, 'LAGOS_LIFE')
 
 
-@router.post('/generate/statsman')
-async def statsman(body: GenerateInput, request: Request):
-    return await run_generation(body, request, 'STATSMAN')
-
-
 @router.post('/tools/split')
 @router.post('/split')
 async def split(body: SplitInput, request: Request):

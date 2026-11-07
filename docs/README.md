@@ -17,7 +17,7 @@ Product docs for the myOdd monorepo: SportyBet Nigeria booking-code variations f
 | Over 1.5 Machine | [features/over15-machine.md](./features/over15-machine.md) |
 | Goals Desk v2 | [features/goals-desk-v2.md](./features/goals-desk-v2.md) |
 | GGSP v1.1 | [features/ggsp-v11.md](./features/ggsp-v11.md) |
-| Statsman Mode | [features/statsman-mode.md](./features/statsman-mode.md) |
+| Statsman engine | [features/statsman-mode.md](./features/statsman-mode.md) |
 | Investor Mode system ticket | [features/investor-system-mode.md](./features/investor-system-mode.md) |
 | Collections, share & history | [features/collections.md](./features/collections.md) |
 | Booking codes (SportyBet) | [features/booking.md](./features/booking.md) |

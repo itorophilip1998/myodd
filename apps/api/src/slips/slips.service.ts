@@ -131,7 +131,7 @@ export class SlipsService implements OnModuleInit {
   }
 
   private internalSystem(input: GenerateRequest) {
-    return (input.riskMode === 'OVER15_MACHINE' || input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11' || input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER' || input.riskMode === 'STATSMAN')
+    return (input.riskMode === 'OVER15_MACHINE' || input.riskMode === 'GOALS_DESK_V2' || input.riskMode === 'GGSP_V11' || input.riskMode === 'INVESTOR' || input.riskMode === 'GAMBLER')
       && !input.splitInto && !input.pinnedSelections?.length;
   }
 
@@ -142,8 +142,7 @@ export class SlipsService implements OnModuleInit {
       const label = mode === 'OVER15_MACHINE' ? 'Over 1.5 Machine'
         : mode === 'GOALS_DESK_V2' ? 'Goals Desk v2'
           : mode === 'GGSP_V11' ? 'GGSP v1.1'
-            : mode === 'STATSMAN' ? 'Statsman'
-              : mode === 'INVESTOR' ? 'Investor' : 'Gambler';
+            : mode === 'INVESTOR' ? 'Investor' : 'Gambler';
       const band = MODE_ODDS[mode];
       const notices = [...config.unhandledRequests];
       const note = (message: string) => { if (!notices.includes(message)) notices.push(message); };
@@ -190,10 +189,10 @@ export class SlipsService implements OnModuleInit {
     const requestedCount = requestedTicketCount(req.instruction);
     if ((requestedCount ?? 0) > 10 || (req.ticketCount ?? 0) > 10 || (req.splitInto ?? 0) > 10) throw new BadRequestException('You can generate up to 10 tickets at a time.');
     if (!req.userId && req.profileId && await this.prisma.appUser.findUnique({ where: { id: req.profileId } })) throw new BadRequestException('Sign in to use account preferences');
-    if ((req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN') && req.operation !== 'split' && !req.pinnedSelections?.length) {
+    if ((req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER') && req.operation !== 'split' && !req.pinnedSelections?.length) {
       req = { ...req, operation: 'generate', splitInto: undefined, ticketCount: undefined, gamesPerTicket: undefined, minimumOdds: undefined, maximumOdds: undefined, selectedMarketIds: [] };
     }
-    const internalSystem = (req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER' || req.riskMode === 'STATSMAN')
+    const internalSystem = (req.riskMode === 'OVER15_MACHINE' || req.riskMode === 'GOALS_DESK_V2' || req.riskMode === 'GGSP_V11' || req.riskMode === 'INVESTOR' || req.riskMode === 'GAMBLER')
       && req.operation === 'generate' && !req.pinnedSelections?.length;
     const parsed = readChatRequest(req.instruction);
     const splitInto = req.operation === 'generate' ? undefined : req.splitInto ?? parsed.splitInto;
@@ -321,9 +320,7 @@ export class SlipsService implements OnModuleInit {
             ? 'Goals Desk v2 system ticket. O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace); skip Omikuji 吉. O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (still on the Over 1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and priced ≤1.60. Never mix the Over 1.5 lane with Over 2.5. Over 1.5 lane tickets at 3–5; Over 2.5 tickets at 4–6. Build up to 10 tickets. When a single day is thin, also include the next 1–2 days.'
             : input.riskMode === 'GGSP_V11'
               ? 'GGSP v1.1 system ticket. Chaldean CLEAN roots 7–8 on home+away (Flashscore name aliases; skip toxic totals 54/62). Apply HARD and SOFT league skips. Over 1.5, or Asian Over 2 when Over 1.5 is 1.09–1.12. Use the selected match day or range (defaults to that calendar day; thin days pull in +1/+2). Build up to 10 tickets at combined odds 3–4. Never reuse the same game on another ticket. Each leg 1.10–1.30.'
-              : input.riskMode === 'STATSMAN'
-                ? 'Statsman Mode system ticket. Scan all listed games with the Statsman engine. Ticket only goals≥76%, side 58–65%→to score, side≥66%→1/over 2.5 or win either half, corners/shots/SOT≥76%. Build 10 tickets near 3/4/5/6 within 3–6. Legs 1.10–1.35.'
-                : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Choose games and 10 tickets from the exclusive 19-market list. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection between 1.10 and 1.35. Ignore requested markets, odds, and counts.`
+              : `${input.riskMode === 'INVESTOR' ? 'Investor' : 'Gambler'} Mode system ticket. Statsman engine ranks picks from the exclusive markets plus Statsman ticket options. ${input.riskMode === 'INVESTOR' ? 'Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6.' : 'Spread ticket targets across 6.1–20 odds.'} Each selection 1.10–1.35; corners, shots/SOT, and 1·over/2·over may be up to 1.45. Ignore requested markets, odds, and counts.`
       ) : '',
       !internalSystem && input.ticketCount && !input.splitInto ? `Generate ${input.ticketCount} tickets.` : '',
       !internalSystem && input.gamesPerTicket ? `Exactly ${input.gamesPerTicket} games per ticket.` : '',

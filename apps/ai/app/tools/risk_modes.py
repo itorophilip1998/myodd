@@ -13,7 +13,8 @@ MODES = (
     (r'\bggsp(?:\s*v?1\.?1)?(?:\s+modes?)?\b|\bgematria\b', 'GGSP_V11', 'VERY_LOW', 3., 4.),
     (r'\binvestor\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
     (r'\bgam(?:b)?ler\s+modes?\b', 'GAMBLER', 'MODERATE', 6.1, 20.),
-    (r'\bstatsman\s+modes?\b', 'STATSMAN', 'VERY_LOW', 3., 6.),
+    # Legacy “Statsman Mode” → Investor (engine is built into Investor/Gambler/Japa/Lagos).
+    (r'\bstatsman\s+modes?\b', 'INVESTOR', 'VERY_LOW', 3., 6.),
     (r'\bjapa\s+modes?\b', 'JAPA', 'HIGHER', 20.01, 100.),
     (r'\blagos[\s-]*(?:li(?:f|v)es?|life)(?:\s+modes?)?\b', 'LAGOS_LIFE', 'VERY_HIGH', 100, None),
 )
@@ -38,7 +39,7 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     label = {
         'OVER15_MACHINE': 'Over 1.5 Machine', 'GOALS_DESK_V2': 'Goals Desk v2',
         'GGSP_V11': 'GGSP v1.1',
-        'INVESTOR': 'Investor', 'GAMBLER': 'Gambler', 'STATSMAN': 'Statsman',
+        'INVESTOR': 'Investor', 'GAMBLER': 'Gambler',
     }.get(mode, mode.title())
     notices = list(config.unhandledRequests)
     slips = 10
@@ -51,10 +52,8 @@ def lock_system_mode(config: Config, instruction: str, mode: str = 'INVESTOR') -
     low, high = extract_odds_bounds(user)
     if has_explicit_odds_request(user) and not (low == minimum and high == maximum):
         note(f'{label} kept its fixed ticket odds band {minimum:g}–{maximum:g}. Requested odds were not applied.')
-    if _MARKET_REQUEST.search(user) and mode not in ('STATSMAN', 'OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11'):
+    if _MARKET_REQUEST.search(user) and mode not in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11'):
         note(f'{label} chooses the markets. Requested markets were not applied.')
-    if mode == 'STATSMAN':
-        note('Statsman Mode tickets goals ≥76%, side 58–65%→to score, side ≥66%→1/over 2.5 or win either half, corners/shots/SOT ≥76%.')
     if mode == 'OVER15_MACHINE':
         note('Over 1.5 Machine: Aries rising only · Over 1.5 (or Over 2.5 if O1.5 < 1.11) · week range by default · up to 10 tickets at 4–6 · no same-game repeat · legs ≤1.25.')
     if mode == 'GOALS_DESK_V2':
@@ -86,7 +85,7 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     else:
         _, mode, preference, low, high = max(matches, key=lambda item: item[0])
     # Lock named system modes; inferred numeric requests retain their custom constraints until mode generation.
-    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER') and lock_system and matches and not re.search(r'\b(?:split|divide|partition)\b', instruction, re.I):
         return lock_system_mode(config, instruction, mode)
     explicit = has_explicit_odds_request(instruction)
     target_low, target_high = config.minimumOdds, config.maximumOdds
@@ -108,7 +107,7 @@ def apply_named_mode(config: Config, instruction: str, *, lock_system: bool = Tr
     return Config.model_validate(result.model_dump())
 
 
-# Freeform odds → mode mapping only. Do not auto-pick Over 1.5 / Goals Desk / GGSP / Statsman
+# Freeform odds → mode mapping only. Do not auto-pick Over 1.5 / Goals Desk / GGSP
 # from a bare "3–5 odds" prompt — those modes share Investor's band and must be named.
 _AUTO_ODDS_MODES = frozenset({'INVESTOR', 'GAMBLER', 'JAPA', 'LAGOS_LIFE'})
 
@@ -138,7 +137,7 @@ def configure_mode(config: Config, mode: str | None) -> Config:
     if config.riskMode is not None and config.riskMode != mode:
         raise ModeConstraintError('The selected route conflicts with the request risk mode.')
     pinned = config.fixtureMode == 'original_only' and config.preserveOriginalSelections
-    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER', 'STATSMAN') and not pinned:
+    if mode in ('OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER') and not pinned:
         if config.fixtureMode == 'original_only':
             config = config.model_copy(update={'fixtureMode': 'adaptive'})
         return lock_system_mode(config, '', mode)

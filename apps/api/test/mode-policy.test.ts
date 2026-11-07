@@ -35,6 +35,17 @@ it('enforces safe per-game odds inside named-mode tickets', () => {
   expect(withinModeSelectionOdds(1.1, 'INVESTOR')).toBe(true);
   expect(withinModeSelectionOdds(1.35, 'INVESTOR')).toBe(true);
   expect(withinModeSelectionOdds(1.36, 'INVESTOR')).toBe(false);
+  expect(withinModeSelectionOdds(1.45, 'INVESTOR', 'Total Corners', 'Over 8.5')).toBe(true);
+  expect(withinModeSelectionOdds(1.46, 'INVESTOR', 'Total Corners', 'Over 8.5')).toBe(false);
+  expect(withinModeSelectionOdds(1.45, 'INVESTOR', 'Total shots on target', 'Over 8.5')).toBe(true);
+  expect(withinModeSelectionOdds(1.45, 'GAMBLER', 'Home or Over 2.5', 'Yes')).toBe(true);
+  expect(withinModeSelectionOdds(1.40, 'INVESTOR', 'Home Team Goals', 'Over 0.5')).toBe(false);
+  expect(withinModeSelectionOdds(1.40, 'INVESTOR', 'Away team clean sheet', 'No')).toBe(false);
+  expect(withinModeSelectionOdds(1.40, 'INVESTOR', 'Home win either half', 'Yes')).toBe(false);
+  expect(withinModeSelectionOdds(1.27, 'INVESTOR', 'Over/Under', 'Over 1.5')).toBe(true);
+  expect(withinModeSelectionOdds(1.28, 'INVESTOR', 'Over/Under', 'Over 1.5')).toBe(false);
+  expect(withinModeSelectionOdds(1.40, 'INVESTOR', 'Over/Under', 'Over 1.5')).toBe(false);
+  expect(withinModeSelectionOdds(1.40, 'INVESTOR', 'Excluded Goals', '2')).toBe(false);
   expect(withinModeSelectionOdds(1.35, 'GAMBLER')).toBe(true);
   expect(withinModeSelectionOdds(1.36, 'GAMBLER')).toBe(false);
   expect(withinModeSelectionOdds(1.25, 'OVER15_MACHINE')).toBe(true);
