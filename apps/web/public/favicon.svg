@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="myOdd">
+  <rect width="32" height="32" rx="9" fill="#c6f28c"/>
+  <text x="9.5" y="23" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#112016">m</text>
+  <g stroke="#112016" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M17.2 20.6 L24.2 10.4"/>
+    <path d="M18.6 10.4 H24.2 V16"/>
+  </g>
+</svg>

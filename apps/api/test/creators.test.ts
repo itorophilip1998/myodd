@@ -15,13 +15,13 @@ describe('creator labels', () => {
 describe('owner collection management', () => {
   it('rejects editing someone else’s collection before any update', async () => {
     const update = vi.fn(); const tx = { slipGroup: { findFirst: vi.fn().mockResolvedValue(null), update } };
-    const svc = new GroupsService({ $transaction: (work: any) => work(tx) } as any, {} as any);
+    const svc = new GroupsService({ $transaction: (work: any) => work(tx) } as any, {} as any, {} as any);
     await expect(svc.edit('public', 'not-owner', { isPublic: false })).rejects.toThrow('Collection not found'); expect(update).not.toHaveBeenCalled();
   });
   it('saves owner privacy changes and their audit event in one transaction', async () => {
     const update = vi.fn().mockResolvedValue({ publicId: 'public', title: 'Renamed', isPublic: false }); const create = vi.fn();
     const findFirst = vi.fn().mockResolvedValue({ id: 'g' }); const tx = { slipGroup: { findFirst, update }, trainingEvent: { create } };
-    await new GroupsService({ $transaction: (work: any) => work(tx) } as any, {} as any).edit('public', 'owner', { title: 'Renamed', isPublic: false });
+    await new GroupsService({ $transaction: (work: any) => work(tx) } as any, {} as any, {} as any).edit('public', 'owner', { title: 'Renamed', isPublic: false });
     expect(findFirst).toHaveBeenCalledWith({ where: { publicId: 'public', ownerId: 'owner', deletedAt: null } });
     expect(update.mock.calls[0][0].data).toEqual({ title: 'Renamed', isPublic: false }); expect(create.mock.calls[0][0].data.kind).toBe('COLLECTION_UPDATED');
   });
@@ -32,7 +32,7 @@ describe('owner collection management', () => {
   });
   it('deleted collections cannot be read or shared, including by their owner', async () => {
     const group = { ownerId: 'owner', isPublic: false, deletedAt: new Date() }; const displayStatus = vi.fn();
-    const svc = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(group) } } as any, { displayStatus } as any);
+    const svc = new GroupsService({ slipGroup: { findUnique: vi.fn().mockResolvedValue(group) } } as any, { displayStatus } as any, {} as any);
     await expect(svc.getByPublicId('deleted', 'owner')).rejects.toThrow('Collection not found'); await expect(svc.publish('deleted', 'owner')).rejects.toThrow('Collection not found'); expect(displayStatus).not.toHaveBeenCalled();
   });
 });

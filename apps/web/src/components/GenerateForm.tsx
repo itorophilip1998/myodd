@@ -1,344 +1,595 @@
 'use client';
+import { track } from '@/lib/analytics';
 import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ModeInfo } from './ModeInfo';
 import { useRouter } from 'next/navigation';
-import { MODE_ODDS, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, matchDayMaxYmd, modeKeyFromLabel, readChatRequest, type ModeKey } from '@myodd/shared';
+import { MAX_TICKET_ODDS, MODE_ODDS, addLagosDays, clampOddsToMode, lagosDateYmd, matchDayKickoffWindow, promptMatchDay, modeKeyFromLabel, previewOddsFromPrompt, readChatRequest, registryForMode, requestedTicketCount } from '@myodd/shared';
+import { MarketPicker } from './MarketPicker';
 import { ProgressQuest } from './ProgressQuest';
-import { api } from '@/lib/api';
+import { MatchDayPicker } from './MatchDayPicker';
+import { OptionsPopover } from './OptionsPopover';
+import { useSpeechDictation } from '@/hooks/useSpeechDictation';
+import { extractPromptFromFile } from '@/lib/prompt-import';
+import { api, ApiError } from '@/lib/api';
+import { useSettings, useUiSound } from '@/components/SettingsProvider';
+import { useToast } from '@/components/ToastProvider';
+import { generateGuardrailMessage } from '@/lib/generate-guardrails';
+import { MAX_TICKETS, MAX_GAMES_PER_TICKET } from '@/lib/ui-settings';
+import { readGenerationControls } from '@/lib/generation-controls';
+import {
+  clearPredictionBook,
+  predictionBookPrompt,
+  readPredictionBook,
+  removePredictionBookPick,
+  type PredictionBookPick,
+} from '@/lib/prediction-book';
 
 const MODES = [
-  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Low risk', detail: '2–5 · legs 1.10–1.50', icon: '◈', tone: 'investor', recommended: true },
-  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium', detail: '5.01–20 · legs ≤1.80', icon: '♧', tone: 'gambler', recommended: false },
-  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High', detail: '20.01–100 · legs ≤2.00', icon: '↗', tone: 'japa', recommended: false },
-  { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Very high', detail: '100.01+ · legs ≤2.00', icon: 'ϟ', tone: 'lagos', recommended: false },
+  { name: 'Over 1.5 Machine', key: 'OVER15_MACHINE' as const, risk: 'Low risk · O1.5 card', detail: 'Week by default · tickets 4–6 · legs ≤1.25 · no same-game repeat', icon: '◇', tone: 'over15', recommended: false, termsHash: 'mode-over15-machine' },
+  { name: 'Goals Desk v2', key: 'GOALS_DESK_V2' as const, risk: 'Low risk · ≥3 Yes O1.5 · all-4 O2.5', detail: 'That day by default · date range OK · O1.5 lane 3–5 · O2.5 4–6', icon: '✦', tone: 'goalsdesk', recommended: false, termsHash: 'mode-goals-desk-v2' },
+  { name: 'GGSP v1.1', key: 'GGSP_V11' as const, risk: 'Low risk · Chaldean CLEAN O1.5', detail: 'That day · thin +1/+2 · tickets 3–4 · Asian O2 on 1.09–1.12', icon: '⬡', tone: 'ggsp', recommended: false, termsHash: 'mode-ggsp-v11' },
+  { name: 'Investor Mode', key: 'INVESTOR' as const, risk: 'Recommended · lower odds', detail: 'Mixed tickets 3–6 · legs ≤1.35 (corners/shots/1·over ≤1.45) · Statsman', icon: '◈', tone: 'investor', recommended: true, termsHash: 'mode-investor' },
+  { name: 'Gambler Mode', key: 'GAMBLER' as const, risk: 'Medium risk', detail: 'Mixed tickets 6.1–20 · legs ≤1.35 (corners/shots/1·over ≤1.45) · Statsman', icon: '♧', tone: 'gambler', recommended: false, termsHash: 'mode-gambler' },
+  { name: 'Japa Mode', key: 'JAPA' as const, risk: 'High risk', detail: `Ticket 20.01–${MODE_ODDS.JAPA.maximum} · each game ≤2.00`, icon: '↗', tone: 'japa', recommended: false, termsHash: 'mode-japa' },
+  { name: 'Lagoslife Mode', key: 'LAGOS_LIFE' as const, risk: 'Super high risk', detail: 'Ticket 100+ · no maximum · each game ≤2.00', icon: 'ϟ', tone: 'lagos', recommended: false, termsHash: 'mode-lagos-life' },
 ];
 
-const TICKET_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const GAME_CHOICES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+const TICKET_CHOICES = Array.from({ length: MAX_TICKETS }, (_, i) => i + 1);
+const GAME_CHOICES = Array.from({ length: MAX_GAMES_PER_TICKET }, (_, i) => i + 1);
+const MAX_PROMPT = 4000;
 
 function bandForMode(modeName: string) {
   const key = modeKeyFromLabel(modeName) ?? 'INVESTOR';
   return { key, ...MODE_ODDS[key] };
 }
 
-function oddsPresets(key: ModeKey): Array<{ label: string; min: number; max: number | null }> {
-  switch (key) {
-    case 'INVESTOR':
-      return [
-        { label: '2–5', min: 2, max: 5 },
-        { label: '2–3', min: 2, max: 3 },
-        { label: '3–4', min: 3, max: 4 },
-        { label: '4–5', min: 4, max: 5 },
-      ];
-    case 'GAMBLER':
-      return [
-        { label: '5–20', min: 5.01, max: 20 },
-        { label: '5–10', min: 5.01, max: 10 },
-        { label: '10–15', min: 10, max: 15 },
-        { label: '15–20', min: 15, max: 20 },
-      ];
-    case 'JAPA':
-      return [
-        { label: '20–100', min: 20.01, max: 100 },
-        { label: '20–40', min: 20.01, max: 40 },
-        { label: '40–70', min: 40, max: 70 },
-        { label: '70–100', min: 70, max: 100 },
-      ];
-    case 'LAGOS_LIFE':
-      return [
-        { label: '100+', min: 100.01, max: null },
-        { label: '100–500', min: 100.01, max: 500 },
-        { label: '500–2k', min: 500, max: 2000 },
-        { label: '2k+', min: 2000, max: null },
-      ];
-  }
+function appendPrompt(current: string, addition: string) {
+  const next = current.trim() ? `${current.trim()} ${addition.trim()}` : addition.trim();
+  return next.slice(0, MAX_PROMPT);
 }
 
 export function GenerateForm({ initialBookingCode = '', initialInstruction = '', sourceCode, initialMode = '', initialSplitInto, sourceRevision = 0, busy = false }: { initialBookingCode?: string; initialInstruction?: string; sourceCode?: string; initialMode?: string; initialSplitInto?: number; sourceRevision?: number; busy?: boolean }) {
   const router = useRouter();
+  const play = useUiSound();
+  const toast = useToast();
+  const { settings } = useSettings();
   const promptId = useId();
-  const dateId = useId();
+  const fileInputId = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
   const bookingCode = sourceCode ?? initialBookingCode;
+  const [selectedMarketIds, setSelectedMarketIds] = useState<string[]>([]);
+  const requestRef = useRef<{ payload: string; id: string } | null>(null);
+  useEffect(() => { try { const ids = JSON.parse(sessionStorage.getItem('myodd-market-draft') ?? '[]'); if (Array.isArray(ids)) setSelectedMarketIds(ids.filter((id: unknown) => typeof id === 'string')); } catch {} }, []);
+  function changeMarkets(ids: string[]) { if (ids.some(id => !selectedMarketIds.includes(id))) track('market_selected', { count: ids.length }); setSelectedMarketIds(ids); try { sessionStorage.setItem('myodd-market-draft', JSON.stringify(ids)); } catch {} }
   const [preferSource, setPreferSource] = useState(false);
   useEffect(() => { if (sourceRevision) setPreferSource(true); }, [sourceRevision]);
   const [instruction, setInstruction] = useState(initialInstruction);
-  const [mode, setMode] = useState(() => MODES.find(item => item.name.toLowerCase() === initialMode.replace(/gamler/i, 'Gambler').replace(/lagos[ -]*li(?:f|v)es?/i, 'Lagoslife').toLowerCase())?.name ?? 'Investor Mode');
-  const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(initialSplitInto ? 'split' : 'generate');
+  const initialControls = readGenerationControls(initialInstruction);
+  const [mode, setMode] = useState(() => MODES.find(m => m.key === (initialControls.mode ?? modeKeyFromLabel(initialMode)))?.name ?? 'Investor Mode');
+  const [operation, setOperation] = useState<'auto' | 'generate' | 'split'>(() => {
+    if (initialSplitInto) return 'split';
+    return settings.defaultOperation === 'split' ? 'split' : 'generate';
+  });
   const splitEnabled = operation === 'split';
-  const [splitCount, setSplitCount] = useState(() => String(initialSplitInto ?? readChatRequest(initialInstruction).splitInto ?? 5));
+  const [splitCount, setSplitCount] = useState(() => String(
+    initialSplitInto
+      ?? readChatRequest(initialInstruction).splitInto
+      ?? settings.defaultSplitParts
+      ?? 5,
+  ));
   const parsedChat = readChatRequest(instruction);
   const effectiveSplit = splitEnabled ? Number(splitCount) : parsedChat.splitInto;
-  const wantsSplit = splitEnabled || (operation === 'auto' && parsedChat.isSplit);
   const edited = useRef(false);
-  const [ticketCount, setTicketCount] = useState('5');
-  const [gamesCount, setGamesCount] = useState('');
+  const [predictionBook, setPredictionBook] = useState<PredictionBookPick[]>([]);
+  const [bookOpen, setBookOpen] = useState(false);
+  const bookApplied = useRef(false);
+  const [ticketCount, setTicketCount] = useState(() => String(initialControls.tickets ?? settings.defaultTickets ?? 10));
+  const [gamesPerTicket, setGamesPerTicket] = useState(() => initialControls.games || settings.defaultGames ? String(initialControls.games ?? settings.defaultGames) : '');
+  const [scope, setScope] = useState(settings.defaultScope);
+  const [strict, setStrict] = useState(settings.defaultStrict);
+  const [nearest, setNearest] = useState(settings.defaultNearest);
   const modeBand = useMemo(() => bandForMode(mode), [mode]);
-  const presets = useMemo(() => oddsPresets(modeBand.key), [modeBand.key]);
-  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>('manual');
-  const [minOdds, setMinOdds] = useState(() => String(bandForMode('Investor Mode').minimum));
+  const systemMode = (modeBand.key === 'OVER15_MACHINE' || modeBand.key === 'GOALS_DESK_V2' || modeBand.key === 'GGSP_V11' || modeBand.key === 'INVESTOR' || modeBand.key === 'GAMBLER') && predictionBook.length === 0;
+  const wantsSplit = !systemMode && (splitEnabled || (operation === 'auto' && parsedChat.isSplit));
+  const [oddsSource, setOddsSource] = useState<'manual' | 'prompt'>(() => initialControls.odds ? 'prompt' : 'manual');
+  const [minOdds, setMinOdds] = useState(() => String(initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).minimum : modeBand.minimum));
   const [maxOdds, setMaxOdds] = useState(() => {
-    const max = bandForMode('Investor Mode').maximum;
+    const max = initialControls.odds ? clampOddsToMode(initialControls.odds.minimum, initialControls.odds.maximum, modeBand.key).maximum : modeBand.maximum;
     return max == null ? '' : String(max);
   });
   useEffect(() => {
+    if (edited.current || initialInstruction) return;
     setOddsSource('manual');
     setMinOdds(String(modeBand.minimum));
     setMaxOdds(modeBand.maximum == null ? '' : String(modeBand.maximum));
-  }, [modeBand]);
-  const [matchDate, setMatchDate] = useState(() => lagosDateYmd());
-  const [today, setToday] = useState(() => lagosDateYmd());
-  const [maxDate, setMaxDate] = useState(() => matchDayMaxYmd());
+  }, [modeBand, initialInstruction]);
   useEffect(() => {
-    const sync = () => {
-      const nextToday = lagosDateYmd();
-      setToday(nextToday);
-      setMaxDate(matchDayMaxYmd());
-      setMatchDate(current => (current < nextToday ? nextToday : current));
-    };
+    const sync = () => setPredictionBook(readPredictionBook());
     sync();
-    const timer = window.setInterval(sync, 60_000);
-    return () => window.clearInterval(timer);
+    window.addEventListener('storage', sync);
+    window.addEventListener('myodd:prediction-book', sync as EventListener);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('myodd:prediction-book', sync as EventListener);
+    };
   }, []);
-  const matchWindow = matchDayKickoffWindow(matchDate);
   useEffect(() => {
-    if (initialInstruction) return;
+    if (bookApplied.current || typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('book') !== '1') return;
+    const picks = readPredictionBook();
+    if (!picks.length) return;
+    bookApplied.current = true;
+    setPredictionBook(picks);
+    setInstruction(predictionBookPrompt(picks));
+    setScope('original_only');
+    setTicketCount('1');
+    setOddsSource('prompt');
+    setOperation('generate');
+    edited.current = true;
+  }, []);
+  const [dateEdited, setDateEdited] = useState(false);
+  const promptDay = promptMatchDay(instruction);
+  const [rangeStart, setRangeStart] = useState(() => lagosDateYmd());
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const start = lagosDateYmd();
+    const key = initialControls.mode ?? modeKeyFromLabel(initialMode) ?? settings.defaultMode;
+    return key === 'OVER15_MACHINE' ? addLagosDays(start, 6) : start;
+  });
+  const matchWindow = matchDayKickoffWindow(!dateEdited && promptDay ? promptDay.start : rangeStart, new Date(), !dateEdited && promptDay ? promptDay.end : rangeEnd);
+  useEffect(() => {
+    if (initialInstruction || edited.current) return;
+    setMode(MODES.find(item => item.key === settings.defaultMode)?.name ?? 'Investor Mode');
+    if (!initialSplitInto) setOperation(settings.defaultOperation === 'split' ? 'split' : 'generate');
+    if (settings.defaultTickets) setTicketCount(String(settings.defaultTickets));
+    else if (settings.defaultTickets === null) setTicketCount('');
+    if (settings.defaultSplitParts) setSplitCount(String(settings.defaultSplitParts));
+    else if (settings.defaultSplitParts === null) setSplitCount('');
+    setScope(settings.defaultScope);
+    setGamesPerTicket(settings.defaultGames ? String(settings.defaultGames) : '');
+    setStrict(settings.defaultStrict);
+    setNearest(settings.defaultNearest);
+    setOddsSource('manual');
+    if (!dateEdited && settings.defaultMode === 'OVER15_MACHINE') {
+      const start = lagosDateYmd();
+      setRangeStart(start);
+      setRangeEnd(addLagosDays(start, 6));
+    }
+  }, [initialInstruction, initialSplitInto, settings.defaultMode, settings.defaultOperation, settings.defaultTickets, settings.defaultGames, settings.defaultSplitParts, settings.defaultScope, settings.defaultStrict, settings.defaultNearest, dateEdited]);
+  useEffect(() => {
+    if (initialInstruction || edited.current) return;
     void api.preferences().then(({ preferences }) => {
       if (!preferences || edited.current) return;
-      const names: Record<string, string> = { INVESTOR: 'Investor Mode', GAMBLER: 'Gambler Mode', JAPA: 'Japa Mode', LAGOS_LIFE: 'Lagoslife Mode' };
-      if (preferences.riskMode) setMode(names[preferences.riskMode] ?? 'Investor Mode');
-      if (preferences.ticketCount) setTicketCount(String(Math.min(10, Math.max(1, preferences.ticketCount))));
-      if (preferences.gamesPerTicket) setGamesCount(String(preferences.gamesPerTicket));
+      // Mode always stays Investor by default; prefs only fill ticket count gaps.
+      if (!settings.defaultTickets && preferences.ticketCount) setTicketCount(String(Math.min(MAX_TICKETS, Math.max(1, preferences.ticketCount))));
     }).catch(() => {});
-  }, [initialInstruction]);
-  const [scope, setScope] = useState('prompt');
-  const [strict, setStrict] = useState(false);
-  const [nearest, setNearest] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  }, [initialInstruction, settings.defaultTickets]);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [submittedAt, setSubmittedAt] = useState<string>();
 
-  const optionsSummary = useMemo(() => {
-    if (wantsSplit) return `Split · ${effectiveSplit || '?'} parts`;
-    const tickets = ticketCount || 'prompt';
-    const games = gamesCount || 'prompt';
-    const odds = oddsSource === 'prompt'
-      ? 'odds from prompt'
-      : `${minOdds}–${maxOdds.trim() === '' ? '∞' : maxOdds}`;
-    return `${mode.replace(' Mode', '')} · ${tickets} tickets · ${games} games · ${odds}`;
-  }, [wantsSplit, effectiveSplit, ticketCount, gamesCount, oddsSource, minOdds, maxOdds, mode]);
+  const speech = useSpeechDictation(text => {
+    touch();
+    setPreferSource(false);
+    applyInstruction(appendPrompt(instruction, text));
+    toast('Voice added');
+  });
+  useEffect(() => {
+    if (!speech.error) return;
+    toast(speech.error, { sticky: true });
+    speech.setError('');
+  }, [speech.error, speech.setError, toast]);
 
-  function touch() { edited.current = true; if (!optionsOpen) setOptionsOpen(true); }
+  const optionsSummary = useMemo(() => {
+    if (wantsSplit) return `${effectiveSplit || '?'} parts`;
+    const bits = [
+      ticketCount ? `${ticketCount} tix` : null,
+      oddsSource === 'manual' ? `${minOdds}–${maxOdds.trim() === '' ? 'no maximum' : maxOdds}` : null,
+    ].filter(Boolean);
+    return bits.join(' · ') || 'defaults';
+  }, [wantsSplit, effectiveSplit, ticketCount, oddsSource, minOdds, maxOdds]);
+
+  function touch() { edited.current = true; setSubmitError(''); }
+
+  function chooseMode(name: string) {
+    touch();
+    setMode(name);
+    if (['OVER15_MACHINE', 'GOALS_DESK_V2', 'GGSP_V11', 'INVESTOR', 'GAMBLER'].includes(modeKeyFromLabel(name) ?? '')) setOperation('generate');
+    const nextMode = modeKeyFromLabel(name);
+    if (nextMode !== 'GAMBLER') {
+      const allowed = new Set(registryForMode(nextMode).map(item => item.id));
+      setSelectedMarketIds(ids => ids.filter(id => allowed.has(id)));
+    }
+    // Aries rising is only ~2h/day at a ground; default the match window to this week.
+    if (nextMode === 'OVER15_MACHINE' && !dateEdited) {
+      const start = lagosDateYmd();
+      setRangeStart(start);
+      setRangeEnd(addLagosDays(start, 6));
+    }
+    // Goals Desk / GGSP default to that calendar day; user can still widen via the match-day picker.
+    if ((nextMode === 'GOALS_DESK_V2' || nextMode === 'GGSP_V11') && !dateEdited) {
+      const today = lagosDateYmd();
+      setRangeStart(today);
+      setRangeEnd(today);
+    }
+    const band = bandForMode(name);
+    setMinOdds(String(band.minimum));
+    setMaxOdds(band.maximum == null ? '' : String(band.maximum));
+    setOddsSource('manual');
+  }
+
+  function applyInstruction(next: string) {
+    const before = readGenerationControls(instruction);
+    const after = readGenerationControls(next);
+    touch();
+    setInstruction(next);
+    if (after.tickets !== before.tickets && after.tickets !== null) setTicketCount(String(after.tickets));
+    if (after.games !== before.games && after.games !== null) setGamesPerTicket(String(after.games));
+    if (after.odds && JSON.stringify(after.odds) !== JSON.stringify(before.odds)) {
+      const odds = clampOddsToMode(after.odds.minimum, after.odds.maximum, modeBand.key);
+      setMinOdds(String(odds.minimum));
+      setMaxOdds(odds.maximum == null ? '' : String(odds.maximum));
+      setOddsSource('prompt');
+    }
+  }
 
   function resolvedOdds() {
     if (oddsSource === 'prompt') return null;
     const parsedMin = Number(minOdds);
     const parsedMax = maxOdds.trim() === '' ? null : Number(maxOdds);
     if (!Number.isFinite(parsedMin) || (parsedMax != null && !Number.isFinite(parsedMax))) return null;
-    return clampOddsToMode(parsedMin, parsedMax, modeBand.key);
+    return mode ? clampOddsToMode(parsedMin, parsedMax, modeBand.key) : { minimum: parsedMin, maximum: parsedMax };
   }
-  function applyPreset(min: number, max: number | null) {
-    touch();
-    setOddsSource('manual');
-    setMinOdds(String(min));
-    setMaxOdds(max == null ? '' : String(max));
+
+  async function onImportFile(file: File | undefined) {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const { text, truncated } = await extractPromptFromFile(file);
+      touch();
+      setPreferSource(false);
+      applyInstruction(text);
+      play('import');
+      play('prompt');
+      toast(truncated ? `Imported ${file.name} (trimmed to ${MAX_PROMPT} characters).` : `Imported ${file.name}.`);
+    } catch (e) {
+      play('error');
+      toast((e as Error).message, { sticky: true });
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   }
+
   async function submit(event: FormEvent) {
-    event.preventDefault(); if (loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount)) return;
-    setSubmittedAt(new Date().toISOString()); setLoading(true); setError(null);
+    event.preventDefault(); if (loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !predictionBook.length)) return;
+    speech.stop();
     const typedCode = parsedChat.bookingCode;
     const effectiveCode = (preferSource ? bookingCode : typedCode ?? bookingCode).trim().toUpperCase();
-    const dayLabel = matchWindow.within24Hours ? 'today (next 24 hours)' : matchWindow.matchDate;
-    const odds = !wantsSplit ? resolvedOdds() : null;
-    if (!wantsSplit && oddsSource === 'manual' && !odds) {
-      setError('Enter a valid ticket odds range, pick a preset, or choose “From prompt”.'); setLoading(false); setOptionsOpen(true); return;
-    }
-    if (!wantsSplit && odds && odds.maximum != null && odds.minimum > odds.maximum) {
-      setError('Minimum ticket odds cannot be higher than the maximum.'); setLoading(false); setOptionsOpen(true); return;
-    }
     const uiTickets = !wantsSplit && ticketCount ? Number(ticketCount) : undefined;
-    const uiGames = gamesCount ? Number(gamesCount) : undefined;
-    if (uiTickets != null && (!Number.isInteger(uiTickets) || uiTickets < 1 || uiTickets > 10)) {
-      setError('Choose 1–10 tickets.'); setLoading(false); setOptionsOpen(true); return;
+    const rawMin = oddsSource === 'manual' ? Number(minOdds) : null;
+    const rawMax = oddsSource === 'manual' ? (maxOdds.trim() === '' ? null : Number(maxOdds)) : null;
+    const guard = systemMode ? ((requestedTicketCount(instruction) ?? 0) > MAX_TICKETS ? 'You can generate up to 10 tickets at a time.' : null) : generateGuardrailMessage({
+      wantsSplit,
+      instruction,
+      ticketCount: uiTickets,
+      gamesPerTicket: gamesPerTicket ? Number(gamesPerTicket) : undefined,
+      splitParts: wantsSplit ? Number(effectiveSplit) : undefined,
+      rawMinOdds: rawMin,
+      rawMaxOdds: rawMax,
+      oddsSource,
+      mode: mode ? modeBand.key : undefined,
+    });
+    if (guard) { setSubmitError(guard);
+      play('error');
+      toast(guard, { sticky: true });
+      setOptionsOpen(true);
+      return;
     }
-    if (uiGames != null && (!Number.isInteger(uiGames) || uiGames < 1 || uiGames > 30)) {
-      setError('Choose 1–30 games per ticket.'); setLoading(false); setOptionsOpen(true); return;
-    }
+    track('generate_started');
+    play('submit');
+    setSubmittedAt(new Date().toISOString()); setLoading(true);
+    const odds = !wantsSplit ? resolvedOdds() ?? (oddsSource === 'prompt' ? previewOddsFromPrompt(instruction) : null) : null;
     const oddsLabel = odds
-      ? `Ticket odds between ${odds.minimum} and ${odds.maximum == null ? 'no upper limit' : odds.maximum}.`
+      ? (odds.maximum == null ? `Ticket odds at least ${odds.minimum}. No maximum ticket odds.` : `Ticket odds between ${odds.minimum} and ${odds.maximum}.`)
       : '';
-    const dateLine = !wantsSplit ? `Match day: ${dayLabel} (${matchWindow.matchDate}).` : '';
-    const settings = [
+    const dateLine = !wantsSplit
+      ? (matchWindow.matchDate === matchWindow.matchDateEnd
+        ? `Match day: ${matchWindow.label} (${matchWindow.matchDate}).`
+        : `Match days: ${matchWindow.matchDate} to ${matchWindow.matchDateEnd}.`)
+      : '';
+    const settingsLine = (systemMode ? [
+      effectiveCode ? `Source code: ${effectiveCode}.` : '',
+      `${mode} system ticket. Statsman ranks picks from the exclusive markets plus Statsman ticket options. Ignore requested markets, odds, ticket counts, and game counts.`,
+      modeBand.key === 'OVER15_MACHINE'
+        ? 'Over 1.5 Machine: Aries rising only. Prefer Over 1.5; if priced under 1.11 take Over 2.5. Use the selected match day or range (defaults to this week). Build up to 10 tickets at combined odds 4–6. Never reuse the same game on another ticket. Legs 1.10–1.25.'
+        : modeBand.key === 'GOALS_DESK_V2'
+          ? 'Goals Desk v2: O1.5 needs ≥3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace), skips Omikuji 吉; O2.5 needs all-4 Yes (also skips 吉). If Over 1.5 is 1.09–1.13 take Asian Over 2 (same O1.5 ticket). If Over 1.5 is 1.14–1.27 take Over 1.5. Over 2.5 when all-4 Yes and ≤1.60. Never mix lanes. O1.5 tickets at 3–5; O2.5 at 4–6. Up to 10 tickets. Thin days pull in +1/+2 days.'
+          : modeBand.key === 'GGSP_V11'
+            ? 'GGSP v1.1: Chaldean CLEAN roots 7–8 on home+away (Flashscore name aliases; skip toxic 54/62). HARD/SOFT league skips. Over 1.5, or Asian Over 2 when Over 1.5 is 1.09–1.12. Use the selected match day or range (defaults to that day; thin days pull in +1/+2). Build up to 10 tickets at combined odds 3–4. Never reuse the same game on another ticket. Legs 1.10–1.30.'
+            : modeBand.key === 'INVESTOR'
+              ? 'Statsman engine ranks picks. Build 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6 odds, strictly within 3–6. Legs 1.10–1.35; corners, shots/SOT, 1·over/2·over up to 1.45.'
+              : 'Statsman engine ranks picks. Build 10 tickets with mixed targets across 6.1–20 odds. Legs 1.10–1.35; corners, shots/SOT, 1·over/2·over up to 1.45.',
+      dateLine,
+    ] : [
+      predictionBook.length ? `Keep these ${predictionBook.length} prediction picks exactly. Original matches only.` : '',
       effectiveCode ? `Source code: ${effectiveCode}.` : '',
       wantsSplit ? `Split this code into ${effectiveSplit} parts.` : '',
       uiTickets ? `Generate ${uiTickets} tickets.` : '',
-      uiGames ? `Exactly ${uiGames} games per ticket.` : '',
-      scope === 'original_only' ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
+      gamesPerTicket ? `Exactly ${gamesPerTicket} games per ticket.` : 'Games per ticket: Random (1–50). Ignore saved game counts.',
+      scope === 'original_only' && (effectiveCode || predictionBook.length) ? 'Only use the original matches. Do not add new matches.' : scope === 'upcoming' ? 'Use new upcoming matches only.' : '',
       strict ? 'Only use my requested markets.' : '',
       nearest ? 'Closest available odds are allowed if exact target odds cannot be reached.' : '',
-      mode ? `Risk mode: ${mode}.` : '',
       oddsLabel,
       dateLine,
-      'Never repeat the same game twice in one ticket.',
-    ].filter(Boolean).join(' ');
-    const basePrompt = instruction.trim() || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
-    const prompt = dateLine && !basePrompt.toLowerCase().includes('match day') ? `${basePrompt}\n${dateLine}` : basePrompt;
-    if (wantsSplit && (!Number.isInteger(effectiveSplit) || effectiveSplit! < 1 || effectiveSplit! > 10)) {
-      setError('Choose 1–10 parts.'); setLoading(false); setOptionsOpen(true); return;
-    }
+      modeBand.key === 'LAGOS_LIFE' ? '' : `Ticket odds must not exceed ${MAX_TICKET_ODDS}.`,
+    ]).filter(Boolean).join(' ');
+    const basePrompt = instruction.trim() || (predictionBook.length ? predictionBookPrompt(predictionBook) : '') || (wantsSplit ? `Split this code into ${effectiveSplit} parts.` : 'Create tickets using my selected settings.');
+    const prompt = dateLine && !/match day/i.test(basePrompt) ? `${basePrompt}\n${dateLine}` : basePrompt;
     try {
-      const result = await api.generate({
+      const hasBook = predictionBook.length > 0;
+      const payload = {
+        riskMode: mode ? modeBand.key : null,
+        selectedMarketIds: systemMode ? [] : selectedMarketIds.filter(id => registryForMode(modeBand.key).some(item => item.id === id)),
         bookingCode: effectiveCode || undefined,
-        ticketCount: uiTickets,
-        gamesPerTicket: uiGames,
-        operation: wantsSplit ? 'split' : 'generate',
+        ticketCount: systemMode ? undefined : uiTickets ?? (hasBook ? 1 : undefined),
+        gamesPerTicket: systemMode ? undefined : hasBook ? predictionBook.length : gamesPerTicket ? Number(gamesPerTicket) : undefined,
+        operation: wantsSplit ? 'split' as const : 'generate' as const,
         splitInto: wantsSplit ? effectiveSplit : undefined,
         matchDate: wantsSplit ? undefined : matchWindow.matchDate,
-        minimumOdds: odds?.minimum,
-        maximumOdds: odds ? odds.maximum : undefined,
-        instruction: prompt + (settings ? `\nFinal request settings (take precedence): ${settings}` : ''),
-      });
+        matchDateEnd: wantsSplit ? undefined : matchWindow.matchDateEnd,
+        minimumOdds: systemMode || hasBook ? undefined : odds?.minimum,
+        maximumOdds: systemMode || hasBook ? undefined : (odds ? odds.maximum : undefined),
+        instruction: prompt + (settingsLine ? `\nFinal request settings (take precedence): ${settingsLine}` : ''),
+        pinnedSelections: hasBook
+          ? predictionBook.map((pick) => ({
+              eventId: pick.eventId,
+              marketId: pick.marketId,
+              outcomeId: pick.outcomeId,
+              specifier: pick.specifier ?? '',
+              odds: pick.odds,
+              marketName: pick.marketName,
+              selectionName: pick.selectionName,
+              homeTeam: pick.homeTeam,
+              awayTeam: pick.awayTeam,
+              league: pick.league,
+              kickoffAt: pick.kickoffAt,
+            }))
+          : undefined,
+      };
+      const payloadKey = JSON.stringify(payload);
+      if (!requestRef.current) { try { requestRef.current = JSON.parse(sessionStorage.getItem('myodd-generation-retry') ?? 'null'); } catch {} }
+      if (!requestRef.current || requestRef.current.payload !== payloadKey) requestRef.current = { payload: payloadKey, id: crypto.randomUUID() };
+      try { sessionStorage.setItem('myodd-generation-retry', JSON.stringify(requestRef.current)); } catch {}
+      const result = await api.generate({ ...payload, requestId: requestRef.current.id });
+      try { sessionStorage.removeItem('myodd-generation-retry'); } catch {}
+      requestRef.current = null;
+      if (hasBook) {
+        clearPredictionBook();
+        setPredictionBook([]);
+      }
       router.push(`/result/${result.publicId}?job=${result.jobId}`);
-    } catch (err) { setError((err as Error).message); setLoading(false); }
+    } catch (err) { const message = (err as Error).message.includes('You can generate up to 10 tickets') ? 'You can generate up to 10 tickets at a time.' : err instanceof ApiError && err.code === 'SOURCE_REQUIRED' ? 'Paste a source booking code to reuse its original matches.' : 'Your request could not be started. Please try again.'; track('generate_failed'); play('error'); setSubmitError(message); toast(message, { sticky: true }); setLoading(false); }
   }
   function shortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
   }
-  if (loading) return <ProgressQuest job={{ status: 'PENDING', stage: 'SUBMITTING', stageDetail: 'Waiting for the server to accept your request', createdAt: submittedAt, progress: 0, total: 0, failedCount: 0 }} />;
+  if (loading) {
+    return (
+      <ProgressQuest
+        job={{ status: 'PENDING', stage: 'SUBMITTING', stageDetail: 'Waiting for the server to accept your request', createdAt: submittedAt, progress: 0, total: 0, failedCount: 0 }}
+      />
+    );
+  }
 
   return <form onSubmit={submit} className="chat-composer">
+    <fieldset className="mode-picker">
+      <legend>Choose your mode</legend>
+      <div className="mode-grid">
+        {MODES.map(item => (
+          <div key={item.name} className={`mode-option-wrap ${item.tone}${mode === item.name ? ' selected' : ''}`}>
+            <button
+              type="button"
+              aria-pressed={mode === item.name}
+              onClick={() => chooseMode(item.name)}
+              className={`mode-option ${item.tone}${mode === item.name ? ' selected' : ''}`}
+            >
+              <span className="mode-icon" aria-hidden>{item.icon}</span>
+              <span className="mode-copy">
+                <strong>
+                  {item.name}
+                  {item.recommended ? <em className="mode-recommended">Recommended</em> : null}
+                </strong>
+                <span className="mode-risk">{item.risk}</span>
+                <small>{item.detail}</small>
+              </span>
+              <span className="mode-check" aria-hidden>{mode === item.name ? '✓' : ''}</span>
+            </button>
+            <ModeInfo name={item.name} mode={item.key} termsHash={item.termsHash} />
+          </div>
+        ))}
+      </div>
+    </fieldset>
+
+    {mode && initialControls.mode && initialControls.mode !== modeBand.key && <p role="status">Your selected mode takes precedence over the prompt mode.</p>}
+    {submitError && <p role="alert" className="generation-outcome">{submitError}</p>}
     <div className="composer chat-input-box">
-      <label htmlFor={promptId} className="sr-only">Message myOdd</label>
+      {predictionBook.length > 0 && (
+        <div className="prediction-book-panel" role="region" aria-label="Prediction book picks">
+          <div className="prediction-book-panel-head">
+            <button
+              type="button"
+              className="prediction-book-toggle"
+              aria-expanded={bookOpen}
+              title={bookOpen ? 'Hide booked picks' : 'Show booked picks'}
+              onClick={() => setBookOpen(open => !open)}
+            >
+              <span aria-hidden>{bookOpen ? '▾' : '▸'}</span>
+              <strong>Book · {predictionBook.length}</strong>
+            </button>
+            <button
+              type="button"
+              className="quiet-button"
+              title="Clear prediction book"
+              onClick={() => { clearPredictionBook(); setPredictionBook([]); setBookOpen(false); touch(); }}
+            >
+              Clear
+            </button>
+          </div>
+          {bookOpen && (
+            <ul className="prediction-book-list">
+              {predictionBook.map((pick) => (
+                <li key={`${pick.eventId}:${pick.marketId}:${pick.outcomeId}:${pick.specifier}`}>
+                  <span title={`${pick.marketName}: ${pick.selectionName} @ ${pick.odds}`}>
+                    <b>{pick.homeTeam} vs {pick.awayTeam}</b>
+                    <small>{pick.selectionName} @ {pick.odds}</small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${pick.homeTeam} vs ${pick.awayTeam}`}
+                    title="Remove pick"
+                    onClick={() => {
+                      const next = removePredictionBookPick(pick.eventId);
+                      setPredictionBook(next);
+                      setInstruction(next.length ? predictionBookPrompt(next) : '');
+                      if (!next.length) setBookOpen(false);
+                      touch();
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      <label htmlFor={promptId} className="sr-only">Describe your tickets</label>
       <textarea
         id={promptId}
         value={instruction}
-        onChange={e => { touch(); setInstruction(e.target.value); setPreferSource(false); }}
+        onChange={e => { applyInstruction(e.target.value); setPreferSource(false); }}
         onKeyDown={shortcut}
-        maxLength={4000}
-        rows={3}
-        placeholder="Optional note — e.g. ‘only double chance’ or a booking code…"
+        maxLength={MAX_PROMPT}
+        rows={2}
+        placeholder={systemMode ? `Optional note, saved with your tickets. Choose the match day; ${mode} selects approved options automatically.` : 'Try “5 tickets · 4–5 odds · double chance · tonight…”'}
       />
-      {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && <p className="parsed-code-hint">Using {parsedChat.bookingCode} from your message</p>}
+      {!preferSource && parsedChat.bookingCode && parsedChat.bookingCode !== bookingCode && (
+        <p className="parsed-code-hint" title={`Using ${parsedChat.bookingCode} from your message`}>Using {parsedChat.bookingCode}</p>
+      )}
+      {speech.listening && (
+        <p className="composer-live-hint" role="status" title="Tap the mic to stop">
+          <span className="live-dot" aria-hidden />
+          {speech.interim ? speech.interim : 'Listening…'}
+        </p>
+      )}
 
       <div className="chat-input-footer">
-        {!wantsSplit && (
-          <label className="composer-date" htmlFor={dateId} title="Match day">
-            <input
-              id={dateId}
-              type="date"
-              aria-label="Match day"
-              value={matchDate}
-              min={today}
-              max={maxDate}
-              onChange={e => { touch(); setMatchDate(e.target.value || today); }}
+        <div className="composer-tools">
+          {!wantsSplit && (
+            <MatchDayPicker
+              start={rangeStart}
+              end={rangeEnd}
+              onChange={(s, e) => { touch(); setDateEdited(true); setRangeStart(s); setRangeEnd(e); setOptionsOpen(false); }}
             />
-          </label>
-        )}
+          )}
 
-        <details className="composer-options" open={optionsOpen} onToggle={e => setOptionsOpen((e.target as HTMLDetailsElement).open)}>
-          <summary>Options <span>{optionsSummary}</span></summary>
-          <div className="composer-settings">
-            <div className="options-section">
-              <div className="settings-heading"><strong>Mode</strong><span>Changes odds band automatically</span></div>
-              <div className="mode-grid options-mode-grid" role="group" aria-label="Risk mode">
-                {MODES.map(item => (
-                  <button
-                    type="button"
-                    key={item.name}
-                    aria-pressed={mode === item.name}
-                    onClick={() => { touch(); setMode(item.name); }}
-                    className={`mode-option ${item.tone} ${mode === item.name ? 'selected' : ''}`}
-                  >
-                    <span className="mode-icon" aria-hidden>{item.icon}</span>
-                    <span>
-                      <strong>{item.name.replace(' Mode', '')}{item.recommended ? <em className="mode-recommended">Rec</em> : null}</strong>
-                      <span className="mode-risk">{item.risk}</span>
-                      <small>{item.detail}</small>
-                    </span>
-                    <span className="mode-check" aria-hidden>{mode === item.name ? '✓' : ''}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="options-section">
-              <div className="settings-heading"><strong>Variations</strong><span>Generate or split</span></div>
-              <div className="options-grid">
-                <label>Action
-                  <select aria-label="Code operation" value={wantsSplit ? 'split' : 'generate'} onChange={e => { touch(); setOperation(e.target.value as 'generate' | 'split'); }}>
-                    <option value="generate">Generate variations</option>
-                    <option value="split">Split a code</option>
+          {!systemMode && <OptionsPopover
+            summary={optionsSummary}
+            open={optionsOpen}
+            onOpenChange={open => { setOptionsOpen(open); }}
+          >
+            <div className="options-grid">
+              <label>Action
+                <select aria-label="Code operation" value={wantsSplit ? 'split' : 'generate'} onChange={e => { touch(); setOperation(e.target.value as 'generate' | 'split'); }}>
+                  <option value="generate">Variations</option>
+                  <option value="split">Split</option>
+                </select>
+              </label>
+              {wantsSplit ? (
+                <label>Parts
+                  <input type="number" aria-label="Number of parts" min={1} max={MAX_TICKETS} step={1} value={splitEnabled ? splitCount : parsedChat.splitInto ?? ''} onChange={e => { touch(); setOperation('split'); setSplitCount(e.target.value); }} />
+                </label>
+              ) : (
+                <label>Tickets
+                  <select aria-label="Total tickets" value={ticketCount} onChange={e => { touch(); setTicketCount(e.target.value); }}>
+                    <option value="">Prompt</option>
+                    {TICKET_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
-                {wantsSplit ? (
-                  <label>Parts
-                    <input type="number" aria-label="Number of parts" min={1} max={10} step={1} value={splitEnabled ? splitCount : parsedChat.splitInto ?? ''} onChange={e => { touch(); setOperation('split'); setSplitCount(e.target.value); }} />
-                  </label>
-                ) : (
-                  <>
-                    <label>Tickets
-                      <select aria-label="Total tickets" value={ticketCount} onChange={e => { touch(); setTicketCount(e.target.value); }}>
-                        <option value="">From prompt</option>
-                        {TICKET_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
-                      </select>
-                    </label>
-                    <label>Games / ticket
-                      <select aria-label="Games per ticket" value={gamesCount} onChange={e => { touch(); setGamesCount(e.target.value); }}>
-                        <option value="">From prompt</option>
-                        {GAME_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
-                      </select>
-                    </label>
-                  </>
-                )}
-                <label className="settings-matches">Matches
-                  <select value={scope} onChange={e => { touch(); setScope(e.target.value); }}>
-                    <option value="prompt">Follow my prompt</option>
-                    <option value="original_only">Original matches only</option>
-                    <option value="upcoming">New upcoming matches</option>
-                  </select>
-                </label>
-              </div>
+              )}
+              {!wantsSplit && <label>Games per ticket
+                <select aria-label="Games per ticket" value={gamesPerTicket} onChange={e => { touch(); setGamesPerTicket(e.target.value); }}>
+                  <option value="">Random (1–50)</option>
+                  {GAME_CHOICES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>}
             </div>
 
             {!wantsSplit && (
-              <div className="options-section">
-                <div className="settings-heading">
-                  <strong>Ticket odds</strong>
-                  <span>{modeBand.minimum}–{modeBand.maximum == null ? '∞' : modeBand.maximum}</span>
+              <div className="compact-odds">
+                <div className="compact-odds-head">
+                  <strong>Odds</strong>
+                  <span>{modeBand.minimum}–{modeBand.maximum ?? 'no maximum'}</span>
                 </div>
-                <div className="odds-source-tabs" role="group" aria-label="Odds source">
-                  <button type="button" aria-pressed={oddsSource === 'manual'} className={oddsSource === 'manual' ? 'is-active' : ''} onClick={() => { touch(); setOddsSource('manual'); }}>From options</button>
-                  <button type="button" aria-pressed={oddsSource === 'prompt'} className={oddsSource === 'prompt' ? 'is-active' : ''} onClick={() => { touch(); setOddsSource('prompt'); }}>From prompt</button>
-                </div>
-                {oddsSource === 'manual' && <>
-                  <div className="odds-presets" role="group" aria-label="Odds presets">
-                    {presets.map(preset => {
-                      const active = Number(minOdds) === preset.min && ((preset.max == null && maxOdds.trim() === '') || Number(maxOdds) === preset.max);
-                      return <button type="button" key={preset.label} aria-pressed={active} className={active ? 'is-active' : ''} onClick={() => applyPreset(preset.min, preset.max)}>{preset.label}</button>;
-                    })}
-                  </div>
                   <div className="ticket-odds-inputs">
                     <label>Min<input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} max={modeBand.maximum ?? undefined} value={minOdds} onChange={e => { touch(); setOddsSource('manual'); setMinOdds(e.target.value); }} /></label>
-                    <span className="ticket-odds-sep" aria-hidden>to</span>
-                    <label>Max{modeBand.maximum == null
-                      ? <input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} value={maxOdds} placeholder="No limit" onChange={e => { touch(); setOddsSource('manual'); setMaxOdds(e.target.value); }} />
-                      : <input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} max={modeBand.maximum} value={maxOdds} onChange={e => { touch(); setOddsSource('manual'); setMaxOdds(e.target.value); }} />}</label>
+                    <span className="ticket-odds-sep" aria-hidden>–</span>
+                    <label>Max<input type="number" inputMode="decimal" step="0.01" min={modeBand.minimum} max={modeBand.maximum ?? undefined} placeholder={modeBand.maximum == null ? 'No maximum' : undefined} value={maxOdds} onChange={e => { touch(); setOddsSource('manual'); setMaxOdds(e.target.value); }} /></label>
                   </div>
-                </>}
               </div>
             )}
 
+            <MarketPicker mode={modeBand.key} selected={selectedMarketIds} onChange={changeMarkets} />
+
             <div className="settings-toggles">
               <label className="check-option"><input type="checkbox" checked={strict} onChange={e => { touch(); setStrict(e.target.checked); }} />Only requested markets</label>
-              <label className="check-option"><input type="checkbox" checked={nearest} onChange={e => { touch(); setNearest(e.target.checked); }} />Allow nearest odds</label>
+              <label className="check-option"><input type="checkbox" checked={nearest} onChange={e => { touch(); setNearest(e.target.checked); }} />Nearest odds OK</label>
             </div>
-          </div>
-        </details>
+          </OptionsPopover>}
 
-        <button className="primary-button" disabled={loading || busy || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !gamesCount)} type="submit">
-          {loading ? 'Sending…' : busy ? 'Creating codes…' : wantsSplit ? `Split${effectiveSplit ? ` into ${effectiveSplit}` : ''}` : 'Generate'} <span aria-hidden>↑</span>
+          <button
+            type="button"
+            className={`composer-icon-btn${speech.listening ? ' is-live' : ''}`}
+            aria-pressed={speech.listening}
+            title={speech.supported ? (speech.listening ? 'Stop recording' : 'Dictate prompt') : 'Voice not supported here'}
+            disabled={!speech.supported || busy}
+            onClick={() => { setOptionsOpen(false); speech.setError(''); speech.toggle(); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" />
+            </svg>
+            <span className="sr-only">{speech.listening ? 'Stop voice' : 'Start voice'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="composer-icon-btn"
+            title="Attach .txt, .pdf, or .docx"
+            disabled={importing || busy}
+            onClick={() => { setOptionsOpen(false); fileRef.current?.click(); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.49-8.49a3.5 3.5 0 0 1 4.95 4.95l-8.5 8.49a1.5 1.5 0 1 1-2.12-2.12l7.78-7.78" />
+            </svg>
+            <span className="sr-only">{importing ? 'Attaching…' : 'Attach prompt file'}</span>
+          </button>
+          <input
+            id={fileInputId}
+            ref={fileRef}
+            type="file"
+            className="sr-only"
+            accept=".txt,.md,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={e => void onImportFile(e.target.files?.[0])}
+          />
+        </div>
+
+        <button className="primary-button" disabled={loading || busy || importing || (!instruction.trim() && !mode && !splitEnabled && !ticketCount && !predictionBook.length)} type="submit">
+          {loading ? 'Sending…' : busy ? 'Creating…' : wantsSplit ? `Split${effectiveSplit ? ` · ${effectiveSplit}` : ''}` : predictionBook.length ? 'Submit book' : 'Generate codes'} <span aria-hidden>↑</span>
         </button>
       </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
     </div>
   </form>;
 }

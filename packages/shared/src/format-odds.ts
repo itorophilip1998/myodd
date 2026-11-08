@@ -1,5 +1,5 @@
 /** Compact display only; calculations and stored prices retain their full value. */
-const SUFFIXES = ['', 'ks', 'ms', 'b', 't', 'q'] as const;
+const SUFFIXES = ['', 'k', 'm', 'b', 't', 'q'] as const;
 const PARSE_MULT: Record<string, number> = {
   '': 1,
   k: 1e3,

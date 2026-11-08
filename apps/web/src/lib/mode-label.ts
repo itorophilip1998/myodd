@@ -1,0 +1,17 @@
+import type { ModeKey } from '@myodd/shared';
+
+export const MODE_TAG: Record<ModeKey, string> = {
+  OVER15_MACHINE: 'Over 1.5',
+  GOALS_DESK_V2: 'Goals Desk',
+  GGSP_V11: 'GGSP',
+  INVESTOR: 'Investor',
+  GAMBLER: 'Gambler',
+  JAPA: 'Japa',
+  LAGOS_LIFE: 'Lagoslife',
+};
+
+export function modeTag(mode?: string | null) {
+  if (!mode) return null;
+  if (mode in MODE_TAG) return MODE_TAG[mode as ModeKey];
+  return null;
+}

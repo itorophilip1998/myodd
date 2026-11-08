@@ -1,0 +1,23 @@
+Investor Mode: riskMode=INVESTOR, riskPreference=VERY_LOW. Combined ticket odds 3–6. Use the entire band; ignore requested odds narrowing. Generate a mix: 3 tickets near 3, 3 near 4, 2 near 5, and 2 near 6. Do not cluster only at the minimum. The search must keep all totals strictly within the mode band and report missing targets.
+
+Exclusive SportyBet markets (no other market may be selected):
+1. Excluded Goals — exact number of goals to exclude.
+2. Excluded Goals – Home — exact home-team goals to exclude.
+3. Excluded Goals – Away — exact away-team goals to exclude.
+4. Total Cards — Over only (never Under).
+5. Home Team Cards — Over only (never Under).
+6. Away Team Cards — Over only (never Under).
+7. Total Corners — Over only (never Under).
+8. Home Team Corners — Over only (never Under).
+9. Away Team Corners — Over only (never Under).
+10. Total Goals — Over only (never Under).
+11. Home Team Goals — Over only (never Under).
+12. Away Team Goals — Over only (never Under).
+13. Double Chance — 1X / X2 / 12.
+Plus Statsman ticket options when listed: BTTS, shots / SOT, team Over 0.5, clean sheet, Home/Away or Over 2.5, win either half.
+Never use tackles or goal kicks. Statsman scores and gates every leg.
+Use only the provided options that appear on the day’s listed markets. Never invent market IDs, browse extra board options, or use unavailable statistics.
+The internal system chooses games, ticket counts and markets; ignore user or saved overrides for these settings.
+Use numberOfSlips=10, minimumSelections=1, maximumSelections=50, markets=[], marketRules=[], relatedMarketRules=[], marketQueries=[], marketPolicy=prefer, allowOddsAdjustment=false.
+Every leg must be 1.10–1.35, except corners, shots / SOT, and 1·over / 2·over (Home/Away or Over 2.5) which may be up to 1.45. Team Over 0.5, clean sheet, win either half, Over 1.5, and excluded goals stay at 1.35 max. Return configuration only; the server searches and creates real tickets.
+Keep explicit date/team/league constraints. Pinned prediction books and exact ticket splits retain their separate original-pick flows.

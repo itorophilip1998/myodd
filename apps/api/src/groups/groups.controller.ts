@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { collectionSaveSchema } from '@myodd/shared';
 import { Controller, Get, Post, Patch, Body, HttpCode, Param, Query, BadRequestException, Req, UseGuards } from '@nestjs/common';
 import { ClerkGuard, SignedInGuard, type AuthRequest } from '../auth/auth.guard';
 import { GroupsService } from './groups.service';
@@ -31,10 +32,13 @@ export class GroupsController {
 
   @Patch('groups/:groupId') @UseGuards(SignedInGuard)
   async edit(@Param('groupId') id: string, @Req() req: AuthRequest, @Body() body: unknown) {
-    const parsed = z.object({ title: z.string().trim().min(1).max(120).optional(), isPublic: z.boolean().optional() }).strict().refine(data => data.title !== undefined || data.isPublic !== undefined).safeParse(body);
+    const parsed = collectionSaveSchema.refine(data => data.title !== undefined || data.isPublic !== undefined).safeParse(body);
     if (!parsed.success) throw new BadRequestException('Provide a title or visibility');
     return this.groups.edit(id, req.account!.id, parsed.data);
   }
+
+  @Get('groups/sitemap') sitemap() { return this.groups.sitemap(); }
+  @Get('groups/:groupId/public-metadata') publicMetadata(@Param('groupId') id: string) { return this.groups.publicMetadata(id); }
 
   @Get('groups/:groupId')
   async getGroup(@Param('groupId') groupId: string, @Req() req: AuthRequest) {
@@ -51,6 +55,26 @@ export class GroupsController {
   async verifyCode(@Param('code') code: string, @Req() req: AuthRequest) {
     await this.rateLimit.consume('verify-code', 60);
     return this.groups.verifyCode(code, req.account?.id);
+  }
+
+  @Post('groups/:groupId/check-play') @HttpCode(200)
+  async checkPlayGroup(@Param('groupId') groupId: string, @Req() req: AuthRequest) {
+    await this.rateLimit.consume('check-play-group', 10);
+    return this.groups.checkPlayGroup(groupId, req.account?.id);
+  }
+
+  @Post('checks/lookup') @HttpCode(200)
+  async lookup(@Body() body: unknown, @Req() req: AuthRequest) {
+    const parsed = z.object({ identifier: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/) }).strict().safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Enter a valid booking code, ticket ID, or collection ID');
+    await this.rateLimit.consume('check-play-lookup', 10);
+    return this.groups.lookupAndCheck(parsed.data.identifier, req.account?.id);
+  }
+
+  @Post('codes/:code/check-play') @HttpCode(200)
+  async checkPlayCode(@Param('code') code: string, @Req() req: AuthRequest) {
+    await this.rateLimit.consume('check-play-code', 30);
+    return this.groups.checkPlayCode(code, req.account?.id);
   }
 
   @Post('groups/:groupId/share') @HttpCode(200)

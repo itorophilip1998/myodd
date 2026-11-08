@@ -1,5 +1,8 @@
 import type { SupportedMarket, VarianceLevel, JobStatus } from './enums';
 
+/** Settlement of a booked selection (win/loss), separate from bettability (`isActive`). */
+export type SelectionSettlement = 'WON' | 'LOST' | 'VOID' | 'PENDING' | 'UNKNOWN';
+
 export interface BookmakerSelection {
   eventId: string;
   marketId: string;
@@ -11,8 +14,16 @@ export interface BookmakerSelection {
   homeTeam?: string;
   awayTeam?: string;
   league?: string;
+  /** SportyBet category (country / region). Used by GGSP league gate with `league`. */
+  categoryName?: string;
   kickoffAt?: string;
+  /** Explicit event phase from the booking response, independent of bettability. */
+  matchStatus?: string;
+  /** Still open for betting (pre-match / not suspended). Not the same as won/lost. */
   isActive?: boolean;
+  /** Explicit settlement when SportyBet exposes it on the share ticket. */
+  settlement?: SelectionSettlement;
+  settlementConflict?: boolean;
 }
 
 export interface BookmakerBooking {
@@ -32,6 +43,7 @@ export interface BookmakerFixture {
   categoryName: string;
   kickoffAt: string;
   matchStatus: string;
+  score?: string | null;
   markets: BookmakerMarket[];
 }
 
@@ -57,6 +69,9 @@ export interface BookmakerOutcome {
 }
 
 export interface ScoredSelection extends BookmakerSelection {
+  baseProbability?: number | null;
+  baseModelVersion?: string | null;
+  predictedAt?: string | null;
   supportedMarket: SupportedMarket;
   probability: number;
   confidence: number;
@@ -88,6 +103,9 @@ export interface SlipSelectionDto {
   predictionScore: number;
   modelVersion: string;
   kickoffAt: string | null;
+  playStatus?: 'UPCOMING' | 'LIVE' | 'PLAYED' | 'UNKNOWN' | 'CUT';
+  score?: string | null;
+  playNote?: string | null;
 }
 
 export interface SlipGroupDto {

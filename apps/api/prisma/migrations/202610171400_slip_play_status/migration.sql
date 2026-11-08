@@ -1,0 +1,15 @@
+CREATE TYPE "SlipPlayStatus" AS ENUM ('OPEN', 'LIVE', 'CUT', 'ALL_PLAYED', 'UNKNOWN');
+CREATE TYPE "LegPlayStatus" AS ENUM ('UPCOMING', 'LIVE', 'PLAYED', 'CUT', 'UNKNOWN');
+
+ALTER TABLE "generated_slips"
+  ADD COLUMN "play_status" "SlipPlayStatus" NOT NULL DEFAULT 'UNKNOWN',
+  ADD COLUMN "play_checked_at" TIMESTAMP(3),
+  ADD COLUMN "open_legs" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "live_legs" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "played_legs" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "cut_legs" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "slip_selections"
+  ADD COLUMN "play_status" "LegPlayStatus" NOT NULL DEFAULT 'UNKNOWN',
+  ADD COLUMN "score" TEXT,
+  ADD COLUMN "play_note" TEXT;

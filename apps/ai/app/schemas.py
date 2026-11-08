@@ -1,8 +1,9 @@
+from app.tools.generation_limits import validate_ticket_count
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import field_validator, BaseModel, Field, ConfigDict, model_validator
 
 
 class Market(StrEnum):
@@ -30,8 +31,8 @@ class Config(BaseModel):
     numberOfSlips: int = Field(default=10, ge=1, le=10)
     minimumOdds: float = Field(default=2.5, ge=1.1, allow_inf_nan=False)
     maximumOdds: float | None = Field(default=5, ge=1.1, allow_inf_nan=False)
-    maximumSelections: int = Field(default=20, ge=1, le=30)
-    minimumSelections: int = Field(default=2, ge=1, le=30)
+    maximumSelections: int = Field(default=50, ge=1, le=50)
+    minimumSelections: int = Field(default=1, ge=1, le=50)
     markets: list[Market] = Field(default_factory=list)
     marketQueries: list[str] = Field(default_factory=list)
     marketRules: list[MarketRule] = Field(default_factory=list)
@@ -41,7 +42,7 @@ class Config(BaseModel):
     preserveOriginalSelections: bool = False
     allowOddsAdjustment: bool = False
     minimumProbability: float | None = Field(default=None, ge=0, le=1)
-    riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
+    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|GOALS_DESK_V2|GGSP_V11|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
     riskPreference: str = Field(default='LOWER', pattern='^(VERY_LOW|LOWER|MODERATE|HIGHER|VERY_HIGH)$')
     excludedTeams: list[str] = Field(default_factory=list)
     includedTeams: list[str] = Field(default_factory=list)
@@ -66,15 +67,26 @@ class Config(BaseModel):
 
 
 class LearnedDefaults(BaseModel):
-    riskMode: str | None = Field(default=None, pattern='^(INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
+    riskMode: str | None = Field(default=None, pattern='^(OVER15_MACHINE|GOALS_DESK_V2|GGSP_V11|INVESTOR|GAMBLER|JAPA|LAGOS_LIFE)$')
     ticketCount: int | None = Field(default=None, ge=1, le=10)
-    gamesPerTicket: int | None = Field(default=None, ge=1, le=30)
+    gamesPerTicket: int | None = Field(default=None, ge=1, le=50)
+
+
+    @field_validator('ticketCount', mode='before')
+    @classmethod
+    def cap_legacy_count(cls, value):
+        return min(10, value) if isinstance(value, (int, float)) else value
 
 
 class Instruction(BaseModel):
     learnedDefaults: LearnedDefaults = Field(default_factory=LearnedDefaults)
     instruction: str = Field(min_length=3, max_length=6000)
     availableMarkets: list[dict] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode='after')
+    def enforce_output_limit(self):
+        validate_ticket_count(self.instruction)
+        return self
 
 
 class ResolveInput(Instruction):
@@ -101,6 +113,7 @@ class Fixture(BaseModel):
     homeTeam: str
     awayTeam: str
     league: str
+    categoryName: str = ''
     kickoffAt: datetime
     matchStatus: str = ''
     markets: list[BookmakerMarket]
@@ -115,10 +128,14 @@ class Selection(BaseModel):
 
 
 class ScoredSelection(Selection):
+    baseProbability: float | None = Field(default=None, gt=0, lt=1)
+    baseModelVersion: str | None = None
+    predictedAt: datetime | None = None
     odds: float
     homeTeam: str
     awayTeam: str
     league: str
+    categoryName: str = ''
     marketName: str
     selectionName: str
     kickoffAt: datetime
@@ -135,10 +152,10 @@ class PredictionInput(BaseModel):
 
 class GenerateInput(BaseModel):
     expandedSearch: bool = False
-    fixtures: Annotated[list[Fixture], Field(max_length=1000)]
+    fixtures: Annotated[list[Fixture], Field(max_length=2500)]
     config: Config
     originalSelections: list[Selection] = Field(default_factory=list)
 
 
 class SplitInput(GenerateInput):
-    parts: int = Field(ge=1, le=100)
+    parts: int = Field(ge=1, le=10)

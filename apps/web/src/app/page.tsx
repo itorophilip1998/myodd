@@ -1,4 +1,13 @@
-import { GenerateForm } from '@/components/GenerateForm';
+import { GenerateWorkspace } from '@/components/GenerateWorkspace';
+import { HOME_TITLE, HOME_DESCRIPTION, publicMetadata, siteUrl } from '@/lib/public-seo';
+
+export const metadata = publicMetadata('/', HOME_TITLE, HOME_DESCRIPTION);
 export default function HomePage() {
-  return <main className="home-workspace"><div className="hero"><p className="eyebrow"><span className="status-dot" /> SPORTYBET, REIMAGINED</p><h1>Your next code.<br /><span>Your way.</span></h1><p>Your codes. Your conversation.<br className="hidden sm:block" /> Set options, pick a date, generate.</p></div><GenerateForm /></main>;
+  const url = siteUrl().origin;
+  const structuredData = { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'Organization', '@id': `${url}/#organization`, name: 'MyOdd', url, logo: `${url}/icon.png` },
+    { '@type': 'WebSite', '@id': `${url}/#website`, name: 'MyOdd', url, publisher: { '@id': `${url}/#organization` } },
+    { '@type': 'SoftwareApplication', name: 'MyOdd', url, applicationCategory: 'UtilitiesApplication', operatingSystem: 'Web', description: HOME_DESCRIPTION, publisher: { '@id': `${url}/#organization` } },
+  ] };
+  return <><GenerateWorkspace /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} /></>;
 }

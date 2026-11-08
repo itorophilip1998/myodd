@@ -1,19 +1,21 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.generation import generate_report
-from app.intent import parse_intent
-from app.market_preferences import resolve_preferences
-from app.predictions import OddsModel, score_fixtures
+from app.tools.generation import generate_report
+from app.tools.intent import parse_intent
+from app.tools.market_preferences import resolve_preferences
+from app.tools.selections import is_virtual_game
+from app.llms.scoring import OddsModel, score_fixtures
 from app.schemas import Config, Fixture, Market, MarketRule, ScoredSelection, Selection
 
 
 def selection(event, odds=2, probability=.4, market='1', outcome='1', supported=Market.HOME, **values):
+    values.setdefault('marketName', 'Market')
+    values.setdefault('selectionName', 'Outcome')
     return ScoredSelection(eventId=str(event), marketId=market, outcomeId=outcome, specifier='',
                            odds=odds, probability=probability, confidence=probability * 100,
                            modelVersion='test', supportedMarket=supported,
                            homeTeam=f'Home {event}', awayTeam=f'Away {event}', league='League',
-                           marketName='Market', selectionName='Outcome',
                            kickoffAt='2099-01-01T12:00:00Z', **values)
 
 
@@ -26,7 +28,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         pool = [selection(i, odds=3, probability=.3) for i in range(8)]
         report = generate_report(pool, Config(numberOfSlips=10, minimumOdds=100, maximumOdds=500,
                                              riskPreference='LOWER'), [])
-        self.assertEqual(len(report['candidates']), 10)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(100 <= c['totalOdds'] <= 500 for c in report['candidates']))
 
     def test_adaptive_mode_adds_matches_and_explains_it(self):
@@ -54,7 +56,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         self.assertEqual(strict['candidates'], [])
 
     def test_nearest_odds_require_explicit_permission_and_are_reported(self):
-        pool = [selection(i) for i in range(3)]
+        pool = [selection(i) for i in range(4)]
         config = Config(numberOfSlips=2, minimumOdds=10, maximumOdds=20, maximumSelections=2)
         self.assertEqual(generate_report(pool, config, [])['candidates'], [])
         report = generate_report(pool, config.model_copy(update={'allowOddsAdjustment': True}), [])
@@ -97,7 +99,7 @@ class FlexibleGenerationTests(unittest.TestCase):
         pool = [selection(i) for i in range(8)]
         report = generate_report(pool, Config(numberOfSlips=3, minimumOdds=3, maximumOdds=10,
                                  includedTeams=['Home 2']), [])
-        self.assertEqual(len(report['candidates']), 3)
+        self.assertEqual(len(report['candidates']), 1)
         self.assertTrue(all(any(s['homeTeam'] == 'Home 2' for s in c['selections']) for c in report['candidates']))
 
     def test_preserved_picks_can_be_kept_in_a_large_expanded_pool(self):
@@ -132,6 +134,16 @@ class CatalogTests(unittest.TestCase):
         self.assertAlmostEqual(scored[0].probability, 1 / 1.4, places=5)
         fixture.markets[0].status = '2'
         self.assertEqual(score_fixtures([fixture], OddsModel()), [])
+
+    def test_srl_virtual_games_are_omitted(self):
+        real = selection(1)
+        srl_home = real.model_copy(update={'homeTeam': 'Arsenal SRL'})
+        srl_league = real.model_copy(update={'league': 'SRL Argentina'})
+        self.assertTrue(is_virtual_game(srl_home))
+        self.assertTrue(is_virtual_game(srl_league))
+        self.assertTrue(is_virtual_game({'homeTeam': 'A', 'awayTeam': 'B', 'league': 'Simulated Reality'}))
+        self.assertFalse(is_virtual_game(real.model_copy(update={'homeTeam': 'Arsenal', 'awayTeam': 'Chelsea', 'league': 'Premier League'})))
+        self.assertFalse(is_virtual_game(real.model_copy(update={'homeTeam': 'Israel', 'awayTeam': 'Spain'})))
 
 
 if __name__ == '__main__':

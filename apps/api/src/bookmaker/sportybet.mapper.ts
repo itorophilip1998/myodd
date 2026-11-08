@@ -1,11 +1,14 @@
 import {
   MIN_SELECTION_ODDS,
+  explicitSettlement,
+  hasSettlementConflict,
   type LiveFixture,
   type BookmakerBooking,
   type BookmakerFixture,
   type BookmakerMarket,
   type BookmakerOutcome,
   type BookmakerSelection,
+  type SelectionSettlement,
 } from '@myodd/shared';
 
 interface RawOutcome {
@@ -13,6 +16,10 @@ interface RawOutcome {
   desc: string;
   odds: string | number;
   isActive?: boolean | number | string;
+  status?: string | number;
+  result?: string | number;
+  settleStatus?: string | number;
+  outcomeStatus?: string | number;
 }
 
 interface RawMarket {
@@ -49,6 +56,7 @@ interface UpcomingEventsData {
 }
 
 interface ShareOutcome {
+  matchStatus?: string | number;
   eventId?: string;
   marketId?: string;
   outcomeId?: string;
@@ -61,6 +69,10 @@ interface ShareOutcome {
   tournamentName?: string;
   estimateStartTime?: number;
   status?: string | number;
+  result?: string | number;
+  settleStatus?: string | number;
+  outcomeStatus?: string | number;
+  selectionStatus?: string | number;
   markets?: RawMarket[];
   sport?: { category?: { tournament?: { name?: string } } };
 }
@@ -71,7 +83,12 @@ interface ShareData {
   deadline?: number;
   outcomes?: ShareOutcome[];
   unavailableOutcomes?: ShareOutcome[];
-  ticket?: { selections?: ShareOutcome[]; displayTotalOdds?: string | number };
+  ticket?: {
+    selections?: ShareOutcome[];
+    displayTotalOdds?: string | number;
+    status?: string | number;
+    ticketStatus?: string | number;
+  };
 }
 
 export function mapFixtures(data: UpcomingEventsData): BookmakerFixture[] {
@@ -104,6 +121,7 @@ export function mapEvent(event: RawEvent, league?: string, category?: string): B
     categoryName: category ?? event.sport?.category?.name ?? '',
     kickoffAt: new Date(event.estimateStartTime).toISOString(),
     matchStatus: String(event.matchStatus ?? ''),
+    score: /^\d+:\d+$/.test(event.setScore ?? '') ? event.setScore!.replace(':', ' : ') : null,
     markets: (event.markets ?? []).map(mapMarket),
   };
 }
@@ -154,6 +172,10 @@ export function mapShareResponse(
   };
 }
 
+function readSettlement(...values: unknown[]) {
+  return { settlement: explicitSettlement(...values), settlementConflict: hasSettlementConflict(...values) };
+}
+
 function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]): BookmakerSelection[] {
   return events.flatMap(event => {
     if (!event.markets?.length) return [mapShareOutcome(event)];
@@ -166,12 +188,23 @@ function mapBookingOutcomes(events: ShareOutcome[], requested?: ShareOutcome[]):
       const market = event.markets!.find(m => String(m.id) === String(selection.marketId)
         && (m.specifier ?? '') === (selection.specifier ?? ''));
       const outcome = market?.outcomes?.find(o => String(o.id) === String(selection.outcomeId));
+      const base = mapShareOutcome({ ...event, ...selection, odds: outcome?.odds,
+        marketDesc: market?.desc, outcomeDesc: outcome?.desc,
+        tournamentName: event.sport?.category?.tournament?.name ?? event.tournamentName });
       return {
-        ...mapShareOutcome({ ...event, ...selection, odds: outcome?.odds,
-          marketDesc: market?.desc, outcomeDesc: outcome?.desc,
-          tournamentName: event.sport?.category?.tournament?.name ?? event.tournamentName }),
+        ...base,
+        // Bettability only — finished events are inactive for betting, not necessarily lost.
         isActive: !!outcome && mapOutcome(outcome).isActive
           && String(market?.status ?? '0') === '0' && String(event.status ?? '0') === '0',
+        ...readSettlement(
+          (selection as ShareOutcome).settleStatus,
+          (selection as ShareOutcome).outcomeStatus,
+          (selection as ShareOutcome).selectionStatus,
+          (selection as ShareOutcome).result,
+          outcome?.settleStatus,
+          outcome?.outcomeStatus,
+          outcome?.result,
+        ),
       };
     });
   });
@@ -189,10 +222,12 @@ function mapShareOutcome(o: ShareOutcome): BookmakerSelection {
     homeTeam: o.homeTeamName,
     awayTeam: o.awayTeamName,
     league: o.tournamentName,
+    matchStatus: o.matchStatus == null ? undefined : String(o.matchStatus),
     kickoffAt: o.estimateStartTime
       ? new Date(o.estimateStartTime).toISOString()
       : undefined,
     isActive: o.status !== 'suspended',
+    ...readSettlement(o.settleStatus, o.outcomeStatus, o.selectionStatus, o.result),
   };
 }
 

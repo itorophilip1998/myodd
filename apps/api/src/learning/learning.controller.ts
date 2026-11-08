@@ -1,3 +1,4 @@
+import { normalizeLearnedPreferences } from './preferences';
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ClerkGuard, type AuthRequest } from '../auth/auth.guard';
 import { z } from 'zod';
@@ -19,7 +20,7 @@ export class LearningController {
     const accountOwner = await this.prisma.appUser.findUnique({ where: { id: profileId } });
     if (accountOwner && accountOwner.id !== req.account?.id) throw new NotFoundException('Profile not found');
     const profile = await this.prisma.learningProfile.findUnique({ where: { id: profileId } });
-    return { preferences: profile?.preferences ?? null, revision: profile?.revision ?? 0 };
+    return { preferences: normalizeLearnedPreferences(profile?.preferences), revision: profile?.revision ?? 0 };
   }
   @Post('feedback')
   async record(@Body() body: unknown, @Req() req: AuthRequest) {

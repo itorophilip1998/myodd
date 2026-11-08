@@ -23,6 +23,7 @@ export class SportyBetClient {
   private readonly cacheTtlMs: number;
   private lastRequestAt = 0;
   private inFlight = 0;
+  private readonly reads = new Map<string, Promise<unknown>>();
   private readonly queue: Array<() => void> = [];
 
   constructor(private readonly redis: RedisService) {
@@ -32,7 +33,7 @@ export class SportyBetClient {
     this.timeoutMs = Number(process.env.SPORTYBET_TIMEOUT_MS ?? 15000);
     this.minIntervalMs = Number(process.env.SPORTYBET_MIN_INTERVAL_MS ?? 250);
     this.maxConcurrency = Number(process.env.SPORTYBET_MAX_CONCURRENCY ?? 4);
-    this.cacheTtlMs = Number(process.env.SPORTYBET_CACHE_TTL_MS ?? 90000);
+    this.cacheTtlMs = Number(process.env.SPORTYBET_CACHE_TTL_MS ?? 30000);
   }
 
   get regionCode() {
@@ -43,12 +44,22 @@ export class SportyBetClient {
     return Math.max(1, Math.floor(this.cacheTtlMs / 1000));
   }
 
-  async get<T>(
+  async get<T>(path: string, options?: { cacheKey?: string; retries?: number; minIntervalMs?: number }): Promise<T> {
+    const key = `${options?.cacheKey ?? 'fresh'}:${path.replace(/([?&])_t=[^&]+/g, '$1')}`;
+    const existing = this.reads.get(key);
+    if (existing) return existing as Promise<T>;
+    const pending = this.read<T>(path, options);
+    this.reads.set(key, pending);
+    try { return await pending; } finally { if (this.reads.get(key) === pending) this.reads.delete(key); }
+  }
+
+  private async read<T>(
     path: string,
-    options?: { cacheKey?: string; retries?: number },
+    options?: { cacheKey?: string; retries?: number; minIntervalMs?: number },
   ): Promise<T> {
     if (options?.cacheKey) {
-      const cached = await this.redis.getJson<T>(options.cacheKey);
+      const cached = await this.redis.getJson<T & { __missing?: boolean }>(options.cacheKey).catch(() => null);
+      if (cached?.__missing) throw new SportyBetHttpError('Booking code unavailable', 'NOT_FOUND', 404);
       if (cached) return cached;
     }
 
@@ -57,20 +68,23 @@ export class SportyBetClient {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
-        const data = await this.request<T>('GET', path);
+        const data = await this.request<T>('GET', path, undefined, options?.minIntervalMs);
         if (options?.cacheKey) {
           await this.redis.setJson(
             options.cacheKey,
             data,
             this.cacheTtlSeconds,
-          );
+          ).catch(() => undefined);
         }
         return data;
       } catch (err) {
+        if (options?.cacheKey && err instanceof SportyBetHttpError && ['NOT_FOUND', 'INVALID_BOOKING_CODE'].includes(err.code)) await this.redis.setJson(options.cacheKey, { __missing: true }, 60).catch(() => undefined);
         attempt += 1;
         const retryable =
           err instanceof SportyBetHttpError &&
-          (err.status === 429 || (err.status !== undefined && err.status >= 500));
+          (err.status === 429 || err.status === 202
+            || (err.status !== undefined && err.status >= 500)
+            || ['TIMEOUT', 'NETWORK', 'EMPTY', 'INVALID_JSON', 'NOT_READY'].includes(err.code));
         if (!retryable || attempt > maxRetries) throw err;
         const delay = Math.min(2000, 250 * 2 ** (attempt - 1));
         await sleep(delay);
@@ -106,6 +120,7 @@ export class SportyBetClient {
     method: 'GET' | 'POST',
     path: string,
     body?: unknown,
+    minIntervalMs?: number,
   ): Promise<T> {
     if (method === 'POST' && !path.includes('/orders/share')) {
       throw new SportyBetHttpError(
@@ -114,7 +129,7 @@ export class SportyBetClient {
       );
     }
 
-    await this.acquireSlot();
+    await this.acquireSlot(minIntervalMs);
     try {
       const url = `${this.baseUrl}${path}`;
       const controller = new AbortController();
@@ -133,6 +148,14 @@ export class SportyBetClient {
           signal: controller.signal,
         });
 
+        if (res.status === 202 || res.status === 204) {
+          throw new SportyBetHttpError(
+            `SportyBet HTTP ${res.status}`,
+            mapStatus(res.status),
+            res.status,
+          );
+        }
+
         if (!res.ok) {
           throw new SportyBetHttpError(
             `SportyBet HTTP ${res.status}`,
@@ -141,11 +164,16 @@ export class SportyBetClient {
           );
         }
 
-        const json = (await res.json()) as {
-          bizCode?: number;
-          message?: string;
-          data?: T;
-        };
+        const text = await res.text();
+        if (!text.trim()) {
+          throw new SportyBetHttpError('SportyBet returned an empty response', 'EMPTY', res.status);
+        }
+        let json: { bizCode?: number; message?: string; data?: T };
+        try {
+          json = JSON.parse(text) as { bizCode?: number; message?: string; data?: T };
+        } catch {
+          throw new SportyBetHttpError('SportyBet returned a non-JSON response', 'INVALID_JSON', res.status);
+        }
 
         if (json.bizCode !== undefined && json.bizCode !== 10000) {
           throw new SportyBetHttpError(
@@ -171,12 +199,14 @@ export class SportyBetClient {
     }
   }
 
-  private async acquireSlot() {
-    if (this.inFlight >= this.maxConcurrency) {
+  private async acquireSlot(minIntervalMs?: number) {
+    const interval = minIntervalMs ?? this.minIntervalMs;
+    const limit = interval < this.minIntervalMs ? Math.max(this.maxConcurrency, 12) : this.maxConcurrency;
+    if (this.inFlight >= limit) {
       await new Promise<void>((resolve) => this.queue.push(resolve));
     }
     this.inFlight += 1;
-    const wait = this.minIntervalMs - (Date.now() - this.lastRequestAt);
+    const wait = interval - (Date.now() - this.lastRequestAt);
     if (wait > 0) await sleep(wait);
     this.lastRequestAt = Date.now();
   }
@@ -193,6 +223,8 @@ function sleep(ms: number) {
 }
 
 function mapStatus(status: number) {
+  if (status === 202) return 'NOT_READY';
+  if (status === 204) return 'EMPTY';
   if (status === 400) return 'BAD_REQUEST';
   if (status === 401) return 'UNAUTHORIZED';
   if (status === 403) return 'FORBIDDEN';

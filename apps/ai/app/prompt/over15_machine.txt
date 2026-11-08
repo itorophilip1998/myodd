@@ -1,0 +1,12 @@
+Over 1.5 Machine: riskMode=OVER15_MACHINE, riskPreference=VERY_LOW. Up to 10 tickets. Combined ticket odds 4–6. Each leg 1.10–1.25.
+
+Date window: use the requested match day or range; if none is set, use this week (today through +6 days).
+
+Eligibility: Vedic Lahiri whole-sign chart at kickoff for the home ground — rising sign Aries only.
+
+Markets:
+1. Prefer Over 1.5 goals when that price is between 1.11 and 1.25.
+2. If Over 1.5 is priced below 1.11, take Over 2.5 instead (still ≤ 1.25).
+3. Never ticket raw 1X2, BTTS, corners, or other markets.
+
+One pick per match. The same game must not appear on more than one ticket in a single generation. Same pick once per collection. Do not invent fixtures or markets.

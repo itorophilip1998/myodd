@@ -7,6 +7,10 @@ import type {
 } from '@myodd/shared';
 
 export interface FixturesQuery {
+  fresh?: boolean;
+  systemOnly?: boolean;
+  /** When systemOnly, which fixed mode filters listing outcomes (defaults Investor). */
+  systemMode?: 'OVER15_MACHINE' | 'GOALS_DESK_V2' | 'GGSP_V11' | 'INVESTOR' | 'GAMBLER' | null;
   eventIds?: string[];
   timelineHours?: number;
   pageSize?: number;

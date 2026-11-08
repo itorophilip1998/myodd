@@ -2,6 +2,8 @@
 
 Generate ranked SportyBet Nigeria booking-code variations from an existing code or a natural-language request. Football, pre-match, booking codes only; myOdd never stakes or places wagers.
 
+**Docs:** [docs/README.md](./docs/README.md) — architecture, software guide, and feature notes.
+
 ## Services
 
 ```text
@@ -29,6 +31,34 @@ Each application has its own container. PostgreSQL, Redis, and a one-shot migrat
 Deploy syncs code to `/opt/myodd` and runs `docker compose up -d --build --wait`. Server files `.env` and `apps/web/.env.local` are never overwritten. When you introduce a new environment variable, add it to `.env.production.example` and set it manually on the Hetzner host before relying on it in production.
 
 Promote work with: feature branch → PR into `development` → PR into `production`.
+
+### Custom domain (Spaceship → Hetzner)
+
+Buy/manage the domain at [Spaceship](https://www.spaceship.com/application/domain-list-application/). Do **not** point it at Spaceship web hosting — only use Spaceship DNS, and host the app on Hetzner.
+
+1. In Spaceship → **Advanced DNS** → your domain → **Custom records**:
+
+   | Host | Type | Value |
+   |------|------|-------|
+   | `@` | A | `2.31.56.193` |
+   | `www` | CNAME | `yourdomain.com` (or A → same IP) |
+
+2. Wait until `dig +short yourdomain.com` returns `2.31.56.193`.
+3. On the server, edit `/opt/myodd/.env` (manual — deploy never overwrites it):
+
+   ```bash
+   DOMAIN=yourdomain.com
+   ACME_EMAIL=you@yourdomain.com
+   CORS_ORIGIN=https://yourdomain.com
+   CLERK_AUTHORIZED_PARTIES=https://yourdomain.com
+   PUBLIC_WEB_URL=https://yourdomain.com
+   NEXT_PUBLIC_API_URL=
+   ```
+
+4. In Clerk, add `https://yourdomain.com` as an allowed origin / production instance.
+5. Redeploy (merge to `production` or re-run the workflow). With `DOMAIN` set, Compose enables Caddy on `:80`/`:443` (Let's Encrypt) and proxies `/` → web, `/api` → api.
+
+Until `DOMAIN` is set, the site stays on host loopback `:3000` only (not public). With `DOMAIN` set, the only public entry is Caddy on `:80`/`:443`. Web, API, AI, Postgres, and Redis stay on the Docker network (host binds are loopback-only for admin/debug).
 
 ## Run everything locally
 
@@ -110,14 +140,16 @@ Four selectable modes also work as typed keywords and enforce **hard per-ticket 
 
 | Mode | Ticket odds | Safe odds per game |
 |------|-------------|--------------------|
-| Investor Mode (recommended) | 2–5 inclusive | 1.10–1.50 |
-| Gambler Mode (also `Gamler Mode`) | 5.01–20 | 1.10–1.80 |
+| Investor Mode (recommended) | 3 near 3, 3 near 4, 2 near 5, 2 near 6 (band 3–6) | 1.10–1.35 |
+| Gambler Mode (also `Gamler Mode`) | 6.1–20 | 1.10–1.35 |
 | Japa Mode | 20.01–50 | 1.10–2.00 |
 | Lagoslife / Lagos-Lifes Mode | 35–50 | 1.10–2.00 |
 
 Ticket odds never exceed **50** in any mode. Explicit odds targets narrow the mode band; asking above 50 is blocked before generate starts. A typed contradictory target fails clearly; a final mode selected in the controls overrides an older conflicting range and reports that change. Nearest-odds adjustment cannot escape a named band. Inventory, selection-count, numerical and bookmaker constraints still apply. These names do not promise prediction accuracy or a guaranteed outcome.
 
 Ticket count (1–10) can be set in Options or the prompt. Games per ticket are chosen automatically between 1 and 50 unless the prompt asks for an exact count (hard max 50). The compact panel also includes the generate/split action, split count, match scope and market/odds toggles. Split part counts must preserve all eligible original picks; contradictory sizes fail instead of repeating picks. Results are paginated (12/24/48 per page), searched and sorted before pagination; Copy all checks and copies the entire valid collection.
+
+Investor and Gambler use a direct fixed-policy path: no instruction-LLM or market-catalog planning call. They request the provided 19-option IDs on the day’s fixture listing, match only those options, and do not open match boards to hunt extras. Investor remains recommended for its lower combined odds. See [system-mode coverage and speed](docs/features/investor-system-mode.md).
 
 ## Progress, working codes and retained training data
 
@@ -127,7 +159,7 @@ Result cards contain only recently verified, fully active codes. Older codes are
 
 `training_events` is an append-only application journal with versioned JSON payloads: accepted requests, source/fixture/market snapshots, model metadata, parsed and effective configuration, every scored pool/candidate set, final booking plans, validation-time fixture snapshots, booking attempts/rejections/confirmed responses, settlement and stage changes. Events and accepted selections are saved transactionally with job progress; a confirmed booking is durably retained in Redis before its PostgreSQL write is retried. Startup can rebuild missing queue work from database request/plan events. Catalog discovery and validation snapshots are retained rather than overwritten. Legacy collections are imported into the journal, explicitly marked as lacking historical fixture context.
 
-`TrainingFeedback` retains helpful/not-helpful feedback, notes and corrected prompts. **Remember these settings** saves an account preference profile when signed in, or an anonymous browser profile for guests, containing only an approved mode, ticket count and exact games-per-ticket default. Future requests can use these defaults when unspecified; explicit prompts/control values take precedence. Raw feedback notes are not executed as system instructions. This is preference adaptation, not automatic fine-tuning or proof of a betting edge. Prompts and generated tickets are not win/loss labels; predictive retraining still needs verified completed-match outcomes and evaluation (see the CSV/Poisson workflow below).
+`TrainingFeedback` retains helpful/not-helpful feedback, notes and corrected prompts. **Remember these settings** saves an account preference profile when signed in, or an anonymous browser profile for guests, containing only an approved mode, ticket count and exact games-per-ticket default. Future requests can use these defaults when unspecified; explicit prompts/control values take precedence. Raw feedback notes are not executed as system instructions. Feedback remains preference adaptation. Separately, verified pre-match forecasts and completed-match outcomes now feed a scheduled probability-calibration loop every six hours. A candidate must beat the baseline and incumbent on later, unseen matches before activation. The Predictions page tracks selection/ticket results and probability error. See [prediction performance and learning](docs/features/learning.md) for data requirements, deployment migration and promotion checks. The CSV/Poisson workflow below remains available for historical goal-model training.
 
 Export a consistent PostgreSQL snapshot as JSONL, with record-count and SHA-256 manifest:
 
@@ -137,13 +169,20 @@ docker compose cp api:/tmp/myodd-training.jsonl ./myodd-training.jsonl
 docker compose cp api:/tmp/myodd-training.jsonl.manifest.json ./myodd-training.jsonl.manifest.json
 ```
 
-Exports are local-only, contain complete journal payloads and are not available from a public endpoint. Keep exports private. Redis uses `appendfsync always`; PostgreSQL data remains on its named volume. A backup container writes consistent compressed SQL backups at startup and daily to the separate `postgres_backups` volume, with no automatic deletion. Storage must remain available; backups cannot make external data truthful or eliminate every possible infrastructure failure. `docker compose down -v` deletes all named data/backup volumes.
+Exports are local-only, contain complete journal payloads and are not available from a public endpoint. Keep exports private. Redis uses `appendfsync always`; PostgreSQL data remains on its named volume. Database dumps work like `.env`: they live only in the local `backup/` folder (gitignored; deploy never syncs them).
+
+```bash
+./scripts/backup.sh          # dump local Compose Postgres → backup/
+./scripts/backup.sh --pull   # copy production dumps from Hetzner → backup/
+```
+
+The Compose `backup` service also writes daily `.sql.gz` files into host `backup/` on the server. A Mac LaunchAgent runs `./scripts/backup.sh --pull` once a day. Keeps the newest 30 dumps. `docker compose down -v` deletes named data volumes, not `backup/`.
 
 ## Split one booking code into parts
 
 Paste `GNPM8T` in the chat, select **Split a code**, choose the part count and a risk mode, then submit. Natural instructions also work: `Split GNPM8T into 3 parts using Investor Mode`. The API uses the same conservative code/count extractor as the UI, so a separate source field or `@` prefix is optional. SportyBet share links are accepted as code evidence too.
 
-Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor ≤1.50, Gambler ≤1.80, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
+Splitting partitions the original available selections, without substituting markets, adding fixtures or repeating a pick across parts. Investor Mode balances estimated log risk across similarly sized parts; Gambler Mode balances sizes; Japa groups similar risk bands; Lagos-Lifes concentrates risk into larger parts. Requested hard odds and selection limits remain binding. With no explicit split odds/selection bounds, parts allow 1–30 selections and ticket odds of at least 1.10 without an app upper cap (named modes enforce their own ticket and per-game bands). Every individual game/leg must be priced at least **1.10**, and named modes also cap each leg (Investor and Gambler ≤1.35, Japa/Lagoslife ≤2.00). A split can make single-pick parts where the bookmaker accepts them. Parts cannot outnumber eligible original picks.
 
 Unavailable or filtered picks are counted and explained. Impossible counts, contradictory constraints or unsupported same-match/bet-builder originals return a clear error without invented or repeated picks. Static partition planning returns the entire requested partition or none; live bookmaker changes during code creation can still produce partial successes, which the job reports. Each accepted part uses the existing confirmation, persistence, expiry and copy/share pipeline. Split strategy and counts are retained in the group's generation report.
 
@@ -197,7 +236,7 @@ Only matches strictly before the cutoff enter training. Retraining writes a new 
 
 ## Instruction parsing
 
-Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llm.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
+Instruction parsing uses a **dynamic model orchestrator** in `apps/ai/app/llms/client.py`. Provider, model, base URL, and credentials are resolved from environment variables on every request (`AI_PROVIDER` → `INTENT_PROVIDER` → `LLM_PROVIDER`, defaulting to `rules` when unset in code; Compose defaults `AI_PROVIDER` to `openai`).
 
 Supported providers:
 
@@ -273,7 +312,7 @@ The API reads the root `.env`. For Python host development, export AI model/inte
 | GET | `/api/groups/:publicId` | Saved group and selections |
 | GET | `/api/codes/:code` | Saved generated slip |
 
-Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate`, `POST /split`, `POST /tools/discover-codes`.
+Python internal endpoints: `GET /health`, `POST /intent`, `POST /resolve`, `POST /generate/{investor,gambler,japa,lagos-life,prediction}`, `POST /tools/split`, and `POST /tools/discover-codes`. Legacy `/generate`, `/split`, and `/predictions` remain available. See [AI agents and folder ownership](docs/features/ai-agents.md).
 
 ## Checks
 
@@ -291,7 +330,7 @@ SportyBet has no official public developer API. Its undocumented fixtures/share 
 
 Header navigation now provides **Create**, **Live Games**, **Predictions** and **Saved codes**. The generation composer disappears immediately while submitting, remains closed during the job and after results, and reopens only through the request or ticket edit icon. Closing the editor preserves its draft. Running jobs without results show an animated myOdd logo with orbiting checkpoints, ticket tiles and the existing backend stages and real counts. The journey disappears as soon as results are present; ongoing work uses a compact remaining-ticket message, and completed collections never replay the journey. Session and collection loading reuse the branded animation. Reduced-motion preferences disable the decorative animations. Result cards use five desktop columns and progressively fewer on smaller screens.
 
-`/live` reads SportyBet's public football live-list endpoint through the API. Only events explicitly marked live are included; pre-match entries mixed into that feed are excluded. Scores, period labels and reported clocks are preserved rather than simulated. Team/country/league search, league filters and pagination work over the returned feed. The browser refreshes every 15 seconds, the server coalesces concurrent refreshes and caches for 10 seconds, and displayed live snapshots are journaled. Snapshots older than 45 seconds hide scores until fresh data arrives. A feed failure is shown explicitly.
+The Live page has been removed from navigation and the sitemap. Live settlement checks for saved tickets remain available.
 
 `/predictions` uses a separate Python scoring-only endpoint on up to two pages of upcoming football fixtures (72-hour search window). In-play/ended fixtures are excluded by kickoff before scoring; the UI removes kicked-off entries as time passes. Users can search, filter leagues and choose None (all markets), over goals, under goals, draws, corners, BTTS, double chance, handicaps, cards or correct score. Detailed alternate markets are fetched for up to 24 upcoming matches; the remaining loaded matches retain listing markets. Missing specialist markets produce an explicit empty state rather than unrelated picks. The browser receives only the selected market and the first 50 ranked outcomes per match. Compare outcomes fetches additional selections on demand (up to 5,000 per match), including alternate lines, and users can sort matches by estimate. The complete scoring snapshot remains in the local training journal. Predictions show actual per-selection model versions and distinguish price-based estimates from trained Poisson estimates. Available prices and normalized probabilities are estimates, not verified outcomes. Full fixture/scoring snapshots are retained in the training journal, with a 90-second cache to avoid recalculating identical browsing requests. No live forecasts or live booking codes are generated by this feature.
 

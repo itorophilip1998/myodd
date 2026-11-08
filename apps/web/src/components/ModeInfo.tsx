@@ -1,0 +1,53 @@
+'use client';
+
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { MODE_ODDS, MODE_SELECTION_ODDS, type ModeKey } from '@myodd/shared';
+
+const EXPLANATIONS: Record<ModeKey, string> = {
+  OVER15_MACHINE: 'Vedic Lahiri whole-sign chart at kickoff for the home ground. Only Aries rising games. Defaults to this week; use the match-day control for another day or range. Tickets prefer Over 1.5; if that price is under 1.11 the slip takes Over 2.5 instead. Up to 10 tickets at combined odds 4–6; each leg at most 1.25. The same game is never repeated on another ticket in one generation. A ticket can still lose.',
+  GOALS_DESK_V2: 'O1.5 needs at least 3 of 4 Yes plus Zi Wei + Omikuji + Lenormand Yes on O2.5 (pace); Omikuji 吉 is skipped. O2.5 needs all four Yes (also skips 吉). Defaults to that calendar day. Cheap O1.5 (1.09–1.13) switches to Asian Over 2 on the same ticket; O1.5 itself at 1.14–1.27; O2.5 at most 1.60. Lanes never mix. Up to 10 tickets; thin days pull in +1/+2 days. A ticket can still lose.',
+  GGSP_V11: 'Gematria Goal Signature Protocol v1.1. Chaldean digital root on home+away (SportyBet names expanded to Flashscore spellings) — only CLEAN roots 7–8 (skip toxic totals 54/62). HARD/SOFT toxic leagues are skipped. Over 1.5, or Asian Over 2 when Over 1.5 is priced 1.09–1.12. Defaults to that calendar day; thin days pull in the next 1–2 days. Up to 10 tickets at combined odds 3–4; each leg 1.10–1.30. The same game is never repeated on another ticket, so a thin CLEAN day may return fewer than 10. A ticket can still lose.',
+  INVESTOR: 'Recommended system ticket for lower odds. Exclusive markets plus Statsman picks (BTTS, shots, team Over 0.5 / clean sheet, 1/over). Statsman ranks and gates every leg. No tackles or goal kicks. Mixed targets near 3, 4, 5, and 6. A ticket can still lose.',
+  GAMBLER: 'Same markets and strict Statsman scoring as Investor, with mixed targets across 6.1–20. Investor stays recommended for its lower odds.',
+  JAPA: 'High combined odds (20.01–100). Open catalog including 1X2 (not Statsman-gated). Legs ≤2.00. Expect frequent losing tickets.',
+  LAGOS_LIFE: 'Highest target range (100+). Open catalog including 1X2 (not Statsman-gated). Highly speculative — never treat as an income plan.',
+};
+
+export function ModeInfo({ name, mode, termsHash }: { name: string; mode: ModeKey; termsHash: string }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ left: 12, top: 0, arrow: 20, above: false });
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const id = useId();
+  function close(restoreFocus = false) { setOpen(false); if (restoreFocus) trigger.current?.focus({ preventScroll: true }); }
+  useEffect(() => {
+    if (!open) return;
+    function place() {
+      const anchor = trigger.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const width = Math.min(320, window.innerWidth - 24);
+      const height = panel.current?.offsetHeight ?? 240;
+      const left = Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12));
+      const above = anchor.bottom + height + 22 > window.innerHeight && anchor.top > height + 22;
+      setPosition({ left, top: above ? anchor.top - height - 10 : anchor.bottom + 10, arrow: Math.max(14, Math.min(width - 14, anchor.left + anchor.width / 2 - left)), above });
+    }
+    trigger.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    place();
+    panel.current?.focus({ preventScroll: true });
+    function outside(event: PointerEvent) { if (!panel.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) close(); }
+    function escape(event: KeyboardEvent) { if (event.key === 'Escape') { event.preventDefault(); close(true); } }
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  return <>
+    <button ref={trigger} type="button" className="mode-info" aria-label={`About ${name}`} aria-expanded={open} aria-controls={open ? id : undefined} aria-haspopup="dialog" onClick={() => setOpen(value => !value)}><span aria-hidden>i</span></button>
+    {open && createPortal(<div ref={panel} id={id} role="dialog" aria-label={`About ${name}`} tabIndex={-1} className={`mode-tip${position.above ? ' is-above' : ''}`} style={{ left: position.left, top: position.top, '--tip-arrow': `${position.arrow}px` } as CSSProperties}>
+      <div className="mode-tip-head"><strong>{name}</strong><button type="button" aria-label="Close mode information" onClick={() => close(true)}>×</button></div>
+      <p>{EXPLANATIONS[mode]}</p>
+      <dl><div><dt>Ticket odds</dt><dd>{mode === 'OVER15_MACHINE' ? 'Up to 10 tickets at 4–6' : mode === 'GOALS_DESK_V2' ? 'Up to 10 · O1.5 lane: 3–5 · O2.5: 4–6' : mode === 'GGSP_V11' ? 'Up to 10 tickets at 3–4' : mode === 'INVESTOR' ? 'Mixed targets: 3, 4, 5, 6' : `${MODE_ODDS[mode].minimum}–${MODE_ODDS[mode].maximum ?? 'no maximum'}`}</dd></div><div><dt>Each selection</dt><dd>{mode === 'INVESTOR' || mode === 'GAMBLER' ? '1.10–1.35 · corners / shots / 1·over / 2·over ≤1.45' : `${MODE_SELECTION_ODDS[mode].minimum}–${MODE_SELECTION_ODDS[mode].maximum}`}</dd></div></dl>
+      <a href={`/terms#${termsHash}`} target="_blank" rel="noopener noreferrer">Learn more <span aria-hidden>↗</span><span className="sr-only"> about {name} (opens in a new tab)</span></a>
+    </div>, document.body)}
+  </>;
+}

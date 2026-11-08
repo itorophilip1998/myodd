@@ -6,12 +6,20 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
-RUN pnpm install --frozen-lockfile
+# Prisma engine downloads can reset on a slow network; retry before failing the image.
+RUN for attempt in 1 2 3; do \
+      pnpm install --frozen-lockfile && break; \
+      echo "pnpm install failed (attempt ${attempt}); retrying…"; \
+      sleep $((attempt * 15)); \
+      test "$attempt" -lt 3 || exit 1; \
+    done
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 RUN pnpm --filter @myodd/shared build
 
 FROM base AS api
+ARG APP_GIT_SHA=local
+ENV APP_GIT_SHA=$APP_GIT_SHA
 COPY apps/api ./apps/api
 RUN pnpm --filter @myodd/api build
 WORKDIR /app/apps/api
@@ -19,8 +27,17 @@ EXPOSE 3001
 CMD ["node", "dist/main.js"]
 
 FROM base AS web
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL=
+ARG API_PROXY_TARGET=http://api:3001
+ARG NEXT_PUBLIC_APP_GIT_SHA=local
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=
+ARG NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED=false
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    API_PROXY_TARGET=$API_PROXY_TARGET \
+    NEXT_PUBLIC_APP_GIT_SHA=$NEXT_PUBLIC_APP_GIT_SHA \
+    NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID \
+    NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED=$NEXT_PUBLIC_GA_MANUAL_EVENTS_CONFIRMED \
+    NEXT_TELEMETRY_DISABLED=1
 COPY apps/web ./apps/web
 RUN pnpm --filter @myodd/web build
 WORKDIR /app/apps/web

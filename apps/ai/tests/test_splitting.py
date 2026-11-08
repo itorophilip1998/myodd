@@ -1,6 +1,6 @@
 import unittest
 from app.schemas import Config, Selection
-from app.splitting import split_report
+from app.tools.splitting import split_report
 from test_flexible_generation import selection
 
 class SplittingTests(unittest.TestCase):
@@ -37,10 +37,10 @@ class SplittingTests(unittest.TestCase):
         result = split_report(self.pool[:10], self.config.model_copy(update={'minimumSelections': 3}), self.original[:10], 3)
         self.assertEqual(sorted(len(c['selections']) for c in result['candidates']), [3, 3, 4])
 
-    def test_mode_band_can_make_unequal_sizes_without_replacing_picks(self):
-        pool = [selection(i, odds) for i, odds in enumerate([9, 1.2, 1.3, 1.4, 1.2, 1.3, 1.4, 1.2])]
+    def test_mode_band_skips_original_picks_outside_the_selection_odds_limit(self):
+        pool = [selection(i, odds) for i, odds in enumerate([9, 1.2, 1.3, 1.35, 1.2, 1.3, 1.35, 1.2])]
         original = [Selection(**s.model_dump()) for s in pool]
         result = split_report(pool, self.config.model_copy(update={'minimumOdds': 1, 'maximumOdds': 10, 'riskMode': 'INVESTOR'}), original, 3)
         self.assertEqual(len(result['candidates']), 3)
         self.assertTrue(all(c['totalOdds'] <= 10 for c in result['candidates']))
-        self.assertEqual(sum(len(c['selections']) for c in result['candidates']), 8)
+        self.assertEqual(sum(len(c['selections']) for c in result['candidates']), 7)

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { SPORTYBET_MARKET_IDS } from '@myodd/shared';
+import { listingMarketIdsForMode, SPORTYBET_MARKET_IDS, systemFixture } from '@myodd/shared';
 import type {
   LiveFixture,
   BookmakerBooking,
@@ -45,11 +45,17 @@ export class SportyBetProvider implements BookmakerProvider {
       const results = await Promise.allSettled(ids.map(async eventId => {
         const data = await this.client.get<Parameters<typeof mapEvent>[0]>(
           `/api/${region}/factsCenter/event?eventId=${encodeURIComponent(eventId)}`,
-          { cacheKey: `sporty:event:${region}:${eventId}` },
+          { cacheKey: query.fresh ? undefined : `sporty:event:${region}:${eventId}`, retries: 0, minIntervalMs: ids.length > 15 ? 40 : undefined },
         );
-        return mapEvent(data);
+        const fixture = mapEvent(data);
+        return query.systemOnly ? systemFixture(fixture, query.systemMode) : fixture;
       }));
       const fixtures = results.filter((result): result is PromiseFulfilledResult<BookmakerFixture> => result.status === 'fulfilled').map(result => result.value);
+      const missing = ids.filter(id => !fixtures.some(fixture => fixture.eventId === id));
+      if (missing.length) {
+        const listed = await this.lookupListedEvents(missing, query);
+        fixtures.push(...listed);
+      }
       if (ids.length && !fixtures.length) throw (results[0] as PromiseRejectedResult).reason;
       return fixtures;
     }
@@ -73,8 +79,32 @@ export class SportyBetProvider implements BookmakerProvider {
     const data = await this.client.get<{
       totalNum?: number;
       tournaments?: unknown[];
-    }>(path, { cacheKey });
-    return mapFixtures(data as never);
+    }>(path, { cacheKey: query.fresh ? undefined : cacheKey });
+    const fixtures = mapFixtures(data as never);
+    return query.systemOnly ? fixtures.map(f => systemFixture(f, query.systemMode)) : fixtures;
+  }
+
+  private async lookupListedEvents(eventIds: string[], query: FixturesQuery): Promise<BookmakerFixture[]> {
+    const wanted = new Set(eventIds);
+    const found = new Map<string, BookmakerFixture>();
+    const marketIds = query.systemOnly ? listingMarketIdsForMode(query.systemMode) : query.marketIds;
+    for (let pageNum = 1; pageNum <= 20 && found.size < wanted.size; pageNum += 1) {
+      const page = await this.getFixtures({
+        pageNum,
+        pageSize: 100,
+        todayGames: false,
+        timelineHours: query.timelineHours ?? 168,
+        marketIds,
+        systemOnly: query.systemOnly,
+        systemMode: query.systemMode,
+        fresh: query.fresh,
+      });
+      for (const fixture of page) {
+        if (wanted.has(fixture.eventId)) found.set(fixture.eventId, fixture);
+      }
+      if (page.length < 100) break;
+    }
+    return [...found.values()];
   }
 
   async getMarkets(eventId: string): Promise<BookmakerMarket[]> {

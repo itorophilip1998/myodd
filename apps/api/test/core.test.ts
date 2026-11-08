@@ -48,6 +48,32 @@ describe('fresh bookmaker validation', () => {
   it('accepts active, future selections meeting all filters', async () => {
     expect(await validator.validate([selection], config, [fixture])).toHaveLength(1);
   });
+  it('accepts Goals Desk soft-floor tickets below the hard 3.0 mode band', async () => {
+    const o15 = {
+      eventId: 'gd1', marketId: '18', outcomeId: '12', specifier: 'total=1.5', odds: 1.2,
+      supportedMarket: SupportedMarket.OVER_1_5, probability: 0.8, confidence: 80, modelVersion: 'goals-desk',
+      homeTeam: 'Home', awayTeam: 'Away', kickoffAt: '2099-01-01T12:00:00Z', selectionName: 'Over 1.5', marketName: 'Over/Under',
+    };
+    const legs = [1, 2, 3, 4].map(i => ({ ...o15, eventId: `gd${i}`, homeTeam: `H${i}`, awayTeam: `A${i}` }));
+    const fixtures = legs.map(leg => ({
+      eventId: leg.eventId, homeTeam: leg.homeTeam, awayTeam: leg.awayTeam, kickoffAt: leg.kickoffAt, matchStatus: 'Not started',
+      markets: [{ marketId: '18', marketName: 'Over/Under', specifier: 'total=1.5', status: '', outcomes: [{ outcomeId: '12', outcomeName: 'Over 1.5', odds: 1.2, isActive: true }] }],
+    }));
+    // 1.2^4 = 2.0736 — AI soft-floor lowers minimumOdds; must not be dropped by MODE_ODDS floor 3.
+    const soft = {
+      ...config,
+      riskMode: 'GOALS_DESK_V2',
+      minimumOdds: 2.0,
+      maximumOdds: 5,
+      minimumSelections: 1,
+      maximumSelections: 8,
+      markets: [SupportedMarket.OVER_1_5],
+      preserveOriginalSelections: false,
+    };
+    expect(await validator.validate(legs as any, soft as any, fixtures as any)).toHaveLength(4);
+    // Hard band still enforced when config.minimumOdds stays at 3.
+    expect(await validator.validate(legs as any, { ...soft, minimumOdds: 3 } as any, fixtures as any)).toBeNull();
+  });
 });
 
 it('maps booking selections and combined odds', () => {
