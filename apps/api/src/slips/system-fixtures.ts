@@ -50,7 +50,7 @@ export class SystemFixtureLoader {
     for (let pageNum = 1; pageNum <= MAX_PAGES && !ended; pageNum += 1) {
       if (onProgress) await onProgress(`Loading games, page ${pageNum}`);
       try {
-        const systemMode = mode === 'OVER15_MACHINE' || mode === 'GOALS_DESK_V2' || mode === 'GGSP_V11' || mode === 'GAMBLER' || mode === 'STATSMAN' ? mode : 'INVESTOR';
+        const systemMode = mode === 'OVER15_MACHINE' || mode === 'GOALS_DESK_V2' || mode === 'GGSP_V11' || mode === 'GAMBLER' ? mode : 'INVESTOR';
         const page = await this.provider.getFixtures({
           pageNum, pageSize: PAGE_SIZE, timelineHours, todayGames: false,
           marketIds, systemOnly: true, systemMode,

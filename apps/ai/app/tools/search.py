@@ -4,6 +4,13 @@ import random
 import re
 
 from .selections import event_choices, fingerprint, match_key, matches_preference, selection_key, unique_ticket
+from .statsman_picks import (
+    STATSMAN_ENGINE_MODES,
+    is_excluded_goals_leg,
+    is_statsman_count_leg,
+    is_statsman_goals_leg,
+    statsman_search_boost,
+)
 
 
 def varied_candidates(candidates, config, rng, limit, ceiling, repeatable=(), unique_matches=False):
@@ -45,7 +52,6 @@ def varied_candidates(candidates, config, rng, limit, ceiling, repeatable=(), un
 
 
 INVESTOR_PLAN = ((3.0, 3), (4.0, 3), (5.0, 2), (6.0, 2))
-STATSMAN_PLAN = INVESTOR_PLAN
 # Week-range Over 1.5 Machine: fill across 4–6 (no near-2 shortfall band).
 OVER15_PLAN = ((4.0, 4), (5.0, 4), (6.0, 2))
 # Goals Desk: O1.5 lane (O1.5 + Asian O2) at 3–5; O2.5 lane at 4–6. Never mix the two lanes.
@@ -71,7 +77,7 @@ def uses_system_plan(config) -> bool:
         return (config.minimumOdds, config.maximumOdds) == GOALS_DESK_ODDS
     if config.riskMode == 'GGSP_V11':
         return (config.minimumOdds, config.maximumOdds) == GGSP_ODDS
-    if config.riskMode in ('INVESTOR', 'STATSMAN'):
+    if config.riskMode == 'INVESTOR':
         return (config.minimumOdds, config.maximumOdds) == (3, 6)
     if config.riskMode == 'GAMBLER':
         return (config.minimumOdds, config.maximumOdds) == (6.1, 20)
@@ -87,7 +93,7 @@ def mode_plan(config):
         return GOALS_DESK_PLAN
     if config.riskMode == 'GGSP_V11':
         return GGSP_PLAN
-    return STATSMAN_PLAN if config.riskMode == 'STATSMAN' else INVESTOR_PLAN
+    return INVESTOR_PLAN
 
 
 def _unique_matches_for(config) -> bool:
@@ -258,7 +264,7 @@ def search_system_plan(pool, config, original, rng=None):
         })
         tickets, possible = search(
             remaining_pool, scoped, original, rng=rng, blocked=blocked, steer=True,
-            attempt_limit=12000, unique_matches=unique_matches,
+            attempt_limit=16000, unique_matches=unique_matches,
         )
         if possible:
             bounds = possible
@@ -266,6 +272,22 @@ def search_system_plan(pool, config, original, rng=None):
         for ticket in tickets:
             blocked.update(selection_key(s) for s in ticket['selections'])
             used_matches.update(match_key(s) for s in ticket['selections'])
+    # Investor: if 5–6 bands thin out, backfill remaining slips in the 3–4 band.
+    if config.riskMode == 'INVESTOR' and len(found) < config.numberOfSlips:
+        need = config.numberOfSlips - len(found)
+        scoped = config.model_copy(update={
+            'numberOfSlips': need, 'minimumOdds': 3.0, 'maximumOdds': 4.5,
+            'minimumSelections': 1, 'maximumSelections': 50,
+        })
+        extra, possible = search(
+            remaining_pool, scoped, original, rng=rng, blocked=blocked, steer=True,
+            attempt_limit=16000, unique_matches=unique_matches,
+        )
+        if possible:
+            bounds = possible
+        found.extend(extra)
+        for ticket in extra:
+            blocked.update(selection_key(s) for s in ticket['selections'])
     return found, bounds
 
 
@@ -305,9 +327,16 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
         'VERY_LOW': (4.5, 0, .85), 'LOWER': (2, 0, .15), 'MODERATE': (1, .4, 0),
         'HIGHER': (.7, 1.15, -.05), 'VERY_HIGH': (.35, 1.6, -.15),
     }[config.riskPreference]
-    weights = {event: [max(.001, s.probability) ** exponent
-                       * (5 if matches_preference(s, config) else 1) for s in options]
-               for event, options in events.items()}
+    statsman_mode = config.riskMode in STATSMAN_ENGINE_MODES
+    weights = {
+        event: [
+            max(.001, s.probability) ** exponent
+            * (5 if matches_preference(s, config) else 1)
+            * (statsman_search_boost(s) if statsman_mode else 1.0)
+            for s in options
+        ]
+        for event, options in events.items()
+    }
     if not allow_nearest and (upper_bound < config.minimumOdds or (config.maximumOdds is not None and lower_bound > config.maximumOdds + .005)):
         return [], {'minimum': round(lower_bound, 2), 'maximum': round(min(upper_bound, 1e12), 2)}
     attempts = attempt_limit if attempt_limit is not None else min(12000, max(900, config.numberOfSlips * 100))
@@ -333,15 +362,65 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
                 if not choices:
                     break
             remaining = legs - index
-            if steer or attempt % 4 in (1, 2):
+            # ~28% of legs: force shots/SOT only (not corners/bookings) so goals stay primary.
+            shots_choices = [
+                s for s in choices
+                if is_statsman_count_leg(s) and re.search(r'\bshots?\b', f'{s.marketName} {s.selectionName}', re.I)
+            ] if statsman_mode else []
+            force_shots = bool(shots_choices) and rng.random() < 0.28
+            if force_shots:
+                cw = [max(.001, s.probability) ** exponent * statsman_search_boost(s) for s in shots_choices]
+                selection = rng.choices(shots_choices, weights=cw)[0]
+            elif steer or attempt % 4 in (1, 2):
                 target = (target_log - log_odds) / remaining
-                ordering = sorted(choices, key=lambda s: abs(math.log(s.odds) - target)
-                                  + (0 if matches_preference(s, config) else .12))[:min(6, len(choices))]
+                pool = choices
+                if statsman_mode and any(is_statsman_goals_leg(s) for s in pool):
+                    # Drop excluded + demote corners/cards out of the steer shortlist when goals exist.
+                    trimmed = [
+                        s for s in pool
+                        if not is_excluded_goals_leg(s)
+                        and not (
+                            is_statsman_count_leg(s)
+                            and not re.search(r'\bshots?\b', f'{s.marketName} {s.selectionName}', re.I)
+                        )
+                    ]
+                    # Keep high-map shots/SOT (≥84%) beside goals; drop soft corners/bookings.
+                    if not trimmed:
+                        trimmed = [s for s in pool if not is_excluded_goals_leg(s)]
+                    if trimmed:
+                        pool = trimmed
+
+                def _steer_pen(s):
+                    if matches_preference(s, config):
+                        pref = 0.0
+                    else:
+                        pref = 0.12
+                    if statsman_mode and is_excluded_goals_leg(s):
+                        return pref + 0.65
+                    name = f'{s.marketName} {s.selectionName}'.casefold()
+                    if statsman_mode and is_statsman_count_leg(s) and not re.search(r'\bshots?\b', name):
+                        return pref + 0.35  # corners / bookings behind goals
+                    if not statsman_mode or is_statsman_goals_leg(s) or (
+                        is_statsman_count_leg(s) and s.probability >= 0.84
+                    ):
+                        path = 0.0
+                    else:
+                        path = 0.08
+                    return pref + path
+
+                ordering = sorted(
+                    pool,
+                    key=lambda s: abs(math.log(s.odds) - target) + _steer_pen(s),
+                )[:min(6, len(pool))]
                 selection = ordering[0] if steer and attempt % 3 != 0 else rng.choice(ordering)
             elif choices is events[event]:
                 selection = rng.choices(choices, weights=weights[event])[0]
             else:
-                selection = rng.choice(choices)
+                # Filtered choice list — rebuild weights for this subset.
+                sw = [max(.001, s.probability) ** exponent
+                      * (5 if matches_preference(s, config) else 1)
+                      * (statsman_search_boost(s) if statsman_mode else 1.0) for s in choices]
+                selection = rng.choices(choices, weights=sw)[0]
             picked.append(selection)
             log_odds += math.log(selection.odds)
         if len(picked) != legs or not unique_ticket(picked):
@@ -361,11 +440,18 @@ def search(pool, config, original, allow_nearest=False, rng=None, blocked=(), st
         volatility = sum(math.log(s.odds) ** 2 for s in picked) / legs
         preference_count = sum(matches_preference(s, config) for s in picked)
         original_count = sum(s.eventId in original_ids for s in picked)
-        ranking = joint_log + appetite * math.log(odds) - penalty * volatility
+        goals_legs = sum(1 for s in picked if is_statsman_goals_leg(s)) if statsman_mode else 0
+        excluded_legs = sum(1 for s in picked if is_excluded_goals_leg(s)) if statsman_mode else 0
+        # Prefer real goals-path legs; crush tickets that leaned on excluded/exact goals.
+        ranking = (
+            joint_log + appetite * math.log(odds) - penalty * volatility
+            + (0.10 * goals_legs if statsman_mode else 0)
+            - (1.25 * excluded_legs if statsman_mode else 0)
+        )
         candidate = {'selections': [s.model_dump(mode='json') for s in picked],
                      'totalOdds': round(odds, 2), 'slipScore': round(math.exp(joint_log) * 100, 8),
                      'fingerprint': key, '_rank': ranking, '_preferred': preference_count / legs,
-                     '_original': original_count / legs}
+                     '_original': original_count / legs, '_goals': goals_legs / legs if legs else 0}
         if within:
             results[key] = candidate
             if steer and attempt >= 300 and attempt % 50 == 0 and len(results) >= max(32, config.numberOfSlips * 16):

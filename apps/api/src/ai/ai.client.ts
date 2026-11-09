@@ -149,7 +149,6 @@ export class AiClient {
         GGSP_V11: 'ggsp-v11',
         INVESTOR: 'investor',
         GAMBLER: 'gambler',
-        STATSMAN: 'statsman',
         JAPA: 'japa',
         LAGOS_LIFE: 'lagos-life',
       }[config.riskMode]

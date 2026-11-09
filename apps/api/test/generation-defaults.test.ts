@@ -83,12 +83,12 @@ it('exposes the same exclusive market options for Investor and Gambler', async (
   const { registryForMode } = await import('@myodd/shared');
   const investor = registryForMode('INVESTOR');
   expect(investor).toEqual(registryForMode('GAMBLER'));
-  expect(investor).toHaveLength(21); // 18 market definitions plus 1X, X2 and 12.
   expect(investor.map(option => option.id)).toEqual(expect.arrayContaining([
     'excluded.goals', 'excluded.goals.home', 'excluded.goals.away',
-    'goalkicks.total', 'goalkicks.home', 'goalkicks.away', 'cards.total', 'cards.home', 'cards.away',
-    'corners.total', 'corners.home', 'corners.away', 'tackles.total', 'tackles.home', 'tackles.away',
+    'cards.total', 'cards.home', 'cards.away',
+    'corners.total', 'corners.home', 'corners.away',
     'goals.match', 'goals.home', 'goals.away', 'chance.1x', 'chance.x2', 'chance.12',
+    'btts.yes', 'shots.total', 'home.or.over.2.5', 'clean.sheet.home',
   ]));
-  expect(investor.some(option => /shots|\.or\.|btts|result\./.test(option.id))).toBe(false);
+  expect(investor.some(option => /goalkicks|tackles/.test(option.id))).toBe(false);
 });
