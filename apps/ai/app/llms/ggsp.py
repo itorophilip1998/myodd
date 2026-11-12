@@ -12,6 +12,7 @@ import re
 import unicodedata
 
 from app.llms.ggsp_aliases import expand_team_name
+from app.llms.national_tournaments import is_national_team_tournament
 
 SYSTEM_SHORT = 'GGSP'
 VERSION = '1.1'
@@ -123,11 +124,16 @@ def _blob(country: str = '', competition: str = '') -> str:
 
 
 def is_hard_skip_league(country: str = '', competition: str = '') -> bool:
+    # Country HARD skips target weak domestic books — not senior national tournaments.
+    if is_national_team_tournament(competition, country):
+        return False
     blob = _blob(country, competition)
     return any(re.search(p, blob) for p in HARD_SKIP_PATTERNS)
 
 
 def is_soft_skip_league(country: str = '', competition: str = '') -> bool:
+    if is_national_team_tournament(competition, country):
+        return False
     if is_hard_skip_league(country, competition):
         return False
     blob = _blob(country, competition)
@@ -146,6 +152,7 @@ def is_clean_select(
 
     Prefer passing SportyBet categoryName as `category` and tournament name as `league`
     so country-dependent HARD/SOFT patterns match football-simulator.
+    National-team tournaments always clear the league gate (cipher still applies).
     """
     _, _, tier = classify_combo(home, away)
     if tier != 'CLEAN_7_8':

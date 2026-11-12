@@ -30,7 +30,7 @@ A target window is at most ±0.10 and is clipped to the mode band: a ticket near
 
 Both prompts contain this list. Runtime also admits Statsman markets (BTTS, shots, team Over 0.5, clean sheet, 1/over, either half). **Tackles and goal kicks are never ticketed.**
 
-**Statsman** ranks every eligible market (Elo + decayed A/D; cards from yellows/reds). Gates: goals/DC ≥76%, count markets ≥76%, exact/excluded ≥42%, side 58–65% → team O0.5 / opponent CS No, side ≥70% → team O1.5, side ≥80% → Sporty 2UP (not plain 1X2), side ≥66% → 1/over (map ≥70%) or either half. Uncovered fixtures are skipped.
+**Statsman** ranks every eligible market (Elo + decayed A/D; cards from yellows/reds). Gates: goals/DC ≥76%, count markets ≥76%, exact/excluded ≥42%, side 58–65% → team O0.5 / opponent CS No, side ≥70% → team O1.5, side ≥80% → Sporty 2UP (not plain 1X2), side ≥66% → 1/over (map ≥70%) or either half. Uncovered leagues may still pass goals/count/exact when Sporty implied odds clear the floor; side-band markets need covered form. **National-team tournaments** (World Cup, Euro, Copa, AFCON, Asian Cup, Gold Cup, Nations Leagues, qualifiers, Olympics, etc.) use `intl.csv` Elo for Investor/Gambler — friendlies stay uncovered. UCL stays on its own club book. Over 1.5 Machine, Goals Desk, and GGSP also keep these tournaments in pool (GGSP country HARD/SOFT skips apply to domestic books only, not senior internationals).
 
 The same pick (event, market, outcome, line) is used at most once in a collection. A fixture may recur with a different option. Insufficient eligible selections can reduce the ticket count.
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 from app.llms.ggsp import classify_combo, is_clean_select
+from app.llms.national_tournaments import is_national_team_tournament
 from app.schemas import Market, ScoredSelection
 
 MAX_LEG_ODDS = 1.30
@@ -143,12 +144,16 @@ def _filter_ggsp(pool: list[ScoredSelection], *, allow_soft: bool) -> list[Score
             continue
         tot, root, tier = classify_combo(sample.homeTeam, sample.awayTeam)
         # Mid-band legs (~1.25) fill more unique-match tickets than ultra-short favourites.
-        league_blob = f'{getattr(sample, "categoryName", "") or ""} {sample.league or ""}'.casefold()
-        uefa = bool(re.search(r'europa|conference|uefa', league_blob))
+        category = getattr(sample, 'categoryName', '') or ''
+        league_blob = f'{category} {sample.league or ""}'.casefold()
+        intl = is_national_team_tournament(sample.league or '', category)
+        uefa_club = bool(re.search(r'europa|conference|champions', league_blob)) and not intl
         odds_fit = max(0.0, 14.0 - abs(pick.odds - SWEET_LEG_ODDS) * 70)
         confidence = min(
             92.0,
-            68.0 + (8 - abs(root - 7.5)) * 4 + odds_fit + (3.5 if uefa else 0.0),
+            68.0 + (8 - abs(root - 7.5)) * 4 + odds_fit
+            + (3.5 if uefa_club else 0.0)
+            + (3.0 if intl else 0.0),
         )
         line_tag = 'asian2' if abs((_line(pick.specifier, pick.selectionName) or 0) - ASIAN_LINE) < 1e-6 else 'o15'
         soft_tag = '-soft' if allow_soft else ''
