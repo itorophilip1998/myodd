@@ -100,6 +100,54 @@ class StatsmanEngineTests(unittest.TestCase):
         self.assertEqual(self.engine.resolve_league('Brazil Serie A'), 'brazil serie a')
         self.assertEqual(self.engine.resolve_league('Italy Serie A'), 'serie a')
 
+    def test_national_team_tournaments_detected_not_friendlies(self):
+        yes = [
+            'UEFA Nations League',
+            'FIFA World Cup',
+            'World Cup Qualification',
+            'UEFA Euro',
+            'European Championship',
+            'Copa America',
+            'Africa Cup of Nations',
+            'AFCON',
+            'AFC Asian Cup',
+            'CONCACAF Gold Cup',
+            'Olympic Football',
+        ]
+        no = [
+            'International Friendly',
+            'Friendlies',
+            'UEFA Champions League',
+            'UEFA Europa League',
+            'England - Premier League',
+            'Championship',  # EFL
+            'U21 Euro',
+            'FIFA U20 World Cup',
+        ]
+        for league in yes:
+            with self.subTest(league=league):
+                self.assertTrue(self.engine.is_national_team_tournament(league), league)
+                self.assertFalse(self.engine.is_friendly(league), league)
+        for league in no:
+            with self.subTest(league=league):
+                self.assertFalse(self.engine.is_national_team_tournament(league), league)
+
+    def test_european_championship_not_efl_championship(self):
+        self.assertIsNone(self.engine.resolve_league('European Championship'))
+        self.assertEqual(self.engine.resolve_league('Championship'), 'championship')
+        self.assertEqual(self.engine.resolve_league('England - Championship'), 'championship')
+
+    def test_intl_prices_known_nations(self):
+        if 'intl' not in self.engine.train:
+            self.skipTest('intl.csv missing')
+        fc = self.engine.price('France', 'Italy', 'UEFA Nations League')
+        self.assertTrue(fc.covered)
+        self.assertTrue(fc.league_key.startswith('intl:'))
+        self.assertGreater(fc.o15, 0.45)
+        friendly = self.engine.price('France', 'Italy', 'International Friendly')
+        self.assertFalse(friendly.covered)
+        self.assertEqual(friendly.league_key, 'friendly')
+
 
 class StatsmanPickTests(unittest.TestCase):
     def test_goals_require_76(self):
@@ -112,6 +160,26 @@ class StatsmanPickTests(unittest.TestCase):
         )
         self.assertTrue(keep_statsman_pick(selection(confidence=80), fc))
         self.assertFalse(keep_statsman_pick(selection(confidence=70), fc))
+
+    def test_uncovered_goals_use_book_implied(self):
+        fc = Forecast(
+            ph=.45, pd=.26, pa=.29, lam=1.35, mu=1.15, o15=.70, o25=.48, btts=.52,
+            home_scores=.72, away_scores=.68, home_or_o25=.70, away_or_o25=.62,
+            home_either_half=.55, away_either_half=.48,
+            corners_lam=5, corners_mu=4, shots_lam=12, shots_mu=10, sot_lam=4, sot_mu=3,
+            league_key='', covered=False,
+        )
+        # Short O1.5 → book implied ≥76% even without CSV coverage.
+        short = selection(confidence=70, odds=1.20, probability=.70)
+        self.assertTrue(keep_statsman_pick(short, fc))
+        long = selection(confidence=70, odds=1.35, probability=.70)
+        self.assertFalse(keep_statsman_pick(long, fc))
+        # Side-band markets stay off when uncovered.
+        over05 = selection(
+            marketId='19', marketName='Home team total goals', selectionName='Over 0.5',
+            specifier='total=0.5', supportedMarket=Market.OTHER, confidence=80, odds=1.20,
+        )
+        self.assertFalse(keep_statsman_pick(over05, fc))
 
     def test_side_band_to_score_uses_over_05_or_clean_sheet(self):
         fc = Forecast(
@@ -388,13 +456,22 @@ class StatsmanPickTests(unittest.TestCase):
             supportedMarket=Market.OTHER, confidence=32, probability=.32,
         ), fc))
 
-    def test_filter_drops_uncovered(self):
+    def test_filter_uncovered_keeps_short_goals_only(self):
         model = StatsmanModel(DATA) if (DATA / 'E0.csv').exists() else None
         if model is None:
             self.skipTest('no data')
-        pool = [selection(homeTeam='Unknown FC', awayTeam='Ghost Utd', league='Fantasy League', confidence=90)]
-        kept = apply_statsman_ticket_filter(pool, model)
-        self.assertEqual(kept, [])
+        # Long-priced O1.5 on uncovered league → book implied under floor → drop.
+        long = selection(
+            homeTeam='Unknown FC', awayTeam='Ghost Utd', league='Fantasy League',
+            confidence=90, odds=1.50, probability=.90,
+        )
+        # Short O1.5 on uncovered league → keep via book implied.
+        short = selection(
+            homeTeam='Unknown FC', awayTeam='Ghost Utd', league='Fantasy League',
+            confidence=90, odds=1.18, probability=.90,
+        )
+        kept = apply_statsman_ticket_filter([long, short], model)
+        self.assertEqual([s.odds for s in kept], [1.18])
 
     def test_exclusive_list_markets_use_statsman_probabilities(self):
         model = StatsmanModel(DATA) if (DATA / 'E0.csv').exists() else None

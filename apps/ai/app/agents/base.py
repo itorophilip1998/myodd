@@ -127,7 +127,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals/DC≥76%; team O0.5 at 58–65% fav; team O1.5 at ≥70% fav; 2UP at ≥80% fav; 1·over at ≥66% fav + map≥70%; WEH at ≥66% fav; corners/shots/cards≥76%; excluded≥42% rare).',
+                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals/DC≥76%; team O0.5 at 58–65% fav; team O1.5 at ≥70% fav; 2UP at ≥80% fav; 1·over at ≥66% fav + map≥70%; WEH at ≥66% fav; corners/shots/cards≥76%; excluded≥42% rare; uncovered leagues use book-implied goals/count).',
                 ],
             })
         report = await loop.run_in_executor(runtime.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)

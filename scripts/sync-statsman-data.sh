@@ -17,3 +17,5 @@ for f in DNK SWE NOR USA BRA POL ROU; do
 done
 # UCL form: openfootball seasons + ESPN finished Champions League games
 STATSMAN_DATA_DIR="$OUT" python3 "$ROOT/scripts/sync-statsman-ucl.py"
+# National-team tournaments (no friendlies): openfootball/internationals ≥2021
+STATSMAN_DATA_DIR="$OUT" python3 "$ROOT/scripts/sync-statsman-intl.py"

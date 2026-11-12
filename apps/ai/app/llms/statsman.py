@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.llms.national_tournaments import is_friendly, is_national_team_tournament
+
 HA = 40.0
 HALF_LIFE = 21.0
 SHRINK = 8.0
@@ -225,6 +227,46 @@ TEAM_ALIASES = {
 
 # Blend weight for UEFA Champions League: UCL form vs domestic form.
 UCL_FORM_WEIGHT = 0.50
+# Mild home edge for national-team tournaments (often semi-neutral venues).
+INTL_HA = 15.0
+
+# Sporty / openfootball national-team name bridges.
+INTL_TEAM_ALIASES = {
+    'usa': 'united states',
+    'usmnt': 'united states',
+    'united states of america': 'united states',
+    'south korea': 'korea republic',
+    'korea': 'korea republic',
+    'north korea': 'korea dpr',
+    'korea dpr': 'korea dpr',
+    'ivory coast': "côte d'ivoire",
+    "cote d'ivoire": "côte d'ivoire",
+    'turkiye': 'turkey',
+    'türkiye': 'turkey',
+    'holland': 'netherlands',
+    'republic of ireland': 'republic of ireland',
+    'rep of ireland': 'republic of ireland',
+    'ireland republic': 'republic of ireland',
+    'bosnia': 'bosnia and herzegovina',
+    'bosnia herzegovina': 'bosnia and herzegovina',
+    'bosnia-herzegovina': 'bosnia and herzegovina',
+    'czech republic': 'czech republic',
+    'czechia': 'czech republic',
+    'north macedonia': 'north macedonia',
+    'fyrom': 'north macedonia',
+    'congo dr': 'dr congo',
+    'dr congo': 'dr congo',
+    'democratic republic of the congo': 'dr congo',
+    'congo': 'congo',
+    'uae': 'united arab emirates',
+    'saudi arabia': 'saudi arabia',
+    'ksa': 'saudi arabia',
+    'china pr': 'china',
+    'chinese taipei': 'chinese taipei',
+    'hong kong': 'hong kong',
+    'cape verde': 'cape verde',
+    'cabo verde': 'cape verde',
+}
 
 # Dropped from SportyBet labels when matching football-data short clubs.
 _TEAM_NOISE = re.compile(
@@ -291,7 +333,8 @@ def _canon(name: str) -> str:
     key = ' '.join(name.casefold().split())
     key = key.replace('&', ' and ')
     key = re.sub(r'\s+', ' ', key).strip()
-    return TEAM_ALIASES.get(key, key)
+    key = TEAM_ALIASES.get(key, key)
+    return INTL_TEAM_ALIASES.get(key, key)
 
 
 def resolve_team(name: str, known: set[str]) -> str | None:
@@ -461,12 +504,22 @@ class StatsmanEngine:
             self.train['ucl'] = ucl_rows
             self.elo['ucl'] = self._fit_elo(ucl_rows)
             self.known['ucl'] = {m.h for m in ucl_rows} | {m.a for m in ucl_rows}
+        intl_rows = self._load_csv(self.data_dir / 'intl.csv')
+        if intl_rows:
+            # Mild home advantage for national sides (many games on neutral ground).
+            self.train['intl'] = intl_rows
+            self.elo['intl'] = self._fit_elo_ha(intl_rows, home_advantage=INTL_HA)
+            self.known['intl'] = {m.h for m in intl_rows} | {m.a for m in intl_rows}
 
     @staticmethod
     def _fit_elo(ms: list[MatchRow]) -> dict[str, float]:
+        return StatsmanEngine._fit_elo_ha(ms, home_advantage=HA)
+
+    @staticmethod
+    def _fit_elo_ha(ms: list[MatchRow], home_advantage: float) -> dict[str, float]:
         R: dict[str, float] = defaultdict(lambda: 1500.0)
         for m in sorted(ms, key=lambda x: (x.d, x.h)):
-            eh = 1 / (1 + 10 ** (-((R[m.h] + HA) - R[m.a]) / 400))
+            eh = 1 / (1 + 10 ** (-((R[m.h] + home_advantage) - R[m.a]) / 400))
             s = 1.0 if m.hs > m.as_ else 0.5 if m.hs == m.as_ else 0.0
             R[m.h] += 20 * (s - eh)
             R[m.a] += 20 * ((1 - s) - (1 - eh))
@@ -479,14 +532,26 @@ class StatsmanEngine:
 
     def resolve_league(self, league: str) -> str | None:
         text = self._league_text(league)
+        # National-team tournaments are priced via intl.csv — not domestic books.
+        if is_friendly(league) or is_national_team_tournament(league):
+            return None
         # Cups / youth / reserves are not the domestic league CSVs.
-        if re.search(r'\b(?:cup|trophy|youth|women|u21|u19|u23|reserve|friendl)', text):
+        # Keep "championship" (EFL) — European Championship is handled as national-team.
+        if re.search(r'\b(?:trophy|youth|women|u21|u19|u23|reserve)\b', text):
+            return None
+        if re.search(r'\bcup\b', text) and not re.search(r'\bchampionship\b', text):
             return None
         # Disambiguate Brazil Serie A vs Italy Serie A, Denmark vs Romania Superliga.
+        # Brasileiro Serie B must NOT fall through to Italian "serie b".
+        if re.search(r'\b(?:brazil|brasileir)', text) and re.search(r'serie\s*b\b|s[eé]rie\s*b\b', text):
+            return None
         if 'brazil' in text and 'serie a' in text and 'brazil serie a' in self.train:
             return 'brazil serie a'
         if 'brasileirao' in text and 'brasileirao' in self.train:
             return 'brasileirao'
+        # Lower Portuguese tiers (Liga 3 / Portugal 3) are not Liga Portugal top flight.
+        if re.search(r'liga\s*portugal\s*3|\bportugal\s*3\b|\bliga\s*3\b', text):
+            return None
         if 'denmark' in text and 'superliga' in text and 'denmark superliga' in self.train:
             return 'denmark superliga'
         if 'romania' in text and (
@@ -497,8 +562,15 @@ class StatsmanEngine:
             return 'mls'
         for key in sorted(ALL_LEAGUE_FILES, key=len, reverse=True):
             if key in text and key in self.train:
+                # "European Championship" must never resolve to EFL Championship.
+                if key == 'championship' and re.search(r'european\s+championship|\beuros?\b|\buefa\s+euro\b', text):
+                    continue
                 return key
         return None
+
+    # Re-export for callers/tests that used engine helpers.
+    is_friendly = staticmethod(is_friendly)
+    is_national_team_tournament = staticmethod(is_national_team_tournament)
 
     @staticmethod
     def is_ucl(league: str) -> bool:
@@ -768,9 +840,41 @@ class StatsmanEngine:
             )
         return self._uncovered('ucl')
 
+    def price_intl(self, home: str, away: str) -> Forecast:
+        """Price senior national-team tournament fixtures from intl.csv Elo + goals."""
+        known = self.known.get('intl', set())
+        ms = self.train.get('intl') or []
+        hk = resolve_team(home, known)
+        ak = resolve_team(away, known)
+        if not hk or not ak or not ms:
+            return self._uncovered('intl')
+        R = self.elo['intl']
+        rh, ra = R.get(hk, 1500.0), R.get(ak, 1500.0)
+        p_h = 1 / (1 + 10 ** (-((rh + INTL_HA) - ra) / 400))
+        nd = sum(m.hs == m.as_ for m in ms)
+        na = sum(m.hs < m.as_ for m in ms)
+        split = nd / (nd + na) if (nd + na) else 0.5
+        rem = 1 - p_h
+        ph, pd, pa = p_h, rem * split, rem * (1 - split)
+        lam, mu = self._rate_pair(ms, hk, ak, 'goals')
+        # Count markets are sparse in openfootball — use mild priors scaled by goal intensity.
+        goal_scale = max(0.75, min(1.35, (lam + mu) / 2.5))
+        return self._forecast(
+            ph, pd, pa, lam, mu,
+            5.2 * goal_scale, 4.6 * goal_scale,
+            12.0 * goal_scale, 10.0 * goal_scale,
+            4.2 * goal_scale, 3.6 * goal_scale,
+            f'intl:{hk}/{ak}',
+            cards_lam=2.1, cards_mu=2.0,
+        )
+
     def price(self, home: str, away: str, league: str) -> Forecast:
+        if is_friendly(league):
+            return self._uncovered('friendly')
         if self.is_ucl(league):
             return self.price_ucl(home, away)
+        if is_national_team_tournament(league):
+            return self.price_intl(home, away)
         lg = self.resolve_league(league)
         known = self.known.get(lg or '', set())
         hk = resolve_team(home, known) if lg else None
@@ -1037,7 +1141,7 @@ class StatsmanModel:
                     return 0.5
                 return p_over if over else 1 - p_over
             # Match / team goals O/U (exclusive Investor list + alternate lines; team O0.5 = to-score proxy)
-            if re.search(r'over/under|total(?:\s+goals)?|\bgoals?\b', name) and not re.search(
+            if re.search(r'over/?under|\bo/u\b|total(?:\s+goals)?|\bgoals?\b', name) and not re.search(
                 r'corner|shot|card|kick|tackle|excluded|exact', name
             ):
                 goals_side = resolve_team_goals_side(market.marketName, home_team, away_team) or side

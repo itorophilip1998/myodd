@@ -57,6 +57,15 @@ class GgspV11PolicyTests(unittest.TestCase):
         self.assertTrue(is_clean_select('Zeta', 'Mladost', 'Second League'))  # no country → cannot match HARD
         self.assertFalse(is_clean_select('Ntugasaze', 'Entebbe UPPC', 'Premier League', category='Uganda'))
         self.assertFalse(is_clean_select('Al Jubail', 'Al Sharq', 'Division 2', category='Saudi Arabia'))
+        # Senior national tournaments clear country HARD/SOFT skips (cipher still required).
+        self.assertFalse(is_hard_skip_league('Montenegro', 'UEFA Nations League'))
+        self.assertFalse(is_hard_skip_league('North Macedonia', 'World Cup Qualification'))
+        self.assertFalse(is_hard_skip_league('DR Congo', 'Africa Cup of Nations'))
+        # Domestic Montenegro still blocked; Nations League clears the country HARD skip.
+        self.assertEqual(classify_combo('Portugal', 'Croatia')[2], 'CLEAN_7_8')
+        self.assertTrue(is_clean_select('Portugal', 'Croatia', 'UEFA Nations League', category='Montenegro'))
+        self.assertTrue(is_clean_select('Portugal', 'Croatia', 'UEFA Nations League', category='International'))
+        self.assertTrue(is_clean_select('Germany', 'Hungary', 'European Championship'))
 
     def test_filter_keeps_clean_o15(self):
         kickoff = datetime(2099, 1, 1, 12, 0, tzinfo=timezone.utc)
