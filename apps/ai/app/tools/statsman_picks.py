@@ -9,6 +9,7 @@ Goals (O/U, BTTS, double chance): confidence ≥ 76%
 Corners / shots / SOT / cards: confidence ≥ 76%
 Match shots soft O20.5 / SOT soft O7.5 map ≥ 85% → Sporty line up to +3 (e.g. O21.5–O23.5) allowed
 Exact / excluded goals: confidence ≥ 42% (kept rare — low search priority)
+Uncovered leagues: goals/count/exact may pass on book implied odds (≥ floor); side-band markets need covered form.
 Raw 1X2 is never ticketed — only the mapped markets above.
 Tackles and goal kicks are removed from every mode.
 """
@@ -174,7 +175,10 @@ def _is_goals_market(selection: ScoredSelection) -> bool:
     line = _line(selection.specifier, selection.selectionName)
     if line in {0.5, 1.5} and _resolved_goals_side(selection):
         return False
-    return bool(re.search(r'over/under|total(?:\s+goals)?|both teams to score|btts|double chance', name))
+    return bool(re.search(
+        r'over/?under|\bo/u\b|total(?:\s+goals)?|both teams to score|btts|double chance',
+        name,
+    ))
 
 
 def _is_count_market(selection: ScoredSelection) -> bool:
@@ -230,7 +234,8 @@ def _is_team_goals_over(selection: ScoredSelection, side: str, line: float) -> b
     name = _name(selection)
     if re.search(r'corner|shot|card|kick|tackle|clean sheet|excluded|exact|btts|both', name):
         return False
-    if not re.search(r'over/under|total|goals?', name):
+    # Sporty shortens Over/Under to O/U on team lines.
+    if not re.search(r'over/?under|\bo/u\b|total|goals?', name):
         return False
     if _line(selection.specifier, selection.selectionName) != line:
         return False
@@ -353,7 +358,7 @@ def _is_goals_ou_market(market: str) -> bool:
     """Match totals / team goals O/U — not corners, shots, cards, kicks, tackles."""
     if re.search(r'corner|shot|card|booking|kick|tackle|clean sheet|excluded|exact|btts|both', market):
         return False
-    return bool(re.search(r'over/under|total(?:\s+goals)?|goals?', market))
+    return bool(re.search(r'over/?under|\bo/u\b|total(?:\s+goals)?|goals?', market))
 
 
 def statsman_market_allowed(market_id: str, market_name: str, specifier: str, outcome_name: str) -> bool:
@@ -389,11 +394,11 @@ def statsman_market_allowed(market_id: str, market_name: str, specifier: str, ou
     line = _line(specifier, outcome_name)
     if (
         line == 0.5 and outcome.startswith('over')
-        and re.search(r'over/under|total|goals?', market)
+        and re.search(r'over/?under|\bo/u\b|total|goals?', market)
         and not re.search(r'corner|shot|card|kick|tackle', market)
         and (
             re.search(r'\b(?:home|away|competitor[12])\b', market)
-            or not re.fullmatch(r'(?:over/?under|total(?:\s+goals)?)', market)
+            or not re.fullmatch(r'(?:over/?under|\bo/u\b|total(?:\s+goals)?)', market)
         )
     ):
         return True
@@ -427,14 +432,30 @@ def statsman_market_allowed(market_id: str, market_name: str, specifier: str, ou
     return False
 
 
+def _book_implied_pct(selection: ScoredSelection) -> float:
+    odds = float(getattr(selection, 'odds', 0) or 0)
+    if odds < 1.01:
+        return 0.0
+    return 100.0 / odds
+
+
 def keep_statsman_pick(selection: ScoredSelection, forecast: Forecast) -> bool:
     """True when this scored outcome may enter a Statsman-gated ticket."""
     if removed_specialty_market(selection.marketId, selection.marketName, selection.selectionName):
         return False
-    if not forecast.covered:
-        return False
     conf = selection.confidence
     side, band = _side_band(forecast)
+
+    # No domestic CSV for this fixture — do not use generic priors for side bands.
+    # Goals/count/exact may still pass when the Sporty price itself clears the floor.
+    if not forecast.covered:
+        if _is_exact_goals(selection):
+            return _book_implied_pct(selection) >= EXACT_FLOOR
+        if _is_goals_market(selection):
+            return _book_implied_pct(selection) >= GOALS_FLOOR
+        if _is_count_market(selection):
+            return _book_implied_pct(selection) >= COUNT_FLOOR
+        return False
 
     if _is_exact_goals(selection):
         return conf >= EXACT_FLOOR
