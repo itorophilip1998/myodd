@@ -442,7 +442,7 @@ class StatsmanPickTests(unittest.TestCase):
         )
         exact = selection(
             marketId='450004', marketName='Excluded Goals', selectionName='2',
-            specifier='', supportedMarket=Market.OTHER, confidence=45, probability=.45,
+            specifier='', supportedMarket=Market.OTHER, confidence=80, probability=.80,
         )
         self.assertTrue(statsman_market_allowed(cards.marketId, cards.marketName, cards.specifier, cards.selectionName))
         self.assertTrue(statsman_market_allowed(exact.marketId, exact.marketName, '', exact.selectionName))
@@ -451,9 +451,14 @@ class StatsmanPickTests(unittest.TestCase):
         self.assertTrue(removed_specialty_market('900622', 'Total goal kicks', 'Over 15.5'))
         self.assertTrue(removed_specialty_market('900614', 'Total tackles', 'Over 20.5'))
         self.assertFalse(statsman_market_allowed('900622', 'Total goal kicks', 'total=15.5', 'Over 15.5'))
+        # Excluded pays on miss — test floor 70% (not the old 42% exact-hit floor).
         self.assertFalse(keep_statsman_pick(selection(
             marketId='450004', marketName='Excluded Goals', selectionName='2',
-            supportedMarket=Market.OTHER, confidence=32, probability=.32,
+            supportedMarket=Market.OTHER, confidence=65, probability=.65,
+        ), fc))
+        self.assertTrue(keep_statsman_pick(selection(
+            marketId='450004', marketName='Excluded Goals', selectionName='2',
+            supportedMarket=Market.OTHER, confidence=75, probability=.75,
         ), fc))
 
     def test_filter_uncovered_keeps_short_goals_only(self):

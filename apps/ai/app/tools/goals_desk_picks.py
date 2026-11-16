@@ -28,6 +28,7 @@ from app.llms.goals_desk_v2 import (
     desk_yes_count,
     goals_desk_probability,
 )
+from app.llms.senior_hygiene import passes_senior_hygiene
 from app.schemas import Market, ScoredSelection
 
 O15_LIST_MIN = 1.09  # keep cheap O1.5 so we can switch to Asian Over 2
@@ -135,6 +136,13 @@ def apply_goals_desk_ticket_filter(pool: list[ScoredSelection]) -> list[ScoredSe
     kept: list[ScoredSelection] = []
     for selections in by_event.values():
         sample = selections[0]
+        if not passes_senior_hygiene(
+            sample.league or '',
+            getattr(sample, 'categoryName', '') or '',
+            home=sample.homeTeam,
+            away=sample.awayTeam,
+        ):
+            continue
         desk = cast_desk(sample.homeTeam, sample.awayTeam, sample.kickoffAt)
         o15 = next((s for s in selections if is_goals_total_over(s, 1.5)), None)
         o20 = next((s for s in selections if is_goals_total_over(s, ASIAN_LINE)), None)

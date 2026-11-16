@@ -155,7 +155,14 @@ export class SlipsService implements OnModuleInit {
       if (input.minimumOdds != null || input.maximumOdds !== undefined) {
         note(`${label} uses mixed ticket odds across ${band.minimum}–${band.maximum}. Requested odds were not applied.`);
       }
-      return { ...config, ...locked, unhandledRequests: notices };
+      // systemConfig defaults kickoffAfter/Before to null — keep the date-picker window.
+      return {
+        ...config,
+        ...locked,
+        kickoffAfter: config.kickoffAfter,
+        kickoffBefore: config.kickoffBefore,
+        unhandledRequests: notices,
+      };
     }
     if (input.riskMode) {
       const band = MODE_ODDS[input.riskMode];

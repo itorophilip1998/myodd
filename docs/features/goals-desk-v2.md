@@ -4,7 +4,7 @@
 
 Ticket the dualman **goals desk v2** books (Zi Wei / Omikuji / Lenormand / Desk) against SportyBet goal totals.
 
-**Flashscore first:** the day board is loaded from Flashscore and desk-cast on Flashscore team names; SportyBet is matched afterward for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`).
+**Flashscore first:** load the Flashscore board, desk-cast on Flashscore team names, then alias-match each eligible game onto SportyBet for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never desk-cast. FS-eligible games missing on SportyBet are reported as misses. **Senior hygiene** refuses youth / FA Trophy / Tercera / Tweede / friendlies (`apps/ai/app/llms/senior_hygiene.py`). Women, Turkish 3. Lig, and German Oberliga are allowed.
 
 ## Pick gates
 
@@ -36,6 +36,7 @@ Defaults to **that calendar day** (Lagos date). The Create match-day control can
 | Layer | Location |
 | --- | --- |
 | Cast / desk | `apps/ai/app/llms/goals_desk_v2.py` |
+| Senior hygiene | `apps/ai/app/llms/senior_hygiene.py` |
 | Pick filter | `apps/ai/app/tools/goals_desk_picks.py` |
 | Lane search | `apps/ai/app/tools/search.py` → `search_goals_desk_plan` |
 | Agent / route | `POST /generate/goals-desk-v2` · `GoalsDeskV2Agent` |

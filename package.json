@@ -1,8 +1,8 @@
 {
   "name": "myodd",
-  "version": "0.2.31",
+  "version": "0.2.32",
   "private": true,
-  "description": "myOdd — SportyBet booking code variations from odds-first scoring",
+  "description": "myOdd \u2014 SportyBet booking code variations from odds-first scoring",
   "scripts": {
     "start": "bash scripts/start.sh",
     "dev": "turbo run dev",

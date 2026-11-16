@@ -8,7 +8,7 @@ Goals (O/U, BTTS, double chance): confidence ≥ 76%
 1X2 side ≥ 66%: that side's win either half
 Corners / shots / SOT / cards: confidence ≥ 76%
 Match shots soft O20.5 / SOT soft O7.5 map ≥ 85% → Sporty line up to +3 (e.g. O21.5–O23.5) allowed
-Exact / excluded goals: confidence ≥ 42% (kept rare — low search priority)
+Exact goals hit: confidence ≥ 42%. Excluded Number of Goals: ≥ 70% on P(total ≠ n) (inverted; low search priority)
 Uncovered leagues: goals/count/exact may pass on book implied odds (≥ floor); side-band markets need covered form.
 Raw 1X2 is never ticketed — only the mapped markets above.
 Tackles and goal kicks are removed from every mode.
@@ -20,6 +20,7 @@ import re
 from app.llms.statsman import (
     COUNT_FLOOR,
     EXACT_FLOOR,
+    EXCLUDED_FLOOR,
     GOALS_FLOOR,
     STRONG_MAP_FLOOR,
     STRONG_SIDE,
@@ -450,7 +451,8 @@ def keep_statsman_pick(selection: ScoredSelection, forecast: Forecast) -> bool:
     # Goals/count/exact may still pass when the Sporty price itself clears the floor.
     if not forecast.covered:
         if _is_exact_goals(selection):
-            return _book_implied_pct(selection) >= EXACT_FLOOR
+            floor = EXCLUDED_FLOOR if re.search(r'\bexcluded\b', _name(selection)) else EXACT_FLOOR
+            return _book_implied_pct(selection) >= floor
         if _is_goals_market(selection):
             return _book_implied_pct(selection) >= GOALS_FLOOR
         if _is_count_market(selection):
@@ -458,7 +460,8 @@ def keep_statsman_pick(selection: ScoredSelection, forecast: Forecast) -> bool:
         return False
 
     if _is_exact_goals(selection):
-        return conf >= EXACT_FLOOR
+        floor = EXCLUDED_FLOOR if re.search(r'\bexcluded\b', _name(selection)) else EXACT_FLOOR
+        return conf >= floor
 
     if _is_goals_market(selection):
         return conf >= GOALS_FLOOR

@@ -22,7 +22,9 @@ HALF_LIFE = 21.0
 SHRINK = 8.0
 GOALS_FLOOR = 76.0
 COUNT_FLOOR = 76.0
-EXACT_FLOOR = 42.0  # Exact / excluded goals — higher than old 30% so they do not flood tickets
+EXACT_FLOOR = 42.0  # True exact-hit lines (rare)
+# Excluded Number of Goals pays when total ≠ n (inverted). Temp test floor at 70%.
+EXCLUDED_FLOOR = 70.0
 TO_SCORE_LO = 58.0
 TO_SCORE_HI = 65.0
 STRONG_SIDE = 66.0
@@ -1079,25 +1081,47 @@ class StatsmanModel:
                 return fc.away_either_half
             return 0.5
 
-        # Exact / excluded goals (exact integer line)
+        # Exact / excluded goals (integer line or n+ band)
         if re.search(r'excluded|exact number of goals|\bexact goals\b', name) and not re.search(
             r'correct score|exact score|half|handicap|player', name
         ):
-            exact = _exact_line(market.specifier, outcome.outcomeName)
+            exact, or_more = _exact_line(market.specifier, outcome.outcomeName)
             if exact is not None:
+                # Sporty "Excluded Number of Goals" pays when the total is NOT that
+                # number/band. Pricing P(hit) made us prefer excluding the mode (worst).
+                exclude_bet = bool(re.search(r'\bexcluded\b', name))
+
+                def _clamp(p: float) -> float:
+                    return max(.001, min(.999, p))
+
                 if side == 'home':
-                    return max(.001, min(.999, _pois(exact, fc.lam)))
+                    p_hit = (
+                        sum(_pois(k, fc.lam) for k in range(exact, 12))
+                        if or_more else _pois(exact, fc.lam)
+                    )
+                    return _clamp(1.0 - p_hit if exclude_bet else p_hit)
                 if side == 'away':
-                    return max(.001, min(.999, _pois(exact, fc.mu)))
+                    p_hit = (
+                        sum(_pois(k, fc.mu) for k in range(exact, 12))
+                        if or_more else _pois(exact, fc.mu)
+                    )
+                    return _clamp(1.0 - p_hit if exclude_bet else p_hit)
                 leftover = re.sub(
                     r'\b(?:excluded|exact|number|of|goals?|total|over|under|team)\b', ' ', name,
                 )
                 if not _is_pure_match_total(name) and re.search(r'[a-z]{3,}', leftover):
                     return 0.5  # club-titled but unresolved
-                return max(.001, min(.999, sum(
-                    _pois(i, fc.lam) * _pois(j, fc.mu)
-                    for i in range(12) for j in range(12) if i + j == exact
-                )))
+                if or_more:
+                    p_hit = sum(
+                        _pois(i, fc.lam) * _pois(j, fc.mu)
+                        for i in range(12) for j in range(12) if i + j >= exact
+                    )
+                else:
+                    p_hit = sum(
+                        _pois(i, fc.lam) * _pois(j, fc.mu)
+                        for i in range(12) for j in range(12) if i + j == exact
+                    )
+                return _clamp(1.0 - p_hit if exclude_bet else p_hit)
 
         # Corners / shots / SOT / cards totals
         if over is not None and line is not None:
@@ -1160,15 +1184,21 @@ class StatsmanModel:
         return max(.001, min(.999, 1 / max(outcome.odds, 1.01)))
 
 
-def _exact_line(specifier: str, outcome_name: str) -> int | None:
+def _exact_line(specifier: str, outcome_name: str) -> tuple[int | None, bool]:
+    """Parse excluded/exact goal line. Returns (n, or_more) for ``n`` or ``n+``."""
+    text = (outcome_name or '').casefold().strip()
     for part in (specifier or '').split('|'):
         if part.startswith('total=') or part.startswith('exact=') or part.startswith('goals='):
             try:
-                return int(float(part.split('=', 1)[1]))
+                return int(float(part.split('=', 1)[1])), False
             except ValueError:
-                return None
+                return None, False
+    # 5+ / 3 or more → band from n upward
+    band = re.search(r'(?:^|\s)(\d+)\s*\+|(\d+)\s*or\s*more', text)
+    if band:
+        return int(band.group(1) or band.group(2)), True
     match = re.search(r'(?:^|\s)(\d+)(?:\s|$)', outcome_name or '')
     if match:
-        return int(match.group(1))
-    match = re.search(r'exact(?:ly)?\s+(\d+)', (outcome_name or '').casefold())
-    return int(match.group(1)) if match else None
+        return int(match.group(1)), False
+    match = re.search(r'exact(?:ly)?\s+(\d+)', text)
+    return (int(match.group(1)), False) if match else (None, False)
