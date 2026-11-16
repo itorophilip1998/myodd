@@ -10,6 +10,7 @@ import re
 
 from app.llms.ggsp import classify_combo, is_clean_select
 from app.llms.national_tournaments import is_national_team_tournament
+from app.llms.senior_hygiene import passes_senior_hygiene
 from app.schemas import Market, ScoredSelection
 
 MAX_LEG_ODDS = 1.30
@@ -116,12 +117,17 @@ def _filter_ggsp(pool: list[ScoredSelection], *, allow_soft: bool) -> list[Score
     kept: list[ScoredSelection] = []
     for selections in by_event.values():
         sample = selections[0]
+        category = getattr(sample, 'categoryName', '') or ''
+        if not passes_senior_hygiene(
+            sample.league or '', category, home=sample.homeTeam, away=sample.awayTeam,
+        ):
+            continue
         # SportyBet: categoryName ≈ country, league ≈ tournament — same blob as FS country+competition.
         if not is_clean_select(
             sample.homeTeam,
             sample.awayTeam,
             sample.league or '',
-            category=getattr(sample, 'categoryName', '') or '',
+            category=category,
             allow_soft=allow_soft,
         ):
             continue

@@ -39,6 +39,10 @@ HARD_SKIP_PATTERNS: tuple[str, ...] = (
     r'\bghana\b.*\b(premier|division one)\b',
     r'\balgeria\b.*\bligue 2\b',
     r'\btunisia\b.*\bligue 2\b',
+    # Soft African pads — Sun 15 Nov 2026 thin O1.5 autopsy
+    r'\bkenya\b',
+    r'\bsenegal\b',
+    r'\bcameroon\b',
     r'\bprimera nacional\b',
     r'\bprimera b metropolitana\b',
     r'\bliga alef\b',

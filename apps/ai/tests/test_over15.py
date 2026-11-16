@@ -60,6 +60,18 @@ class Over15PolicyTests(unittest.TestCase):
         with patch('app.tools.over15_picks.cast_rising', return_value=ineligible):
             self.assertEqual(apply_over15_ticket_filter([make(9, 1.5, 1.18)]), [])
 
+        with patch('app.tools.over15_picks.cast_rising', return_value=eligible):
+            trophy = make(8, 1.5, 1.18).model_copy(update={
+                'league': 'ENGLAND: FA Trophy', 'homeTeam': 'Enfield Town', 'awayTeam': 'Spalding',
+            })
+            women = make(7, 1.5, 1.18).model_copy(update={
+                'league': 'ENGLAND: WSL 2', 'homeTeam': 'Nottingham W', 'awayTeam': 'Leicester W',
+            })
+            self.assertEqual(apply_over15_ticket_filter([trophy]), [])
+            kept_women = apply_over15_ticket_filter([women])
+            self.assertEqual(len(kept_women), 1)
+            self.assertEqual(kept_women[0].eventId, '7')
+
     def test_plan_builds_ten_tickets_in_4_to_6(self):
         pool = [
             selection(event, price, 0.9 / price, market='18', outcome=str(i),

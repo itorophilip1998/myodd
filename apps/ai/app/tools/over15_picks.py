@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from app.llms.senior_hygiene import passes_senior_hygiene
 from app.llms.vedic_o15 import cast_rising, over15_probability, over25_probability
 from app.schemas import Market, ScoredSelection
 
@@ -95,6 +96,13 @@ def apply_over15_ticket_filter(pool: list[ScoredSelection]) -> list[ScoredSelect
     kept: list[ScoredSelection] = []
     for event_id, selections in by_event.items():
         sample = selections[0]
+        if not passes_senior_hygiene(
+            sample.league or '',
+            getattr(sample, 'categoryName', '') or '',
+            home=sample.homeTeam,
+            away=sample.awayTeam,
+        ):
+            continue
         chart = cast_rising(sample.homeTeam, sample.kickoffAt)
         if not chart.eligible:
             continue

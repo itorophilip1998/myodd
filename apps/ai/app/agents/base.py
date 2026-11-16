@@ -98,7 +98,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Over 1.5 Machine kept {len(pool)} Aries-rising Over legs from {before} scored outcomes (O1.5, or O2.5 if O1.5 < 1.11; legs ≤1.25; tickets 4–6; no same-game repeat).',
+                    f'Over 1.5 Machine kept {len(pool)} Aries-rising Over legs from {before} scored outcomes (Flashscore names; senior hygiene; O1.5, or O2.5 if O1.5 < 1.11; legs ≤1.25; tickets 4–6; no same-game repeat).',
                 ],
             })
         elif config.riskMode == 'GOALS_DESK_V2':
@@ -108,7 +108,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Goals Desk v2 kept {len(pool)} Over legs from {before} scored outcomes (O1.5 ≥3 Yes + ZW/OMI/LEN O2.5 pace, skip 吉; O2.5 all-4; O1.5 1.14–1.27, Asian O2 when O1.5 is 1.09–1.13, O2.5 ≤1.60).',
+                    f'Goals Desk v2 kept {len(pool)} Over legs from {before} scored outcomes (Flashscore names; senior hygiene; O1.5 ≥3 Yes + ZW/OMI/LEN O2.5 pace, skip 吉; O2.5 all-4; O1.5 1.14–1.27, Asian O2 when O1.5 is 1.09–1.13, O2.5 ≤1.60).',
                 ],
             })
         elif config.riskMode == 'GGSP_V11':
@@ -118,7 +118,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'GGSP v1.1 kept {len(pool)} CLEAN Over 1.5 legs from {before} scored outcomes (Chaldean roots 7–8; HARD/SOFT league skips; tickets 3–4; no same-game repeat).',
+                    f'GGSP v1.1 kept {len(pool)} CLEAN Over 1.5 legs from {before} scored outcomes (Flashscore names; senior hygiene; Chaldean roots 7–8; HARD/SOFT league skips; tickets 3–4; no same-game repeat).',
                 ],
             })
         elif config.riskMode in STATSMAN_ENGINE_MODES and isinstance(scoring_model, StatsmanModel):
@@ -127,7 +127,7 @@ class ModeAgent:
             config = config.model_copy(update={
                 'unhandledRequests': [
                     *config.unhandledRequests,
-                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals/DC≥76%; team O0.5 at 58–65% fav; team O1.5 at ≥70% fav; 2UP at ≥80% fav; 1·over at ≥66% fav + map≥70%; WEH at ≥66% fav; corners/shots/cards≥76%; excluded≥42% rare; uncovered leagues use book-implied goals/count).',
+                    f'Statsman pick gates kept {len(pool)} of {before} scored outcomes (goals/DC≥76%; team O0.5 at 58–65% fav; team O1.5 at ≥70% fav; 2UP at ≥80% fav; 1·over at ≥66% fav + map≥70%; WEH at ≥66% fav; corners/shots/cards≥76%; excluded≠n ≥70% on P(miss); exact-hit≥42%; uncovered leagues use book-implied goals/count).',
                 ],
             })
         report = await loop.run_in_executor(runtime.executor, generate_report, pool, config, body.originalSelections, body.expandedSearch)

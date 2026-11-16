@@ -152,10 +152,18 @@ it('OVER15_MACHINE plans up to ten 4–6 tickets from day-wide Over/Under listin
   const prisma = { generationJob: { findUniqueOrThrow: vi.fn().mockResolvedValue({ status: 'PENDING' }), update: vi.fn() }, slipGroup: { update: vi.fn() }, trainingEvent: { create: vi.fn() }, $transaction: (ops: unknown[]) => Promise.all(ops) };
   const service = new SlipsService(bookmaker as any, { cacheScores: vi.fn() } as any, ai as any,
     { validate: vi.fn().mockResolvedValue(selections) } as any, prisma as any, {} as any, {} as any);
-  const result = await service.prepareGeneration({ jobId: 'j', groupId: 'g', riskMode: 'OVER15_MACHINE', instruction: 'Create tickets', matchDate: '2099-01-01' });
+  const result = await service.prepareGeneration({
+    jobId: 'j', groupId: 'g', riskMode: 'OVER15_MACHINE', instruction: 'Create tickets',
+    matchDate: '2099-01-01', matchDateEnd: '2099-01-03',
+  });
   expect(result?.config).toMatchObject({ riskMode: 'OVER15_MACHINE', numberOfSlips: 10, minimumOdds: 4, maximumOdds: 6 });
   expect(ai.parse).not.toHaveBeenCalled();
   expect(ai.generate.mock.calls[0][0]).toHaveLength(40);
+  // explicitControls must not wipe the date-picker window before Flashscore-first.
+  expect(ai.generate.mock.calls[0][1]).toMatchObject({
+    kickoffAfter: expect.any(String),
+    kickoffBefore: new Date('2099-01-03T23:00:00.000Z').toISOString(),
+  });
   expect(bookmaker.getFixtures.mock.calls.every(([q]) => q.systemMode === 'OVER15_MACHINE' && q.marketIds.includes('18'))).toBe(true);
 });
 

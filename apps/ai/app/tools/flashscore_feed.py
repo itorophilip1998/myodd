@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import ssl
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ FS_HEADERS = {
 }
 # Prematch + live + finished codes on the daily board
 _STATUS = {'1': 'NS', '2': 'Live', '3': 'FT'}
+_FAILED_OFFSETS: set[int] = set()
 
 
 @dataclass(frozen=True)
@@ -35,12 +37,21 @@ class FlashscoreFixture:
     ab: str
 
 
-def _fetch_raw(offset: int, timeout: float = 45.0) -> str:
+def _fetch_raw(offset: int, timeout: float = 45.0, attempts: int = 3) -> str:
     url = FS_TEMPLATE.format(offset=offset)
     ctx = ssl._create_unverified_context()
-    req = urllib.request.Request(url, headers=FS_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
-        return response.read().decode('utf-8', 'replace')
+    last: BaseException | None = None
+    for attempt in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers=FS_HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+                return response.read().decode('utf-8', 'replace')
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last = exc
+            # Brief backoff — Flashscore ninja is flaky from Docker
+            time.sleep(0.4 * (attempt + 1))
+    assert last is not None
+    raise last
 
 
 @lru_cache(maxsize=16)
@@ -51,7 +62,9 @@ def _cached_day(offset: int, bucket: str) -> tuple[FlashscoreFixture, ...]:
         raw = _fetch_raw(offset)
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         logger.warning('Flashscore feed offset=%s failed: %s', offset, exc)
+        _FAILED_OFFSETS.add(offset)
         return ()
+    _FAILED_OFFSETS.discard(offset)
     return tuple(_parse_feed(raw))
 
 
@@ -99,13 +112,15 @@ def _parse_feed(raw: str) -> list[FlashscoreFixture]:
 
 
 def day_offsets_covering(kickoff_after: datetime, kickoff_before: datetime, *, now: datetime | None = None) -> list[int]:
-    """Flashscore day index relative to today (0=today, 1=tomorrow, -1=yesterday)."""
+    """Flashscore day index relative to today (0=today, 1=tomorrow, -1=yesterday).
+
+    Includes every UTC calendar day that can hold a kickoff in ``[after, before)``.
+    """
     now = now or datetime.now(timezone.utc)
     today = now.astimezone(timezone.utc).date()
     start = kickoff_after.astimezone(timezone.utc).date()
-    # kickoff_before is exclusive end — last included calendar day is the day before
-    end_exclusive = kickoff_before.astimezone(timezone.utc).date()
-    end = end_exclusive - timedelta(days=1)
+    # Exclusive end: last instant still in-range decides the last day board to pull.
+    end = (kickoff_before - timedelta(microseconds=1)).astimezone(timezone.utc).date()
     if end < start:
         end = start
     offsets: list[int] = []
@@ -132,8 +147,9 @@ def fetch_flashscore_window(
     if before.tzinfo is None:
         before = before.replace(tzinfo=timezone.utc)
     bucket = now.strftime('%Y%m%d%H') + str(now.minute // 5)
+    offsets = day_offsets_covering(after, before, now=now)
     fixtures: list[FlashscoreFixture] = []
-    for offset in day_offsets_covering(after, before, now=now):
+    for offset in offsets:
         fixtures.extend(_cached_day(offset, bucket))
     return [
         fixture for fixture in fixtures
@@ -141,5 +157,11 @@ def fetch_flashscore_window(
     ]
 
 
+def flashscore_failed_offsets() -> list[int]:
+    """Offsets that failed on the most recent cache fill (for bridge notices)."""
+    return sorted(_FAILED_OFFSETS)
+
+
 def clear_flashscore_cache() -> None:
     _cached_day.cache_clear()
+    _FAILED_OFFSETS.clear()

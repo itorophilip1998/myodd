@@ -70,6 +70,13 @@ TEAM_ALIASES: dict[str, str] = {
     # Twente + Paphos = 61/7 — "FC Twente" flips to 72/9
     'twente': 'Twente',
     'fc twente': 'Twente',
+    # Common SportyBet shorts that flip Vedic rising / GGSP without Flashscore overlay
+    'man utd': 'Manchester United',
+    'man united': 'Manchester United',
+    'manchester utd': 'Manchester United',
+    'manchester united': 'Manchester United',
+    'man city': 'Manchester City',
+    'manchester city': 'Manchester City',
 }
 
 
