@@ -5,7 +5,7 @@
 **Gematria Goal Signature Protocol** — Chaldean digital-root filter on combined team names for **Over 1.5**.
 
 - **Flashscore first:** load the Flashscore day board, grade CLEAN on Flashscore spellings, then alias-match each CLEAN game onto SportyBet markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never ciphered. Games CLEAN on Flashscore but absent from SportyBet are reported as misses — they cannot be booked.
-- **Senior hygiene:** shared deny for youth / FA Trophy / Tercera / Tweede / friendlies + Kenya / Senegal / Cameroon / Tunisia Ligue 2 (`apps/ai/app/llms/senior_hygiene.py`) — on top of HARD/SOFT. Women, Turkish 3. Lig, German Oberliga, J3, Regionalliga, El Salvador are allowed.
+- **Senior hygiene:** shared deny for youth / FA Trophy / Tercera / Tweede / friendlies + Africa except Egypt/SA first divisions + Czech 3rd/4th / KP + Germany Oberliga/Regionalliga + Italy Serie C/D + Croatia Druga NL + Montenegro Druga Liga + USL Championship (`apps/ai/app/llms/senior_hygiene.py`) — on top of HARD/SOFT. Women, Turkish 3. Lig, J3, El Salvador, USL Super League Women, Serbia Srpska are allowed.
 - **CLEAN Select:** roots **7–8** and tot ∉ {54,62}
 - **v1.1:** HARD (+ SOFT) league exemption map
 - **Names:** SportyBet → Flashscore aliases before the cipher (`apps/ai/app/llms/ggsp_aliases.py`); matched Flashscore rows overwrite SportyBet labels before the cipher

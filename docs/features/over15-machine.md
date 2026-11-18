@@ -4,7 +4,7 @@
 
 Vedic Lahiri whole-sign chart at kickoff for the home ground. Only **Aries rising** games are eligible. Prefer **Over 1.5**; if that price is under **1.11**, take **Over 2.5** instead. Builds up to **10 tickets** at combined odds **4–6**. Each leg **1.10–1.25**.
 
-**Flashscore first:** load the Flashscore board, grade Aries-rising on Flashscore home names, then alias-match each eligible game onto SportyBet for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never graded. FS-eligible games with no SportyBet market are reported as misses. **Senior hygiene** refuses youth / FA Trophy / Tercera / Tweede / friendlies and soft African pads (Kenya, Senegal, Cameroon, Tunisia Ligue 2) — `apps/ai/app/llms/senior_hygiene.py`. Women, Turkish 3. Lig, German Oberliga, J3, Regionalliga, and El Salvador stay allowed.
+**Flashscore first:** load the Flashscore board, grade Aries-rising on Flashscore home names, then alias-match each eligible game onto SportyBet for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never graded. FS-eligible games with no SportyBet market are reported as misses. **Senior hygiene** refuses youth / FA Trophy / Tercera / Tweede / friendlies; Africa except Egypt + South Africa first divisions; Czech 3rd/4th / KP; Germany Oberliga / Regionalliga; Italy Serie C/D; Croatia Druga NL + Montenegro Druga Liga; USL Championship (men) — `apps/ai/app/llms/senior_hygiene.py`. Women, Turkish 3. Lig / 2. Lig, Serbia Srpska, J3, El Salvador, and USL Super League Women stay allowed.
 
 ## Match day
 
