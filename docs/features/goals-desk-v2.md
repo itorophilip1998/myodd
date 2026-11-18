@@ -4,7 +4,7 @@
 
 Ticket the dualman **goals desk v2** books (Zi Wei / Omikuji / Lenormand / Desk) against SportyBet goal totals.
 
-**Flashscore first:** load the Flashscore board, desk-cast on Flashscore team names, then alias-match each eligible game onto SportyBet for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never desk-cast. FS-eligible games missing on SportyBet are reported as misses. **Senior hygiene** refuses youth / FA Trophy / Tercera / Tweede / friendlies (`apps/ai/app/llms/senior_hygiene.py`). Women, Turkish 3. Lig, and German Oberliga are allowed.
+**Flashscore first:** load the Flashscore board, desk-cast on Flashscore team names, then alias-match each eligible game onto SportyBet for Over markets (`apps/ai/app/tools/fs_sporty_bridge.py`). SportyBet-only rows are never desk-cast. FS-eligible games missing on SportyBet are reported as misses. **Senior hygiene** refuses youth / FA Trophy / Tercera / Tweede / friendlies plus the shared soft-pad map in `apps/ai/app/llms/senior_hygiene.py` (Africa except Egypt/SA 1st, Czech 3rd/4th, Germany Oberliga/Regionalliga, Italy Serie C/D, Croatia Druga NL, Montenegro Druga Liga, USL Championship). Women, Turkish 3. Lig, J3, Serbia Srpska, and USL Super League Women are allowed.
 
 ## Pick gates
 
